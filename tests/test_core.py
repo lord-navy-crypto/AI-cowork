@@ -2,7 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_cowork.cursor_supervisor import CursorState, classify_cursor_text
+from ai_cowork.cursor_supervisor import (
+    CursorAction,
+    CursorState,
+    classify_cursor_text,
+    decide_cursor_action,
+)
 from ai_cowork.cooperation import (
     CoordinationSnapshot,
     GitCoordinationMonitor,
@@ -129,6 +134,27 @@ class CoreTests(unittest.TestCase):
             status_ts=100,
         )
         self.assertEqual(state.state, ProtocolState.OWN_WORK_ALLOWED)
+
+    def test_cursor_action_policy_is_conservative(self):
+        self.assertEqual(
+            decide_cursor_action(CursorState.WAITING, True),
+            CursorAction.CLICK_CONTINUE,
+        )
+        self.assertEqual(
+            decide_cursor_action(CursorState.WAITING, False),
+            CursorAction.NONE,
+        )
+        for state in (
+            CursorState.UNKNOWN,
+            CursorState.LOGIN_REQUIRED,
+            CursorState.WORKING,
+            CursorState.READY,
+            CursorState.FAILED,
+        ):
+            self.assertEqual(
+                decide_cursor_action(state, True),
+                CursorAction.NONE,
+            )
 
 
 if __name__ == "__main__":
