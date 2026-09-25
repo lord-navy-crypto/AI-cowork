@@ -519,6 +519,27 @@ def generation_in_progress(app_name: str) -> bool:
         return False
     return False
 
+
+def cancel_generation(app_name: str) -> bool:
+    """Best-effort cancellation for a visibly stuck generation.
+
+    Uses Escape only when an explicit watchdog asks for cancellation.
+    Normal reads never send Escape.
+    """
+    try:
+        activate_app(app_name)
+        time.sleep(0.2)
+        run_osascript(
+            '''
+            tell application "System Events"
+                key code 53
+            end tell
+            '''
+        )
+        return True
+    except Exception:
+        return False
+
 def frontmost_app_name() -> str:
     try:
         app = NSWorkspace.sharedWorkspace().frontmostApplication()
