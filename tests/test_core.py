@@ -234,6 +234,54 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(path.startswith("messages/"))
         self.assertTrue(path.endswith("-cursor-status.md"))
 
+    def test_exact_review_baseline_detects_own_branch_change(self):
+        state = evaluate_protocol_state(
+            agent="chatgpt",
+            own_head="ownNEW",
+            peer_head="peer123",
+            own_ts=999,
+            peer_ts=999,
+            review_ts=999,
+            status_ts=0,
+            reviewed_peer_head="peer123",
+            review_own_head="ownOLD",
+            status_own_head="",
+            review_after_status=True,
+        )
+        self.assertEqual(state.state, ProtocolState.STATUS_REQUIRED)
+
+    def test_exact_review_baseline_allows_unchanged_own_head(self):
+        state = evaluate_protocol_state(
+            agent="cursor",
+            own_head="own123",
+            peer_head="peer123",
+            own_ts=999,
+            peer_ts=999,
+            review_ts=1,
+            status_ts=999,
+            reviewed_peer_head="peer123",
+            review_own_head="own123",
+            status_own_head="old",
+            review_after_status=True,
+        )
+        self.assertEqual(state.state, ProtocolState.OWN_WORK_ALLOWED)
+
+    def test_standard_review_requires_both_heads(self):
+        with self.assertRaises(ValueError):
+            render_coordination_message(
+                "chatgpt",
+                "review",
+                summary="missing heads",
+            )
+
+    def test_standard_status_requires_own_head(self):
+        with self.assertRaises(ValueError):
+            render_coordination_message(
+                "cursor",
+                "status",
+                summary="missing own head",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
