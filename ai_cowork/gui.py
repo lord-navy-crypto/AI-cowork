@@ -181,10 +181,24 @@ class WebControlWindowController(NSObject):
 
     @objc.python_method
     def _validate(self, settings: WebSettings) -> str | None:
-        if not validate_chatgpt_url(settings.chatgpt_url):
-            return "Enter a valid ChatGPT URL beginning with https://chatgpt.com/."
-        if settings.cursor_url and not validate_cursor_url(settings.cursor_url):
-            return "Enter a valid Cursor URL beginning with https://cursor.com/."
+        if settings.chatgpt_supervisor_enabled:
+            if not validate_chatgpt_url(settings.chatgpt_url):
+                return "ChatGPT Supervisor requires a valid https://chatgpt.com/... URL."
+        elif settings.chatgpt_url and not validate_chatgpt_url(settings.chatgpt_url):
+            return "The saved ChatGPT URL is invalid."
+
+        if settings.cursor_supervisor_enabled:
+            if not validate_cursor_url(settings.cursor_url):
+                return "Cursor Supervisor requires a valid https://cursor.com/... URL."
+        elif settings.cursor_url and not validate_cursor_url(settings.cursor_url):
+            return "The saved Cursor URL is invalid."
+
+        if (
+            not settings.chatgpt_supervisor_enabled
+            and not settings.cursor_supervisor_enabled
+            and not settings.cooperation_enabled
+        ):
+            return "Enable at least one module."
         return None
 
     @objc.python_method
