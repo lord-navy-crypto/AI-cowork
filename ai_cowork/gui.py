@@ -279,7 +279,7 @@ class WebControlWindowController(NSObject):
         if self.start_button is not None and not (
             self.runtime and self.runtime.running
         ):
-            self.start_button.setTitle_("Start Web Supervisor")
+            self.start_button.setTitle_("Start Web Runtime")
 
     def windowWillClose_(self, notification):
         if self.runtime and self.runtime.running:
