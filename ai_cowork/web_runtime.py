@@ -10,7 +10,12 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
-from .cursor_supervisor import CursorState, classify_cursor_text
+from .cursor_supervisor import (
+    CursorAction,
+    CursorState,
+    classify_cursor_text,
+    decide_cursor_action,
+)
 
 
 CHATGPT_HOSTS = {"chatgpt.com", "www.chatgpt.com"}
@@ -70,6 +75,7 @@ class WebSettings:
     chatgpt_supervisor_enabled: bool = True
     cursor_supervisor_enabled: bool = True
     cooperation_enabled: bool = True
+    cursor_auto_continue: bool = False
 
 
 class SettingsStore:
@@ -399,6 +405,18 @@ class WebAutomationRuntime:
 
         prompt.press("Enter")
 
+    @staticmethod
+    def _find_cursor_continue_control(page: Page):
+        labels = ("Continue", "Resume")
+        for label in labels:
+            try:
+                button = page.get_by_role("button", name=label, exact=True).first
+                if button.is_visible(timeout=250) and button.is_enabled(timeout=250):
+                    return button
+            except Exception:
+                continue
+        return None
+
     def _tick_cursor(self, force: bool = False) -> None:
         if not self.settings.cursor_supervisor_enabled:
             return
@@ -414,14 +432,38 @@ class WebAutomationRuntime:
         try:
             text = self._page_text(page)
             snapshot = classify_cursor_text(text, page.url)
+
+            continue_control = self._find_cursor_continue_control(page)
+            action = decide_cursor_action(
+                snapshot.state,
+                has_continue_control=continue_control is not None,
+            )
+
+            if (
+                self.settings.cursor_auto_continue
+                and action is CursorAction.CLICK_CONTINUE
+                and continue_control is not None
+            ):
+                continue_control.click()
+                self._status(
+                    "Cursor Supervisor [ACTION]: clicked verified Continue/Resume control."
+                )
+                self._last_cursor_state = snapshot.state
+                return
         except Exception as exc:
             self._status(f"Cursor Supervisor error: {exc}")
             return
 
         if force or snapshot.state != self._last_cursor_state:
             self._last_cursor_state = snapshot.state
+            suffix = (
+                " Auto-continue available."
+                if action is CursorAction.CLICK_CONTINUE
+                else ""
+            )
             self._status(
-                f"Cursor Supervisor [{snapshot.state.value}]: {snapshot.detail}"
+                f"Cursor Supervisor [{snapshot.state.value}]: "
+                f"{snapshot.detail}{suffix}"
             )
 
     def _cursor_summary(self) -> str:
