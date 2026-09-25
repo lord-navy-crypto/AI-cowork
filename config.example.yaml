@@ -10,6 +10,7 @@ agents:
     role: developer_a
     branch: agent/gpt
     enter_to_send: true
+    read_strategy: webarea
 
   claude:
     kind: desktop
@@ -17,6 +18,7 @@ agents:
     role: developer_b
     branch: agent/claude
     enter_to_send: true
+    read_strategy: clipboard
 
   deepseek:
     kind: browser
@@ -25,6 +27,7 @@ agents:
     # Keep one dedicated DeepSeek window/profile open.
     window_title_contains: DeepSeek
     enter_to_send: true
+    read_strategy: ax_tree
 
 safety:
   blocked_fragments:
