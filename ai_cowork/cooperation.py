@@ -44,41 +44,57 @@ def evaluate_protocol_state(
     review_current = (
         reviewed_peer_head == peer_head
         if reviewed_peer_head
-        else review_ts >= peer_ts
+        else review_ts >= peer_ts and review_ts > 0
     )
     status_current = (
         status_own_head == own_head
         if status_own_head
-        else status_ts >= own_ts
+        else status_ts >= own_ts and status_ts > 0
     )
 
     if not review_current:
         return AgentProtocolState(
             agent,
             ProtocolState.REVIEW_REQUIRED,
-            f"{agent} must review the peer branch before doing more own work.",
+            f"{agent} must write a fresh review of the current peer branch before own work.",
             peer_head,
             own_head,
             review_path or "(none)",
             status_path or "(none)",
         )
 
-    if not status_current:
+    # Own-branch commits after the latest review mean work has happened in this
+    # cycle. That cycle is not complete until a status matching the current
+    # own head is appended.
+    if own_ts > review_ts and not status_current:
         return AgentProtocolState(
             agent,
             ProtocolState.STATUS_REQUIRED,
-            f"{agent} has newer own-branch work and must append a status message.",
+            f"{agent} has newer own-branch work and must append a status for the current own head.",
             peer_head,
             own_head,
             review_path or "(none)",
             status_path or "(none)",
         )
 
-    if review_current and (review_ts >= own_ts or reviewed_peer_head == peer_head):
+    # A fresh review newer than the previous status opens exactly one work
+    # cycle. Automatic own-work actions are allowed only in this state.
+    if review_ts > status_ts and review_current:
         return AgentProtocolState(
             agent,
             ProtocolState.OWN_WORK_ALLOWED,
-            f"{agent} has reviewed the current peer state and may work on its owned branch.",
+            f"{agent} completed the fresh peer review gate and may work on its owned branch.",
+            peer_head,
+            own_head,
+            review_path or "(none)",
+            status_path or "(none)",
+        )
+
+    if status_current and status_ts >= review_ts:
+        return AgentProtocolState(
+            agent,
+            ProtocolState.READY,
+            f"{agent} finished the previous cycle; write a new review before starting another work cycle.",
             peer_head,
             own_head,
             review_path or "(none)",
@@ -87,8 +103,8 @@ def evaluate_protocol_state(
 
     return AgentProtocolState(
         agent,
-        ProtocolState.READY,
-        f"{agent} protocol obligations are currently satisfied.",
+        ProtocolState.REVIEW_REQUIRED,
+        f"{agent} needs a fresh review before the next own-work cycle.",
         peer_head,
         own_head,
         review_path or "(none)",
@@ -151,10 +167,7 @@ class ProtocolGate:
             # Cooperation is enabled, so do not act until the first valid
             # coordination snapshot has been fetched.
             return False
-        return state.state in {
-            ProtocolState.OWN_WORK_ALLOWED,
-            ProtocolState.READY,
-        }
+        return state.state is ProtocolState.OWN_WORK_ALLOWED
 
     def block_reason(self, agent: str) -> str:
         with self._lock:
