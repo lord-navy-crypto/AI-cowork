@@ -38,8 +38,21 @@ def evaluate_protocol_state(
     status_ts: int,
     review_path: str = "",
     status_path: str = "",
+    reviewed_peer_head: str = "",
+    status_own_head: str = "",
 ) -> AgentProtocolState:
-    if peer_ts > review_ts:
+    review_current = (
+        reviewed_peer_head == peer_head
+        if reviewed_peer_head
+        else review_ts >= peer_ts
+    )
+    status_current = (
+        status_own_head == own_head
+        if status_own_head
+        else status_ts >= own_ts
+    )
+
+    if not review_current:
         return AgentProtocolState(
             agent,
             ProtocolState.REVIEW_REQUIRED,
@@ -50,7 +63,7 @@ def evaluate_protocol_state(
             status_path or "(none)",
         )
 
-    if own_ts > status_ts:
+    if not status_current:
         return AgentProtocolState(
             agent,
             ProtocolState.STATUS_REQUIRED,
@@ -61,7 +74,7 @@ def evaluate_protocol_state(
             status_path or "(none)",
         )
 
-    if review_ts >= own_ts and review_ts >= peer_ts:
+    if review_current and (review_ts >= own_ts or reviewed_peer_head == peer_head):
         return AgentProtocolState(
             agent,
             ProtocolState.OWN_WORK_ALLOWED,
@@ -221,6 +234,20 @@ class GitCoordinationMonitor:
         matches = sorted(name for name in names if name.endswith(needle))
         return matches[-1] if matches else ""
 
+    def _read_coordination_path(self, path: str) -> str:
+        if not path or path.startswith("("):
+            return ""
+        return self._git("show", f"origin/coordination:{path}")
+
+    @staticmethod
+    def _message_field(content: str, field: str) -> str:
+        prefix = f"- {field}:"
+        for line in (content or "").splitlines():
+            stripped = line.strip()
+            if stripped.startswith(prefix):
+                return stripped[len(prefix):].strip()
+        return ""
+
     def _protocol_state(
         self,
         agent: str,
@@ -237,6 +264,14 @@ class GitCoordinationMonitor:
         status_path = self._latest_matching(names, agent, "status")
         review_ts = self._path_timestamp("origin/coordination", review_path)
         status_ts = self._path_timestamp("origin/coordination", status_path)
+        review_content = self._read_coordination_path(review_path)
+        status_content = self._read_coordination_path(status_path)
+        reviewed_peer_head = self._message_field(
+            review_content, "Peer head reviewed"
+        )
+        status_own_head = self._message_field(
+            status_content, "Own head"
+        )
 
         return evaluate_protocol_state(
             agent=agent,
@@ -248,6 +283,8 @@ class GitCoordinationMonitor:
             status_ts=status_ts,
             review_path=review_path,
             status_path=status_path,
+            reviewed_peer_head=reviewed_peer_head,
+            status_own_head=status_own_head,
         )
 
     def snapshot(self) -> CoordinationSnapshot:
