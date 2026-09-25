@@ -632,3 +632,71 @@ def draft_required_coordination_message(
     raise ValueError(
         "No protocol message is required while OWN_WORK_ALLOWED; work first, then status."
     )
+
+
+class ProtocolDraftStore:
+    """Writes local, non-Git protocol guidance/drafts for each agent."""
+
+    def __init__(self, directory: str | Path = "state/protocol_drafts") -> None:
+        self.directory = Path(directory)
+
+    def write_agent(self, state: AgentProtocolState) -> Path:
+        self.directory.mkdir(parents=True, exist_ok=True)
+        target = self.directory / f"{state.agent}.md"
+
+        lines = [
+            f"# Protocol guidance — {state.agent}",
+            "",
+            f"- State: {state.state.value}",
+            f"- Own head: {state.own_head}",
+            f"- Peer head: {state.peer_head}",
+            "",
+            "## Required next action",
+            "",
+            protocol_next_action(state),
+        ]
+
+        if state.state is not ProtocolState.OWN_WORK_ALLOWED:
+            try:
+                message_path, body = draft_required_coordination_message(
+                    state,
+                    summary=(
+                        "Replace this placeholder with a concise factual summary "
+                        "before publishing to coordination."
+                    ),
+                )
+                lines.extend(
+                    [
+                        "",
+                        "## Suggested coordination message",
+                        "",
+                        f"Target path: `{message_path}`",
+                        "",
+                        "```markdown",
+                        body.rstrip(),
+                        "```",
+                    ]
+                )
+            except ValueError:
+                pass
+
+        temp = target.with_suffix(".md.tmp")
+        temp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        temp.replace(target)
+        return target
+
+    def write_snapshot(
+        self,
+        snapshot: CoordinationSnapshot,
+    ) -> tuple[Path | None, Path | None]:
+        chat_path = (
+            self.write_agent(snapshot.chatgpt_protocol)
+            if snapshot.chatgpt_protocol is not None
+            else None
+        )
+        cursor_path = (
+            self.write_agent(snapshot.cursor_protocol)
+            if snapshot.cursor_protocol is not None
+            else None
+        )
+        return chat_path, cursor_path
