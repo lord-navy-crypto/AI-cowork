@@ -71,7 +71,7 @@ class DesktopAgent(Agent):
 
         # Desktop chat apps can keep focus on sidebar/navigation even when
         # their window is frontmost. Always locate an editable composer before
-        # pasting. This is especially important for Claude, where merely
+        # pasting. This is especially important for Electron editors/chat apps, where merely
         # activating the window does not reliably focus the message box.
         paste_into_chat(self.app_name, prompt, enter=self.enter_to_send)
 
@@ -97,7 +97,7 @@ class DesktopAgent(Agent):
 
         while timeout is None or time.monotonic() - started < timeout:
             if clipboard_mode:
-                # Do not steal focus from Claude while it is visibly thinking
+                # Do not steal focus from a clipboard-read desktop agent while it is visibly thinking
                 # or generating. Use Accessibility as a passive completion
                 # probe and only copy the page after generation has ended.
                 busy = generation_in_progress(self.app_name)
