@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import threading
 import time
 from dataclasses import dataclass, asdict
@@ -84,10 +83,12 @@ class SettingsStore:
 
     def save(self, settings: WebSettings) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
+        temp = self.path.with_suffix(self.path.suffix + ".tmp")
+        temp.write_text(
             json.dumps(asdict(settings), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        temp.replace(self.path)
 
 
 class WebAutomationRuntime:
@@ -243,6 +244,65 @@ class WebAutomationRuntime:
         return None
 
     @staticmethod
+    def _message_state(page: Page) -> tuple[int, int, str]:
+        """Return (user_count, assistant_count, last_assistant_text)."""
+        try:
+            users = page.locator('[data-message-author-role="user"]')
+            assistants = page.locator('[data-message-author-role="assistant"]')
+            user_count = users.count()
+            assistant_count = assistants.count()
+            last_text = ""
+            if assistant_count:
+                try:
+                    last_text = assistants.nth(assistant_count - 1).inner_text(timeout=2_000).strip()
+                except Exception:
+                    last_text = ""
+            return user_count, assistant_count, last_text
+        except Exception:
+            return 0, 0, ""
+
+    @staticmethod
+    def _continuation_acknowledged(
+        page: Page,
+        before: tuple[int, int, str],
+        prompt_text: str,
+    ) -> bool:
+        before_users, before_assistants, before_last = before
+        users, assistants, last_assistant = WebAutomationRuntime._message_state(page)
+
+        if users > before_users or assistants > before_assistants:
+            return True
+        if last_assistant and last_assistant != before_last:
+            return True
+
+        # DOM variants without author-role attributes: verify that the newly
+        # submitted prompt is present in the rendered conversation.
+        try:
+            body = page.locator("body").inner_text(timeout=2_000)
+            if prompt_text.strip() and prompt_text.strip() in body:
+                return True
+        except Exception:
+            pass
+        return False
+
+    @staticmethod
+    def _wait_for_send_ack(
+        page: Page,
+        before: tuple[int, int, str],
+        prompt_text: str,
+        stop_event: threading.Event,
+        timeout: float = 20.0,
+    ) -> bool:
+        deadline = time.monotonic() + timeout
+        while not stop_event.is_set() and time.monotonic() < deadline:
+            if WebAutomationRuntime._chatgpt_generating(page):
+                return True
+            if WebAutomationRuntime._continuation_acknowledged(page, before, prompt_text):
+                return True
+            stop_event.wait(0.5)
+        return False
+
+    @staticmethod
     def _send_prompt(page: Page, text: str) -> None:
         prompt = WebAutomationRuntime._find_prompt(page)
         if prompt is None:
@@ -280,22 +340,33 @@ class WebAutomationRuntime:
             return "Cursor connected — page appears idle/completed."
         return "Cursor connected."
 
-    def _wait_for_generation_cycle(self, page: Page) -> None:
-        start_deadline = time.monotonic() + 20.0
-        saw_generating = False
-        while not self._stop.is_set() and time.monotonic() < start_deadline:
-            if self._chatgpt_generating(page):
-                saw_generating = True
-                break
-            self._stop.wait(0.5)
-
-        if not saw_generating:
-            # Some UI versions transition too quickly to expose the stop button.
-            # A cooldown prevents duplicate continue sends.
-            self._stop.wait(max(4.0, self.settings.idle_confirm_seconds))
+    def _wait_for_generation_cycle(
+        self,
+        page: Page,
+        before: tuple[int, int, str],
+    ) -> None:
+        """Wait for a genuinely new response cycle after our continue prompt."""
+        if not self._wait_for_send_ack(
+            page,
+            before,
+            self.settings.continue_prompt,
+            self._stop,
+            timeout=20.0,
+        ):
+            raise RuntimeError(
+                "Continue was not acknowledged by the ChatGPT page; refusing to send another one."
+            )
 
         idle_since: float | None = None
+        last_state = before
+        saw_response_change = False
+
         while not self._stop.is_set():
+            current_state = self._message_state(page)
+            if current_state != last_state:
+                saw_response_change = True
+                last_state = current_state
+
             if self._chatgpt_generating(page):
                 idle_since = None
                 self._status("ChatGPT Web is working — waiting.")
@@ -303,7 +374,10 @@ class WebAutomationRuntime:
                 now = time.monotonic()
                 if idle_since is None:
                     idle_since = now
-                elif now - idle_since >= self.settings.idle_confirm_seconds:
+                elif (
+                    saw_response_change
+                    and now - idle_since >= self.settings.idle_confirm_seconds
+                ):
                     return
             self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
 
@@ -344,8 +418,9 @@ class WebAutomationRuntime:
                     continue
 
                 self._status("ChatGPT Web is idle — sending continue.")
+                before = self._message_state(page)
                 self._send_prompt(page, self.settings.continue_prompt)
-                self._wait_for_generation_cycle(page)
+                self._wait_for_generation_cycle(page, before)
 
         except Exception as exc:
             self._status(f"Web supervisor error: {exc}")
