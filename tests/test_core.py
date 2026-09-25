@@ -397,6 +397,22 @@ class CoreTests(unittest.TestCase):
             second = events.read_text(encoding="utf-8")
             self.assertEqual(first, second)
 
+    def test_ambiguous_review_status_order_fails_closed(self):
+        state = evaluate_protocol_state(
+            agent="chatgpt",
+            own_head="own123",
+            peer_head="peer123",
+            own_ts=100,
+            peer_ts=100,
+            review_ts=100,
+            status_ts=100,
+            reviewed_peer_head="peer123",
+            review_own_head="own123",
+            status_own_head="own123",
+            review_after_status=None,
+        )
+        self.assertEqual(state.state, ProtocolState.REVIEW_REQUIRED)
+
 
 if __name__ == "__main__":
     unittest.main()
