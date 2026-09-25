@@ -79,3 +79,56 @@ Integration is a separate explicit step after review.
 ## Current product mainline
 
 The repository's `main` branch remains focused on the ChatGPT Supervisor. This future branch is intentionally separate until the GitHub coordination workflow is reliable.
+
+
+## Background service design
+
+AI-cowork should run primarily as a background service, not as a foreground dashboard.
+
+Two independent modules are planned:
+
+### 1. ChatGPT Supervisor
+
+Responsibilities:
+
+- passively read the current ChatGPT conversation state;
+- detect whether generation is still active;
+- wait for confirmed idle;
+- send `continue` using background Accessibility when possible;
+- avoid clipboard and keyboard simulation in the normal path;
+- notify the user when context limits or unrecoverable errors are detected.
+
+The GUI is only an optional control panel.
+
+### 2. Agent Communication
+
+Responsibilities:
+
+- watch `agent/chatgpt`, `agent/cursor`, and `coordination`;
+- require each agent to review the peer branch before starting new work;
+- verify a new coordination review message exists;
+- never relay prose by switching between ChatGPT and Cursor windows;
+- keep historical coordination messages append-only;
+- never allow either agent to write directly to `main`.
+
+Cursor Web does not need to remain visually foregrounded for GitHub communication. GitHub is the communication substrate.
+
+## Foreground policy
+
+Normal background operation must not steal focus.
+
+Allowed order of operations:
+
+1. passive Accessibility / GitHub read;
+2. direct Accessibility write/action;
+3. only if explicitly enabled, a short foreground fallback;
+4. immediately restore the previously frontmost application.
+
+A future status indicator should report which transport was used:
+
+- `BACKGROUND_AX`
+- `GITHUB`
+- `FOREGROUND_FALLBACK`
+- `BLOCKED`
+
+The target end state is that normal operation uses only `BACKGROUND_AX` and `GITHUB`.
