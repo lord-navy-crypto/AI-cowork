@@ -132,6 +132,8 @@ class WebAutomationRuntime:
         self._cursor_page: Page | None = None
         self._last_cursor_state: CursorState | None = None
         self._last_cursor_poll = 0.0
+        self._cursor_failure_count = 0
+        self._cursor_paused_reason: str | None = None
         self._chatgpt_paused_reason: str | None = None
 
     @property
@@ -420,12 +422,54 @@ class WebAutomationRuntime:
                 continue
         return None
 
+    def _recover_cursor_page(self) -> Page | None:
+        if self._context is None or not self.settings.cursor_url:
+            return None
+
+        page = self._cursor_page
+        self._cursor_failure_count += 1
+        attempt = self._cursor_failure_count
+
+        if attempt > 3:
+            self._cursor_paused_reason = "repeated page failures"
+            self.settings.cursor_supervisor_enabled = False
+            self._status(
+                "Cursor Supervisor paused after repeated page failures; "
+                "ChatGPT Supervisor remains independent."
+            )
+            return None
+
+        self._status(f"Cursor Supervisor recovery attempt {attempt}/3.")
+        try:
+            if page is not None and not page.is_closed():
+                page.reload(wait_until="domcontentloaded", timeout=45_000)
+                self._cursor_failure_count = 0
+                return page
+        except Exception:
+            pass
+
+        try:
+            replacement = self._context.new_page()
+            replacement.goto(
+                self.settings.cursor_url,
+                wait_until="domcontentloaded",
+                timeout=60_000,
+            )
+            self._cursor_page = replacement
+            self._cursor_failure_count = 0
+            return replacement
+        except Exception as exc:
+            self._status(f"Cursor Supervisor recovery failed: {exc}")
+            return None
+
     def _tick_cursor(self, force: bool = False) -> None:
         if not self.settings.cursor_supervisor_enabled:
             return
         page = self._cursor_page
-        if page is None:
-            return
+        if page is None or page.is_closed():
+            page = self._recover_cursor_page()
+            if page is None:
+                return
 
         now = time.monotonic()
         if not force and now - self._last_cursor_poll < 5.0:
@@ -435,6 +479,16 @@ class WebAutomationRuntime:
         try:
             text = self._page_text(page)
             snapshot = classify_cursor_text(text, page.url)
+
+            if snapshot.state is CursorState.LOGIN_REQUIRED:
+                self._cursor_paused_reason = "login required"
+                if self.settings.headless:
+                    self.settings.cursor_supervisor_enabled = False
+                    self._status(
+                        "Cursor Supervisor paused: login required. "
+                        "Open/Login Session again; ChatGPT Supervisor remains active."
+                    )
+                    return
 
             continue_control = self._find_cursor_continue_control(page)
             action = decide_cursor_action(
@@ -460,6 +514,7 @@ class WebAutomationRuntime:
                 return
         except Exception as exc:
             self._status(f"Cursor Supervisor error: {exc}")
+            self._recover_cursor_page()
             return
 
         if force or snapshot.state != self._last_cursor_state:
