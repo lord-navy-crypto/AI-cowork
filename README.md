@@ -126,3 +126,35 @@ Desktop/App Accessibility automation is frozen for now. Active development is li
 3. ChatGPT ↔ Cursor Cooperation
 
 See `WEB_ARCHITECTURE.md` for the current design and branch protocol.
+
+
+## Cooperation diagnostics
+
+Show the current gate state for both agents:
+
+```bash
+python main.py protocol
+```
+
+Draft the coordination message currently required by the protocol:
+
+```bash
+python main.py draft-message chatgpt --summary "Reviewed the current Cursor changes."
+python main.py draft-message cursor --summary "Finished and validated the current Cursor work."
+```
+
+Draft generation does not push or modify the coordination branch automatically.
+
+When Cooperation is enabled, automatic web actions are blocked until a valid protocol snapshot is available. Only `OWN_WORK_ALLOWED` permits automatic own-work actions.
+
+## Runtime diagnostics
+
+The controller maintains local crash-friendly diagnostics:
+
+```text
+state/runtime_status.json
+state/events.jsonl
+state/events.1.jsonl
+```
+
+`python main.py doctor` reports the last persisted module states when available.
