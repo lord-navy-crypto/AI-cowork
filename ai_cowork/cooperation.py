@@ -194,6 +194,11 @@ class ProtocolGate:
             self._snapshot = snapshot
             self._snapshot_at = time.monotonic()
 
+    def invalidate(self) -> None:
+        with self._lock:
+            if self._enabled:
+                self._snapshot_at = None
+
     def is_fresh(self) -> bool:
         with self._lock:
             if not self._enabled:
@@ -257,11 +262,13 @@ class GitCoordinationMonitor:
         poll_seconds: float = 10.0,
         on_status: Callable[[str], None] | None = None,
         on_snapshot: Callable[[CoordinationSnapshot], None] | None = None,
+        on_error: Callable[[Exception], None] | None = None,
     ) -> None:
         self.repo_path = Path(repo_path).resolve()
         self.poll_seconds = max(3.0, float(poll_seconds))
         self.on_status = on_status or (lambda _: None)
         self.on_snapshot = on_snapshot or (lambda _: None)
+        self.on_error = on_error or (lambda _: None)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last: CoordinationSnapshot | None = None
@@ -516,7 +523,12 @@ class GitCoordinationMonitor:
                     if message:
                         self.on_status(message)
                 except Exception as exc:
-                    # Cooperation failures are isolated from the browser runtime.
+                    # Cooperation failures are isolated from the browser runtime,
+                    # but any cached protocol permission must be invalidated.
+                    try:
+                        self.on_error(exc)
+                    except Exception:
+                        pass
                     self.on_status(f"Cooperation monitor error: {exc}")
                 self._stop.wait(self.poll_seconds)
         finally:
