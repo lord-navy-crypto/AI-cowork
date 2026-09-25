@@ -487,6 +487,38 @@ def webarea_text(app_name: str) -> str:
     return max(candidates, key=len) if candidates else ""
 
 
+
+def generation_in_progress(app_name: str) -> bool:
+    """Passively detect whether a Chromium/Electron chat is still generating.
+
+    This does not activate the app or touch the clipboard. It first checks
+    AXElementBusy on WebAreas, then looks for generation-stop buttons.
+    """
+    try:
+        for area in _find_role_nodes(app_name, "AXWebArea", max_depth=30, max_nodes=8000):
+            if bool(_attr(area, "AXElementBusy")):
+                return True
+
+        stop_markers = (
+            "stop response",
+            "stop generating",
+            "stop generation",
+            "cancel response",
+            "停止生成",
+            "停止回应",
+            "停止回复",
+        )
+        for button in _find_role_nodes(app_name, "AXButton", max_depth=30, max_nodes=8000):
+            text = " ".join(
+                str(_attr(button, attr) or "")
+                for attr in ("AXTitle", "AXValue", "AXDescription", "AXHelp")
+            ).casefold()
+            if any(marker in text for marker in stop_markers):
+                return True
+    except Exception:
+        return False
+    return False
+
 def frontmost_app_name() -> str:
     try:
         app = NSWorkspace.sharedWorkspace().frontmostApplication()
