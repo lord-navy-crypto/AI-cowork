@@ -159,8 +159,10 @@ def main() -> int:
         return 0
 
     if args.command == "relay":
-        print("===== GPT ROUND 1 =====")
+        print("[relay] GPT round 1: sending + waiting...", flush=True)
         gpt_reply = gpt.send_and_read(args.message, timeout=args.timeout)
+        print("[relay] GPT round 1: complete", flush=True)
+        print("===== GPT ROUND 1 =====")
         print(gpt_reply)
 
         claude_prompt = (
@@ -169,8 +171,10 @@ def main() -> int:
             "Identify errors, omissions, disagreements, and concrete improvements.\n\n"
             "CHATGPT RESPONSE:\n" + gpt_reply
         )
-        print("\n===== CLAUDE REVIEW =====")
+        print("[relay] Claude review: sending + waiting...", flush=True)
         claude_reply = claude.send_and_read(claude_prompt, timeout=args.timeout)
+        print("[relay] Claude review: complete", flush=True)
+        print("\n===== CLAUDE REVIEW =====")
         print(claude_reply)
 
         gpt_followup = (
@@ -178,8 +182,10 @@ def main() -> int:
             "accept only well-supported suggestions, correct any mistakes, and produce the "
             "next improved result.\n\nCLAUDE REVIEW:\n" + claude_reply
         )
-        print("\n===== GPT ROUND 2 =====")
+        print("[relay] GPT round 2: sending + waiting...", flush=True)
         final_reply = gpt.send_and_read(gpt_followup, timeout=args.timeout)
+        print("[relay] GPT round 2: complete", flush=True)
+        print("\n===== GPT ROUND 2 =====")
         print(final_reply)
         return 0
 
