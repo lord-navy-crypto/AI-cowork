@@ -197,27 +197,33 @@ def run_supervisor() -> int:
         return 2
 
     state_store = RuntimeStateStore()
-    state_store.mark_started("cli")
     protocol_gate = ProtocolGate()
     protocol_drafts = ProtocolDraftStore()
     if settings.cooperation_enabled:
         protocol_gate.enable()
 
+    state_store.mark_started("cli")
     runtime = None
     web_enabled = (
         settings.chatgpt_supervisor_enabled
         or settings.cursor_supervisor_enabled
     )
-    if web_enabled:
-        runtime = WebAutomationRuntime(
-            settings,
-            on_status=lambda message: (
-                state_store.update(classify_status_message(message), message),
-                print(f"[web] {message}", flush=True),
-            )[-1],
-            protocol_gate=protocol_gate,
-        )
-        runtime.start()
+    try:
+        if web_enabled:
+            runtime = WebAutomationRuntime(
+                settings,
+                on_status=lambda message: (
+                    state_store.update(classify_status_message(message), message),
+                    print(f"[web] {message}", flush=True),
+                )[-1],
+                protocol_gate=protocol_gate,
+            )
+            runtime.start()
+    except Exception as exc:
+        protocol_gate.disable()
+        state_store.mark_stopped(f"start error: {exc}")
+        print(f"Runtime start failed: {exc}")
+        return 2
 
     cooperation = None
     if settings.cooperation_enabled:
@@ -225,16 +231,24 @@ def run_supervisor() -> int:
             protocol_gate.update(snapshot)
             protocol_drafts.write_snapshot(snapshot)
 
-        cooperation = GitCoordinationMonitor(
-            ".",
-            poll_seconds=10.0,
-            on_status=lambda message: (
-                state_store.update("cooperation", message),
-                print(f"[cooperation] {message}", flush=True),
-            )[-1],
-            on_snapshot=handle_snapshot,
-        )
-        cooperation.start()
+        try:
+            cooperation = GitCoordinationMonitor(
+                ".",
+                poll_seconds=10.0,
+                on_status=lambda message: (
+                    state_store.update("cooperation", message),
+                    print(f"[cooperation] {message}", flush=True),
+                )[-1],
+                on_snapshot=handle_snapshot,
+            )
+            cooperation.start()
+        except Exception as exc:
+            if runtime is not None:
+                runtime.stop()
+            protocol_gate.disable()
+            state_store.mark_stopped(f"cooperation start error: {exc}")
+            print(f"Cooperation start failed: {exc}")
+            return 2
     try:
         while (
             (runtime is not None and runtime.running)
