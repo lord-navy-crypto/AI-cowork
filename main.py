@@ -32,6 +32,8 @@ def build_chatgpt(cfg: dict) -> DesktopAgent:
         enter_to_send=True,
         events=EventLog(),
         read_strategy=item.get("read_strategy", "webarea"),
+        background_preferred=bool(item.get("background_preferred", True)),
+        allow_foreground_fallback=bool(item.get("allow_foreground_fallback", True)),
     )
 
 
