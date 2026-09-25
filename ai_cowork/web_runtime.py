@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from dataclasses import dataclass, asdict
@@ -102,12 +103,20 @@ class SettingsStore:
 
     def save(self, settings: WebSettings) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(self.path.parent, 0o700)
+        except OSError:
+            pass
         temp = self.path.with_suffix(self.path.suffix + ".tmp")
         temp.write_text(
             json.dumps(asdict(settings), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         temp.replace(self.path)
+        try:
+            os.chmod(self.path, 0o600)
+        except OSError:
+            pass
 
 
 class WebAutomationRuntime:
@@ -181,6 +190,10 @@ class WebAutomationRuntime:
     def _launch(self) -> None:
         profile = Path(self.settings.profile_dir).expanduser().resolve()
         profile.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(profile, 0o700)
+        except OSError:
+            pass
         self._playwright = sync_playwright().start()
         self._context = self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(profile),
