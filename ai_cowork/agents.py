@@ -22,7 +22,7 @@ class Agent(ABC):
     def read_snapshot(self) -> str: ...
 
     @abstractmethod
-    def wait_until_stable(self, timeout: float = 300) -> str: ...
+    def wait_until_stable(self, timeout: float | None = None) -> str: ...
 
 
 def _extract_delta(before: str, after: str) -> str:
@@ -83,7 +83,7 @@ class DesktopAgent(Agent):
             return value or text_snapshot(self.app_name)
         return text_snapshot(self.app_name)
 
-    def wait_until_stable(self, timeout: float = 300) -> str:
+    def wait_until_stable(self, timeout: float | None = None) -> str:
         started = time.monotonic()
         previous = ""
         stable_since: float | None = None
@@ -100,7 +100,7 @@ class DesktopAgent(Agent):
             time.sleep(1.5)
             interval = max(interval, 1.5)
 
-        while time.monotonic() - started < timeout:
+        while timeout is None or time.monotonic() - started < timeout:
             current = self.read_snapshot()
 
             if current and current != self._baseline:
@@ -141,7 +141,7 @@ class DesktopAgent(Agent):
 
             time.sleep(interval)
 
-        raise TimeoutError(f"{self.name} output did not become stable")
+        raise TimeoutError(f"{self.name} output did not become stable within {timeout} seconds")
 
     def _extract_response(self, current: str) -> str:
         # In flattened WebArea text the prompt itself is normally echoed into
@@ -155,7 +155,7 @@ class DesktopAgent(Agent):
                     return tail
         return _extract_delta(self._baseline, current)
 
-    def send_and_read(self, prompt: str, timeout: float = 300) -> str:
+    def send_and_read(self, prompt: str, timeout: float | None = None) -> str:
         self.send(prompt)
         return self.wait_until_stable(timeout=timeout)
 
