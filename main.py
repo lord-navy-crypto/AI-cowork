@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import yaml
@@ -111,9 +112,8 @@ def main() -> int:
 
     ping_p = sub.add_parser("ping-pong")
     ping_p.add_argument("message")
-    ping_p.add_argument("--start", choices=["chatgpt", "claude"], default="chatgpt")
-    ping_p.add_argument("--turns", type=int, default=0,
-                        help="Number of AI turns; 0 means continue until Ctrl+C.")
+    ping_p.add_argument("--rounds", type=int, default=0,
+                        help="Number of barrier rounds; 0 means continue until Ctrl+C.")
 
     run_p = sub.add_parser("run")
     run_p.add_argument("--dry-run", action="store_true")
@@ -171,47 +171,78 @@ def main() -> int:
         return 0
 
     if args.command == "ping-pong":
-        current_name = args.start
-        current = mapping[current_name]
-        other_name = "claude" if current_name == "chatgpt" else "chatgpt"
-        other = mapping[other_name]
-        prompt = args.message
-        turn = 0
+        prompts = {
+            "chatgpt": args.message,
+            "claude": args.message,
+        }
+        round_index = 0
 
         print(
-            f"[ping-pong] starting with {current_name}; "
-            + ("continuous mode" if args.turns == 0 else f"{args.turns} turns"),
+            "[ping-pong] barrier mode: both AIs must finish before any handoff",
             flush=True,
         )
 
-        while args.turns == 0 or turn < args.turns:
-            turn += 1
-            print(f"[ping-pong] turn {turn}: waiting for {current_name}...", flush=True)
-            reply = current.send_and_read(prompt, timeout=None)
-            print(f"[ping-pong] turn {turn}: {current_name} complete", flush=True)
-            print(f"===== {current_name.upper()} HANDOFF =====")
-            print(reply)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            while args.rounds == 0 or round_index < args.rounds:
+                round_index += 1
+                print(f"[ping-pong] round {round_index}: sending both tasks...", flush=True)
 
-            if args.turns != 0 and turn >= args.turns:
-                break
+                # Start both work turns before waiting on either result.
+                gpt.send(prompts["chatgpt"])
+                claude.send(prompts["claude"])
 
-            prompt = (
-                "DEVELOPER HANDOFF\n\n"
-                f"The other developer ({current_name}) has completed a work turn. "
-                "Continue the engineering work from this handoff. "
-                "Inspect the repository and current branch state before editing. "
-                "If the handoff names a branch, continue on that branch; otherwise stay on "
-                "the branch you are already using. Do not merge main and do not force push. "
-                "Do real implementation/testing, not just commentary. "
-                "When your turn is genuinely complete, reply with a concise WORK REPORT "
-                "including: branch, completed work, files changed, tests, problems, commit, "
-                "and the next useful step for the other developer.\n\n"
-                "OTHER DEVELOPER HANDOFF:\n"
-                + reply
-            )
+                print(
+                    f"[ping-pong] round {round_index}: both working; waiting for BOTH to complete...",
+                    flush=True,
+                )
 
-            current_name, other_name = other_name, current_name
-            current, other = other, current
+                futures = {
+                    "chatgpt": pool.submit(gpt.wait_until_stable, None),
+                    "claude": pool.submit(claude.wait_until_stable, None),
+                }
+                replies = {}
+                for name in ("chatgpt", "claude"):
+                    replies[name] = futures[name].result()
+                    print(
+                        f"[ping-pong] round {round_index}: {name} READY; "
+                        "handoff blocked until the other side is also READY",
+                        flush=True,
+                    )
+
+                print(
+                    f"[ping-pong] round {round_index}: BARRIER OPEN — both complete",
+                    flush=True,
+                )
+                print("===== CHATGPT WORK REPORT =====")
+                print(replies["chatgpt"])
+                print("===== CLAUDE WORK REPORT =====")
+                print(replies["claude"])
+
+                if args.rounds != 0 and round_index >= args.rounds:
+                    break
+
+                prompts["chatgpt"] = (
+                    "DEVELOPER HANDOFF FROM CLAUDE\n\n"
+                    "Claude has completed its work round. Continue engineering work using "
+                    "this report as context. Inspect the repository/branch before editing. "
+                    "Do real implementation and testing. Do not merge main or force push. "
+                    "When genuinely complete, reply with a concise WORK REPORT containing "
+                    "branch, completed work, files changed, tests, problems, commit, and "
+                    "the next useful step.\n\n"
+                    "CLAUDE REPORT:\n"
+                    + replies["claude"]
+                )
+                prompts["claude"] = (
+                    "DEVELOPER HANDOFF FROM CHATGPT\n\n"
+                    "ChatGPT has completed its work round. Continue engineering work using "
+                    "this report as context. Inspect the repository/branch before editing. "
+                    "Do real implementation and testing. Do not merge main or force push. "
+                    "When genuinely complete, reply with a concise WORK REPORT containing "
+                    "branch, completed work, files changed, tests, problems, commit, and "
+                    "the next useful step.\n\n"
+                    "CHATGPT REPORT:\n"
+                    + replies["chatgpt"]
+                )
 
         return 0
 
