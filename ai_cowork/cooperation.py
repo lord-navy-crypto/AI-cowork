@@ -4,8 +4,27 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Callable
+
+
+class ProtocolState(str, Enum):
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    OWN_WORK_ALLOWED = "OWN_WORK_ALLOWED"
+    STATUS_REQUIRED = "STATUS_REQUIRED"
+    READY = "READY"
+
+
+@dataclass(frozen=True)
+class AgentProtocolState:
+    agent: str
+    state: ProtocolState
+    detail: str
+    peer_head: str
+    own_head: str
+    latest_review: str
+    latest_status: str
 
 
 @dataclass(frozen=True)
@@ -14,10 +33,12 @@ class CoordinationSnapshot:
     cursor_head: str
     coordination_head: str
     latest_message: str
+    chatgpt_protocol: AgentProtocolState | None = None
+    cursor_protocol: AgentProtocolState | None = None
 
 
 class GitCoordinationMonitor:
-    """Read-only GitHub coordination monitor using the repository's existing git remote."""
+    """GitHub-native protocol monitor using the repository's existing git remote."""
 
     def __init__(
         self,
@@ -63,6 +84,84 @@ class GitCoordinationMonitor:
             raise RuntimeError(result.stderr.strip() or "git command failed")
         return result.stdout.strip()
 
+    def _branch_timestamp(self, branch: str) -> int:
+        raw = self._git("log", "-1", "--format=%ct", branch)
+        return int(raw or "0")
+
+    def _path_timestamp(self, branch: str, path: str) -> int:
+        if not path or path.startswith("("):
+            return 0
+        raw = self._git("log", "-1", "--format=%ct", branch, "--", path)
+        return int(raw or "0")
+
+    @staticmethod
+    def _latest_matching(names: list[str], agent: str, kind: str) -> str:
+        needle = f"-{agent}-{kind}.md"
+        matches = sorted(name for name in names if name.endswith(needle))
+        return matches[-1] if matches else ""
+
+    def _protocol_state(
+        self,
+        agent: str,
+        own_branch: str,
+        peer_branch: str,
+        names: list[str],
+    ) -> AgentProtocolState:
+        own_head = self._git("rev-parse", "--short=12", own_branch)
+        peer_head = self._git("rev-parse", "--short=12", peer_branch)
+        own_ts = self._branch_timestamp(own_branch)
+        peer_ts = self._branch_timestamp(peer_branch)
+
+        review_path = self._latest_matching(names, agent, "review")
+        status_path = self._latest_matching(names, agent, "status")
+        review_ts = self._path_timestamp("origin/coordination", review_path)
+        status_ts = self._path_timestamp("origin/coordination", status_path)
+
+        if peer_ts > review_ts:
+            return AgentProtocolState(
+                agent,
+                ProtocolState.REVIEW_REQUIRED,
+                f"{agent} must review the peer branch before doing more own work.",
+                peer_head,
+                own_head,
+                review_path or "(none)",
+                status_path or "(none)",
+            )
+
+        if own_ts > status_ts:
+            return AgentProtocolState(
+                agent,
+                ProtocolState.STATUS_REQUIRED,
+                f"{agent} has newer own-branch work and must append a status message.",
+                peer_head,
+                own_head,
+                review_path or "(none)",
+                status_path or "(none)",
+            )
+
+        # A review newer than the latest own work means the start-of-run gate is
+        # satisfied and the agent may begin/continue its own branch work.
+        if review_ts >= own_ts and review_ts >= peer_ts:
+            return AgentProtocolState(
+                agent,
+                ProtocolState.OWN_WORK_ALLOWED,
+                f"{agent} has reviewed the current peer state and may work on its owned branch.",
+                peer_head,
+                own_head,
+                review_path or "(none)",
+                status_path or "(none)",
+            )
+
+        return AgentProtocolState(
+            agent,
+            ProtocolState.READY,
+            f"{agent} protocol obligations are currently satisfied.",
+            peer_head,
+            own_head,
+            review_path or "(none)",
+            status_path or "(none)",
+        )
+
     def snapshot(self) -> CoordinationSnapshot:
         self._git(
             "fetch",
@@ -83,20 +182,49 @@ class GitCoordinationMonitor:
             "origin/coordination",
             "messages",
         ).splitlines()
-        markdown = sorted(name for name in names if name.endswith(".md") and not name.endswith("README.md"))
+        markdown = sorted(
+            name
+            for name in names
+            if name.endswith(".md") and not name.endswith("README.md")
+        )
         latest = markdown[-1] if markdown else "(no coordination messages yet)"
-        return CoordinationSnapshot(chatgpt, cursor, coord, latest)
+
+        chatgpt_protocol = self._protocol_state(
+            "chatgpt",
+            "origin/agent/chatgpt",
+            "origin/agent/cursor",
+            markdown,
+        )
+        cursor_protocol = self._protocol_state(
+            "cursor",
+            "origin/agent/cursor",
+            "origin/agent/chatgpt",
+            markdown,
+        )
+
+        return CoordinationSnapshot(
+            chatgpt,
+            cursor,
+            coord,
+            latest,
+            chatgpt_protocol,
+            cursor_protocol,
+        )
 
     def _describe_change(
         self,
         previous: CoordinationSnapshot | None,
         current: CoordinationSnapshot,
     ) -> str:
+        protocol = (
+            f"ChatGPT={current.chatgpt_protocol.state.value if current.chatgpt_protocol else 'UNKNOWN'}, "
+            f"Cursor={current.cursor_protocol.state.value if current.cursor_protocol else 'UNKNOWN'}"
+        )
         if previous is None:
             return (
                 "Cooperation connected — "
                 f"ChatGPT {current.chatgpt_head}, Cursor {current.cursor_head}, "
-                f"latest {current.latest_message}."
+                f"latest {current.latest_message}; {protocol}."
             )
 
         changed: list[str] = []
@@ -106,6 +234,18 @@ class GitCoordinationMonitor:
             changed.append("Cursor branch updated")
         if current.coordination_head != previous.coordination_head:
             changed.append(f"coordination updated ({current.latest_message})")
+
+        previous_states = (
+            previous.chatgpt_protocol.state if previous.chatgpt_protocol else None,
+            previous.cursor_protocol.state if previous.cursor_protocol else None,
+        )
+        current_states = (
+            current.chatgpt_protocol.state if current.chatgpt_protocol else None,
+            current.cursor_protocol.state if current.cursor_protocol else None,
+        )
+        if current_states != previous_states:
+            changed.append(f"protocol {protocol}")
+
         if not changed:
             return ""
         return "Cooperation: " + "; ".join(changed) + "."
@@ -120,6 +260,7 @@ class GitCoordinationMonitor:
                     if message:
                         self.on_status(message)
                 except Exception as exc:
+                    # Cooperation failures are isolated from the browser runtime.
                     self.on_status(f"Cooperation monitor error: {exc}")
                 self._stop.wait(self.poll_seconds)
         finally:
