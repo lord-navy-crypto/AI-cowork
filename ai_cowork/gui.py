@@ -17,6 +17,7 @@ from AppKit import (
 from Foundation import NSObject
 
 from .cooperation import GitCoordinationMonitor, ProtocolGate
+from .runtime_state import RuntimeStateStore, classify_status_message
 from .web_runtime import (
     SettingsStore,
     WebAutomationRuntime,
@@ -49,6 +50,7 @@ class WebControlWindowController(NSObject):
         self.cursor_auto_continue_check = None
         self.cooperation_monitor = None
         self.protocol_gate = ProtocolGate()
+        self.runtime_state = RuntimeStateStore()
         return self
 
     @objc.python_method
@@ -309,12 +311,14 @@ class WebControlWindowController(NSObject):
 
     @objc.python_method
     def status_from_worker(self, message: str) -> None:
+        self.runtime_state.update(classify_status_message(message), message)
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "updateStatus:", message, False
         )
 
     @objc.python_method
     def cooperation_status_from_worker(self, message: str) -> None:
+        self.runtime_state.update("cooperation", message)
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "updateCooperationStatus:", message, False
         )
@@ -324,6 +328,7 @@ class WebControlWindowController(NSObject):
             self.cooperation_status_label.setStringValue_(message)
 
     def updateStatus_(self, message):
+        self.runtime_state.update(classify_status_message(message), str(message))
         if self.status_label is not None:
             self.status_label.setStringValue_(f"System: {message}")
         if self.chatgpt_status_label is not None and message.startswith("ChatGPT"):
