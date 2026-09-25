@@ -15,6 +15,7 @@ from ai_cowork.macos import (
     find_pid,
     formatted_tree,
     system_events_probe,
+    accessibility_debug,
 )
 from ai_cowork.state import RuntimeStore
 
@@ -78,6 +79,9 @@ def main() -> int:
     probe_p = sub.add_parser("probe")
     probe_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
 
+    debug_p = sub.add_parser("debug-ax")
+    debug_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+
     send_p = sub.add_parser("send")
     send_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
     send_p.add_argument("message")
@@ -106,6 +110,10 @@ def main() -> int:
         probe = system_events_probe(item["app_name"])
         print(f"system_events_ok={probe['ok']}")
         print(probe["output"])
+        return 0
+
+    if args.command == "debug-ax":
+        print(accessibility_debug(mapping[args.agent].app_name))
         return 0
 
     if args.command == "send":
