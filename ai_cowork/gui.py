@@ -310,7 +310,7 @@ class WebControlWindowController(NSObject):
                     poll_seconds=10.0,
                     on_status=self.cooperation_status_from_worker,
                     on_snapshot=self.cooperation_snapshot_from_worker,
-                    on_error=lambda exc: self.protocol_gate.invalidate(),
+                    on_error=self.cooperation_error_from_worker,
                 )
                 self.cooperation_monitor.start()
 
@@ -339,6 +339,15 @@ class WebControlWindowController(NSObject):
         self.runtime_state.update("cooperation", message)
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "updateCooperationStatus:", message, False
+        )
+
+    @objc.python_method
+    def cooperation_error_from_worker(self, exc) -> None:
+        self.protocol_gate.invalidate()
+        message = f"Gates: STALE/INVALID — {exc}"
+        self.runtime_state.update("cooperation", message)
+        self.performSelectorOnMainThread_withObject_waitUntilDone_(
+            "updateGateStatus:", message, False
         )
 
     @objc.python_method
