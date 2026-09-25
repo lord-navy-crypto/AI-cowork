@@ -259,7 +259,6 @@ class WebControlWindowController(NSObject):
             self.start_button.setTitle_("Stop Session")
             self.updateStatus_("Opening dedicated browser for login/connection only.")
         except Exception as exc:
-            self.runtime_state.mark_stopped(f"start error: {exc}")
             self.updateStatus_(f"Start error: {exc}")
 
     @objc.IBAction
@@ -317,6 +316,7 @@ class WebControlWindowController(NSObject):
             else:
                 self.updateStatus_("Cooperation monitor starting without Chromium.")
         except Exception as exc:
+            self.runtime_state.mark_stopped(f"start error: {exc}")
             self.updateStatus_(f"Start error: {exc}")
 
     @objc.python_method
