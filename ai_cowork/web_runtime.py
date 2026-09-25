@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
+from .cursor_supervisor import CursorState, classify_cursor_text
+
 
 CHATGPT_HOSTS = {"chatgpt.com", "www.chatgpt.com"}
 CURSOR_HOSTS = {"cursor.com", "www.cursor.com"}
@@ -65,6 +67,9 @@ class WebSettings:
     poll_interval_seconds: float = 1.0
     headless: bool = False
     profile_dir: str = "state/browser-profile"
+    chatgpt_supervisor_enabled: bool = True
+    cursor_supervisor_enabled: bool = True
+    cooperation_enabled: bool = True
 
 
 class SettingsStore:
@@ -116,6 +121,8 @@ class WebAutomationRuntime:
         self._context: BrowserContext | None = None
         self._chatgpt_page: Page | None = None
         self._cursor_page: Page | None = None
+        self._last_cursor_state: CursorState | None = None
+        self._last_cursor_poll = 0.0
 
     @property
     def running(self) -> bool:
@@ -361,19 +368,39 @@ class WebAutomationRuntime:
 
         prompt.press("Enter")
 
+    def _tick_cursor(self, force: bool = False) -> None:
+        if not self.settings.cursor_supervisor_enabled:
+            return
+        page = self._cursor_page
+        if page is None:
+            return
+
+        now = time.monotonic()
+        if not force and now - self._last_cursor_poll < 5.0:
+            return
+        self._last_cursor_poll = now
+
+        try:
+            text = self._page_text(page)
+            snapshot = classify_cursor_text(text, page.url)
+        except Exception as exc:
+            self._status(f"Cursor Supervisor error: {exc}")
+            return
+
+        if force or snapshot.state != self._last_cursor_state:
+            self._last_cursor_state = snapshot.state
+            self._status(
+                f"Cursor Supervisor [{snapshot.state.value}]: {snapshot.detail}"
+            )
+
     def _cursor_summary(self) -> str:
         page = self._cursor_page
         if page is None:
             return "Cursor URL not configured."
         if self._login_required(page):
             return "Cursor login required in the dedicated browser."
-        text = self._page_text(page)
-        lowered = text.casefold()
-        if any(word in lowered for word in ("running", "working", "agent is working", "stop agent")):
-            return "Cursor connected — agent appears active."
-        if any(word in lowered for word in ("completed", "done", "finished")):
-            return "Cursor connected — page appears idle/completed."
-        return "Cursor connected."
+        snapshot = classify_cursor_text(self._page_text(page), page.url)
+        return f"Cursor Supervisor [{snapshot.state.value}]: {snapshot.detail}"
 
     def _wait_for_generation_cycle(
         self,
@@ -397,6 +424,7 @@ class WebAutomationRuntime:
         saw_assistant_change = False
 
         while not self._stop.is_set():
+            self._tick_cursor()
             _, assistant_count, assistant_last = self._message_state(page)
             if (
                 assistant_count > before_assistants
@@ -466,6 +494,7 @@ class WebAutomationRuntime:
                 return
 
             self._status(self._cursor_summary())
+            self._tick_cursor(force=True)
             if not self.supervise:
                 self._status("Dedicated web session connected — login state will be saved locally.")
                 while not self._stop.is_set():
@@ -476,6 +505,11 @@ class WebAutomationRuntime:
 
             recovery_attempts = 0
             while not self._stop.is_set():
+                self._tick_cursor()
+                if not self.settings.chatgpt_supervisor_enabled:
+                    self._status("ChatGPT Supervisor paused; Cursor monitoring remains active.")
+                    self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
+                    continue
                 try:
                     if page.is_closed():
                         raise RuntimeError("ChatGPT page was closed.")
