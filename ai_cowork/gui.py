@@ -31,6 +31,7 @@ class SupervisorWindowController(NSObject):
         self.supervisor.on_status = self.status_from_worker
         return self
 
+    @objc.python_method
     def build(self) -> None:
         style = (
             NSWindowStyleMaskTitled
@@ -79,6 +80,7 @@ class SupervisorWindowController(NSObject):
 
         self.window.makeKeyAndOrderFront_(None)
 
+    @objc.python_method
     def _label(self, text: str, x: float, y: float, w: float, h: float, size: float):
         label = NSTextField.alloc().initWithFrame_(NSMakeRect(x, y, w, h))
         label.setStringValue_(text)
@@ -89,6 +91,7 @@ class SupervisorWindowController(NSObject):
         label.setFont_(label.font().fontWithSize_(size))
         return label
 
+    @objc.python_method
     def _button(self, title: str, x: float, y: float, w: float, h: float, action: str):
         button = NSButton.alloc().initWithFrame_(NSMakeRect(x, y, w, h))
         button.setTitle_(title)
@@ -112,6 +115,7 @@ class SupervisorWindowController(NSObject):
         self.updateStatus_("Under development — preserved on the future branch.")
         notify_user("AI-cowork", "This feature is under development.")
 
+    @objc.python_method
     def status_from_worker(self, message: str) -> None:
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "updateStatus:", message, False
