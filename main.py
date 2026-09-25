@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 from ai_cowork.cooperation import GitCoordinationMonitor, ProtocolGate
+from ai_cowork.runtime_state import RuntimeStateStore, classify_status_message
 from ai_cowork.web_runtime import (
     SettingsStore,
     WebAutomationRuntime,
@@ -41,6 +42,7 @@ def doctor() -> int:
         ok = False
 
     settings = SettingsStore().load()
+    runtime_state = RuntimeStateStore().load()
     chat_ok = validate_chatgpt_url(settings.chatgpt_url)
     cursor_ok = validate_cursor_url(settings.cursor_url)
     print(
@@ -71,6 +73,11 @@ def doctor() -> int:
         "Cursor verified auto-continue: "
         + ("enabled" if settings.cursor_auto_continue else "disabled")
     )
+    if runtime_state.updated_at:
+        print(f"Last runtime update: {runtime_state.updated_at}")
+        print(f"Last ChatGPT state: {runtime_state.chatgpt}")
+        print(f"Last Cursor state: {runtime_state.cursor}")
+        print(f"Last Cooperation state: {runtime_state.cooperation}")
 
     if not ok:
         print()
@@ -103,6 +110,7 @@ def run_supervisor() -> int:
         print("No module is enabled.")
         return 2
 
+    state_store = RuntimeStateStore()
     protocol_gate = ProtocolGate()
     if settings.cooperation_enabled:
         protocol_gate.enable()
@@ -115,7 +123,10 @@ def run_supervisor() -> int:
     if web_enabled:
         runtime = WebAutomationRuntime(
             settings,
-            on_status=lambda message: print(f"[web] {message}", flush=True),
+            on_status=lambda message: (
+                state_store.update(classify_status_message(message), message),
+                print(f"[web] {message}", flush=True),
+            )[-1],
             protocol_gate=protocol_gate,
         )
         runtime.start()
@@ -125,7 +136,10 @@ def run_supervisor() -> int:
         cooperation = GitCoordinationMonitor(
             ".",
             poll_seconds=10.0,
-            on_status=lambda message: print(f"[cooperation] {message}", flush=True),
+            on_status=lambda message: (
+                state_store.update("cooperation", message),
+                print(f"[cooperation] {message}", flush=True),
+            )[-1],
             on_snapshot=protocol_gate.update,
         )
         cooperation.start()
