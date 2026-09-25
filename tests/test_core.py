@@ -467,6 +467,17 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(stopped.lifecycle, "STOPPED_CLEANLY")
             self.assertTrue(stopped.stopped_at)
 
+    def test_runtime_lifecycle_marks_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            status = Path(d) / "runtime_status.json"
+            events = Path(d) / "events.jsonl"
+            store = RuntimeStateStore(status, events)
+            store.mark_started("test")
+            crashed = store.mark_crashed("boom")
+            self.assertEqual(crashed.lifecycle, "CRASHED")
+            self.assertIn("boom", crashed.system)
+            self.assertTrue(crashed.stopped_at)
+
 
 if __name__ == "__main__":
     unittest.main()
