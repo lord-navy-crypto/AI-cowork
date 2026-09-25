@@ -16,7 +16,7 @@ from AppKit import (
 )
 from Foundation import NSObject
 
-from .cooperation import GitCoordinationMonitor, ProtocolGate
+from .cooperation import GitCoordinationMonitor, ProtocolDraftStore, ProtocolGate
 from .runtime_state import RuntimeStateStore, classify_status_message
 from .web_runtime import (
     SettingsStore,
@@ -51,6 +51,7 @@ class WebControlWindowController(NSObject):
         self.cursor_auto_continue_check = None
         self.cooperation_monitor = None
         self.protocol_gate = ProtocolGate()
+        self.protocol_drafts = ProtocolDraftStore()
         self.runtime_state = RuntimeStateStore()
         return self
 
@@ -331,6 +332,13 @@ class WebControlWindowController(NSObject):
     @objc.python_method
     def cooperation_snapshot_from_worker(self, snapshot) -> None:
         self.protocol_gate.update(snapshot)
+        try:
+            self.protocol_drafts.write_snapshot(snapshot)
+        except Exception as exc:
+            self.runtime_state.update(
+                "cooperation",
+                f"Cooperation draft error: {exc}",
+            )
         chat = (
             snapshot.chatgpt_protocol.state.value
             if snapshot.chatgpt_protocol is not None
