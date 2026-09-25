@@ -1,43 +1,12 @@
-checkpoint_seconds: 600
 stable_output_seconds: 4
 poll_interval_seconds: 1
-max_rounds: 12
 
-agents:
-  chatgpt:
-    kind: desktop
-    app_name: ChatGPT
-    role: developer_a
-    branch: agent/gpt
-    enter_to_send: true
-    read_strategy: webarea
+chatgpt:
+  app_name: ChatGPT
+  read_strategy: webarea
 
-  cursor:
-    kind: desktop
-    app_name: Cursor
-    role: developer_b
-    branch: agent/cursor
-    enter_to_send: true
-    # Cursor is Electron/VS Code based. Start conservative; switch to webarea
-    # later if AX inspection proves its chat pane exposes stable text markers.
-    read_strategy: clipboard
-
-  deepseek:
-    kind: browser
-    app_name: Google Chrome
-    role: consultant
-    # Keep one dedicated DeepSeek window/profile open.
-    window_title_contains: DeepSeek
-    enter_to_send: true
-    read_strategy: ax_tree
-
-safety:
-  blocked_fragments:
-    - "git push --force"
-    - "git push -f"
-    - "git reset --hard"
-    - "rm -rf"
-    - "git checkout -- ."
-    - "git clean -fd"
-    - "git branch -D"
-    - "git merge main"
+supervisor:
+  idle_confirm_seconds: 3
+  continue_prompt: >-
+    Continue doing the current task. Keep working from where you stopped.
+    Do not restart or summarize unless necessary; continue the actual work.
