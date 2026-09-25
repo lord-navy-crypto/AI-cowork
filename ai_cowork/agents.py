@@ -68,13 +68,11 @@ class DesktopAgent(Agent):
         if self.events:
             self.events.emit("agent_send", agent=self.name, chars=len(prompt))
 
-        # ChatGPT's desktop app can keep focus on sidebar/navigation. For
-        # WebArea-based agents, explicitly find an editable composer before
-        # pasting. Clipboard-based Claude already focuses its content reliably.
-        if self.read_strategy == "webarea":
-            paste_into_chat(self.app_name, prompt, enter=self.enter_to_send)
-        else:
-            paste_and_enter(self.app_name, prompt, enter=self.enter_to_send)
+        # Desktop chat apps can keep focus on sidebar/navigation even when
+        # their window is frontmost. Always locate an editable composer before
+        # pasting. This is especially important for Claude, where merely
+        # activating the window does not reliably focus the message box.
+        paste_into_chat(self.app_name, prompt, enter=self.enter_to_send)
 
     def read_snapshot(self) -> str:
         if self.read_strategy == "webarea":
