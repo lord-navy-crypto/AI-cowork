@@ -42,9 +42,35 @@ def doctor() -> int:
 
     settings = SettingsStore().load()
     chat_ok = validate_chatgpt_url(settings.chatgpt_url)
-    cursor_ok = (not settings.cursor_url) or validate_cursor_url(settings.cursor_url)
-    print(f"Saved ChatGPT URL: {'yes' if chat_ok else 'not configured'}")
-    print(f"Saved Cursor URL: {'yes' if cursor_ok and settings.cursor_url else 'not configured'}")
+    cursor_ok = validate_cursor_url(settings.cursor_url)
+    print(
+        "ChatGPT Supervisor: "
+        + (
+            "ready"
+            if settings.chatgpt_supervisor_enabled and chat_ok
+            else "disabled"
+            if not settings.chatgpt_supervisor_enabled
+            else "URL required"
+        )
+    )
+    print(
+        "Cursor Supervisor: "
+        + (
+            "ready"
+            if settings.cursor_supervisor_enabled and cursor_ok
+            else "disabled"
+            if not settings.cursor_supervisor_enabled
+            else "URL required"
+        )
+    )
+    print(
+        "Cooperation: "
+        + ("enabled" if settings.cooperation_enabled else "disabled")
+    )
+    print(
+        "Cursor verified auto-continue: "
+        + ("enabled" if settings.cursor_auto_continue else "disabled")
+    )
 
     if not ok:
         print()
@@ -55,9 +81,26 @@ def doctor() -> int:
 
 def run_supervisor() -> int:
     settings = SettingsStore().load()
-    if not validate_chatgpt_url(settings.chatgpt_url):
-        print("No valid ChatGPT work URL is saved.")
-        print("Run python main.py and paste the ChatGPT URL first.")
+    if (
+        settings.chatgpt_supervisor_enabled
+        and not validate_chatgpt_url(settings.chatgpt_url)
+    ):
+        print("ChatGPT Supervisor is enabled but no valid ChatGPT URL is saved.")
+        print("Run python main.py and save a ChatGPT URL, or disable that module.")
+        return 2
+    if (
+        settings.cursor_supervisor_enabled
+        and not validate_cursor_url(settings.cursor_url)
+    ):
+        print("Cursor Supervisor is enabled but no valid Cursor URL is saved.")
+        print("Run python main.py and save a Cursor URL, or disable that module.")
+        return 2
+    if not (
+        settings.chatgpt_supervisor_enabled
+        or settings.cursor_supervisor_enabled
+        or settings.cooperation_enabled
+    ):
+        print("No module is enabled.")
         return 2
 
     runtime = WebAutomationRuntime(
