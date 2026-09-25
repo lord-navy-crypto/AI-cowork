@@ -1,133 +1,99 @@
 from __future__ import annotations
 
 import argparse
-import shutil
-import sys
 import time
 from pathlib import Path
 
-import yaml
-
-from ai_cowork.agents import DesktopAgent
-from ai_cowork.events import EventLog
-from ai_cowork.macos import accessibility_trusted, find_pid
-from ai_cowork.supervisor import ChatGPTSupervisor, SupervisorConfig
-
-
-def load_config(path: str = "config.yaml") -> dict:
-    p = Path(path)
-    if not p.exists():
-        p = Path("config.example.yaml")
-    return yaml.safe_load(p.read_text(encoding="utf-8"))
+from ai_cowork.web_runtime import (
+    SettingsStore,
+    WebAutomationRuntime,
+    validate_chatgpt_url,
+    validate_cursor_url,
+)
 
 
-def get_chatgpt_config(cfg: dict) -> dict:
-    if isinstance(cfg.get("chatgpt"), dict):
-        return cfg["chatgpt"]
-    agents = cfg.get("agents")
-    if isinstance(agents, dict) and isinstance(agents.get("chatgpt"), dict):
-        return agents["chatgpt"]
-    return {}
+def doctor() -> int:
+    print("AI-cowork web doctor")
+    print("====================")
 
+    ok = True
+    try:
+        import playwright  # noqa: F401
+        print("Playwright Python package: yes")
+    except Exception as exc:
+        print(f"Playwright Python package: NO ({exc})")
+        ok = False
 
-def build_chatgpt(cfg: dict) -> DesktopAgent:
-    item = get_chatgpt_config(cfg)
-    return DesktopAgent(
-        name="chatgpt",
-        app_name=item.get("app_name", "ChatGPT"),
-        poll_interval=float(cfg.get("poll_interval_seconds", 1)),
-        stable_seconds=float(cfg.get("stable_output_seconds", 4)),
-        enter_to_send=True,
-        events=EventLog(),
-        read_strategy=item.get("read_strategy", "webarea"),
-        background_preferred=bool(item.get("background_preferred", True)),
-        allow_foreground_fallback=bool(item.get("allow_foreground_fallback", True)),
-    )
+    try:
+        from playwright.sync_api import sync_playwright
 
+        p = sync_playwright().start()
+        executable = Path(p.chromium.executable_path)
+        installed = executable.exists()
+        print(f"Chromium installed: {'yes' if installed else 'NO'}")
+        print(f"Chromium path: {executable}")
+        p.stop()
+        if not installed:
+            ok = False
+    except Exception as exc:
+        print(f"Chromium installed: NO ({exc})")
+        ok = False
 
-def build_supervisor(cfg: dict) -> ChatGPTSupervisor:
-    supervisor_cfg = cfg.get("supervisor", {})
-    return ChatGPTSupervisor(
-        build_chatgpt(cfg),
-        SupervisorConfig(
-            continue_prompt=supervisor_cfg.get(
-                "continue_prompt",
-                "Continue doing the current task. Keep working from where you stopped.",
-            ),
-            idle_confirm_seconds=float(
-                supervisor_cfg.get("idle_confirm_seconds", 3)
-            ),
-            poll_interval_seconds=float(
-                cfg.get("poll_interval_seconds", 1)
-            ),
-        ),
-    )
+    settings = SettingsStore().load()
+    chat_ok = validate_chatgpt_url(settings.chatgpt_url)
+    cursor_ok = (not settings.cursor_url) or validate_cursor_url(settings.cursor_url)
+    print(f"Saved ChatGPT URL: {'yes' if chat_ok else 'not configured'}")
+    print(f"Saved Cursor URL: {'yes' if cursor_ok and settings.cursor_url else 'not configured'}")
 
-
-def doctor(cfg: dict) -> int:
-    item = get_chatgpt_config(cfg)
-    app_name = item.get("app_name", "ChatGPT")
-    pid = find_pid(app_name)
-    print("AI-cowork supervisor doctor")
-    print("==========================")
-    print(f"macOS: {'yes' if sys.platform == 'darwin' else 'NO'}")
-    print(f"osascript: {shutil.which('osascript') or 'MISSING'}")
-    print(f"pbcopy: {shutil.which('pbcopy') or 'MISSING'}")
-    print(f"Accessibility trusted: {accessibility_trusted()}")
-    print(f"ChatGPT app: {app_name!r} pid={pid or 'not running'}")
-    ok = (
-        sys.platform == "darwin"
-        and accessibility_trusted()
-        and pid is not None
-    )
+    if not ok:
+        print()
+        print("Run: pip install -r requirements.txt")
+        print("Then: python -m playwright install chromium")
     return 0 if ok else 2
 
 
-def run_headless(supervisor: ChatGPTSupervisor) -> int:
-    supervisor.on_status = lambda message: print(
-        f"[supervisor] {message}", flush=True
+def run_supervisor() -> int:
+    settings = SettingsStore().load()
+    if not validate_chatgpt_url(settings.chatgpt_url):
+        print("No valid ChatGPT work URL is saved.")
+        print("Run python main.py and paste the ChatGPT URL first.")
+        return 2
+
+    runtime = WebAutomationRuntime(
+        settings,
+        on_status=lambda message: print(f"[web] {message}", flush=True),
     )
-    supervisor.start()
+    runtime.start()
     try:
-        while supervisor.running:
+        while runtime.running:
             time.sleep(0.5)
     except KeyboardInterrupt:
-        supervisor.stop()
+        runtime.stop()
+        while runtime.running:
+            time.sleep(0.1)
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="ai-cowork",
-        description="Keep ChatGPT desktop work moving automatically.",
+        description="Background web supervisor for ChatGPT + Cursor.",
     )
     sub = parser.add_subparsers(dest="command")
-    sub.add_parser("gui", help="Open the native supervisor window.")
-    sub.add_parser("supervisor", help="Run the supervisor in the terminal.")
-    sub.add_parser("doctor", help="Check ChatGPT + macOS permissions.")
-    sub.add_parser("snapshot", help="Print the current ChatGPT text snapshot.")
+    sub.add_parser("gui", help="Open the URL control app.")
+    sub.add_parser("supervisor", help="Run the saved ChatGPT Web supervisor.")
+    sub.add_parser("doctor", help="Check Playwright and browser installation.")
 
     args = parser.parse_args()
-    cfg = load_config()
 
     if args.command == "doctor":
-        return doctor(cfg)
-
-    if args.command == "snapshot":
-        print(build_chatgpt(cfg).read_snapshot())
-        return 0
-
-    supervisor = build_supervisor(cfg)
-
+        return doctor()
     if args.command == "supervisor":
-        return run_headless(supervisor)
+        return run_supervisor()
 
-    # Import Cocoa UI only when the GUI is actually requested. This keeps
-    # doctor/supervisor usable even if a future GUI-specific compatibility
-    # issue appears in PyObjC.
     from ai_cowork.gui import run_gui
 
-    run_gui(supervisor)
+    run_gui()
     return 0
 
 
