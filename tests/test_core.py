@@ -2,6 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ai_cowork.cursor_supervisor import CursorState, classify_cursor_text
+from ai_cowork.cooperation import (
+    CoordinationSnapshot,
+    GitCoordinationMonitor,
+    chatgpt_peer_review_instruction,
+    cursor_peer_review_instruction,
+)
 from ai_cowork.web_runtime import (
     SettingsStore,
     WebSettings,
@@ -52,6 +59,38 @@ class CoreTests(unittest.TestCase):
             loaded = SettingsStore(path).load()
             self.assertEqual(loaded.idle_confirm_seconds, 1.5)
             self.assertEqual(loaded.poll_interval_seconds, 0.5)
+
+    def test_cursor_state_classifier(self):
+        self.assertEqual(
+            classify_cursor_text("Agent is working on your task").state,
+            CursorState.WORKING,
+        )
+        self.assertEqual(
+            classify_cursor_text("Task completed. Ready for review.").state,
+            CursorState.READY,
+        )
+        self.assertEqual(
+            classify_cursor_text("Agent failed because something went wrong").state,
+            CursorState.FAILED,
+        )
+        self.assertEqual(
+            classify_cursor_text("Please log in to continue").state,
+            CursorState.LOGIN_REQUIRED,
+        )
+
+    def test_cooperation_change_description(self):
+        monitor = GitCoordinationMonitor(".")
+        before = CoordinationSnapshot("aaa", "bbb", "ccc", "messages/a.md")
+        after = CoordinationSnapshot("aaa", "ddd", "eee", "messages/b.md")
+        description = monitor._describe_change(before, after)
+        self.assertIn("Cursor branch updated", description)
+        self.assertIn("coordination updated", description)
+
+    def test_peer_review_instructions_preserve_branch_ownership(self):
+        self.assertIn("agent/cursor", chatgpt_peer_review_instruction())
+        self.assertIn("agent/chatgpt", cursor_peer_review_instruction())
+        self.assertIn("Never write main", chatgpt_peer_review_instruction())
+        self.assertIn("Never write main", cursor_peer_review_instruction())
 
 
 if __name__ == "__main__":
