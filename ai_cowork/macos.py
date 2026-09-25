@@ -487,7 +487,15 @@ def webarea_text(app_name: str) -> str:
     return max(candidates, key=len) if candidates else ""
 
 
-def select_all_copy_text(app_name: str, settle: float = 0.35) -> str:
+def frontmost_app_name() -> str:
+    try:
+        app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        return str(app.localizedName() or "")
+    except Exception:
+        return ""
+
+
+def select_all_copy_text(app_name: str, settle: float = 0.25) -> str:
     """Best-effort read fallback using Cmd+A / Cmd+C.
 
     This is intended for Electron apps whose AX WebArea exposes no text-marker
@@ -496,6 +504,7 @@ def select_all_copy_text(app_name: str, settle: float = 0.35) -> str:
     Claude, Escape can cancel an in-progress generation.
     """
     old_clipboard = get_clipboard()
+    previous_app = frontmost_app_name()
     activate_app(app_name)
     time.sleep(settle)
     try:
@@ -513,6 +522,11 @@ def select_all_copy_text(app_name: str, settle: float = 0.35) -> str:
         return copied.strip()
     finally:
         set_clipboard(old_clipboard)
+        if previous_app and previous_app.casefold() != app_name.casefold():
+            try:
+                activate_app(previous_app)
+            except Exception:
+                pass
 
 
 def focused_element_info(app_name: str) -> tuple[str, str, str]:
