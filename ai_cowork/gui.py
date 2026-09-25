@@ -124,7 +124,7 @@ class WebControlWindowController(NSObject):
         content.addSubview_(save_button)
 
         self.start_button = self._button(
-            "Start Web Runtime",
+            "Start Runtime",
             183, 115, 220, 34,
             "toggleSupervisor:",
         )
@@ -253,20 +253,35 @@ class WebControlWindowController(NSObject):
 
     @objc.IBAction
     def toggleSupervisor_(self, sender):
-        if self.runtime and self.runtime.running:
-            self.runtime.stop()
+        if (
+            (self.runtime and self.runtime.running)
+            or (self.cooperation_monitor and self.cooperation_monitor.running)
+        ):
+            if self.runtime and self.runtime.running:
+                self.runtime.stop()
             if self.cooperation_monitor and self.cooperation_monitor.running:
                 self.cooperation_monitor.stop()
-            self.start_button.setTitle_("Start Web Runtime")
+            self.start_button.setTitle_("Start Runtime")
             return
 
         settings = self._save()
         if settings is None:
             return
 
-        self.runtime = WebAutomationRuntime(settings, on_status=self.status_from_worker)
         try:
-            self.runtime.start()
+            web_enabled = (
+                settings.chatgpt_supervisor_enabled
+                or settings.cursor_supervisor_enabled
+            )
+            if web_enabled:
+                self.runtime = WebAutomationRuntime(
+                    settings,
+                    on_status=self.status_from_worker,
+                )
+                self.runtime.start()
+            else:
+                self.runtime = None
+
             if settings.cooperation_enabled:
                 self.cooperation_monitor = GitCoordinationMonitor(
                     ".",
@@ -274,8 +289,12 @@ class WebControlWindowController(NSObject):
                     on_status=self.cooperation_status_from_worker,
                 )
                 self.cooperation_monitor.start()
-            self.start_button.setTitle_("Stop Web Runtime")
-            self.updateStatus_("Shared web runtime starting…")
+
+            self.start_button.setTitle_("Stop Runtime")
+            if web_enabled:
+                self.updateStatus_("Selected web modules starting…")
+            else:
+                self.updateStatus_("Cooperation monitor starting without Chromium.")
         except Exception as exc:
             self.updateStatus_(f"Start error: {exc}")
 
