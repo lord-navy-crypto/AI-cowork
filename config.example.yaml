@@ -12,12 +12,14 @@ agents:
     enter_to_send: true
     read_strategy: webarea
 
-  claude:
+  cursor:
     kind: desktop
-    app_name: Claude
+    app_name: Cursor
     role: developer_b
-    branch: agent/claude
+    branch: agent/cursor
     enter_to_send: true
+    # Cursor is Electron/VS Code based. Start conservative; switch to webarea
+    # later if AX inspection proves its chat pane exposes stable text markers.
     read_strategy: clipboard
 
   deepseek:
