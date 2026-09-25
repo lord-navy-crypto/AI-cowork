@@ -86,6 +86,32 @@ def doctor() -> int:
     return 0 if ok else 2
 
 
+def show_protocol() -> int:
+    monitor = GitCoordinationMonitor(".")
+    try:
+        snapshot = monitor.snapshot()
+    except Exception as exc:
+        print(f"Protocol check failed: {exc}")
+        return 2
+
+    print("AI-cowork cooperation protocol")
+    print("=============================")
+    for label, state in (
+        ("ChatGPT", snapshot.chatgpt_protocol),
+        ("Cursor", snapshot.cursor_protocol),
+    ):
+        if state is None:
+            print(f"{label}: UNKNOWN")
+            continue
+        print(f"{label}: {state.state.value}")
+        print(f"  {state.detail}")
+        print(f"  own={state.own_head} peer={state.peer_head}")
+        print(f"  review={state.latest_review}")
+        print(f"  status={state.latest_status}")
+    print(f"Latest coordination message: {snapshot.latest_message}")
+    return 0
+
+
 def run_supervisor() -> int:
     settings = SettingsStore().load()
     if (
@@ -171,6 +197,7 @@ def main() -> int:
     sub.add_parser("gui", help="Open the URL control app.")
     sub.add_parser("supervisor", help="Run the saved ChatGPT Web supervisor.")
     sub.add_parser("doctor", help="Check Playwright and browser installation.")
+    sub.add_parser("protocol", help="Show current cooperation protocol gates.")
 
     args = parser.parse_args()
 
@@ -178,6 +205,8 @@ def main() -> int:
         return doctor()
     if args.command == "supervisor":
         return run_supervisor()
+    if args.command == "protocol":
+        return show_protocol()
 
     from ai_cowork.gui import run_gui
 
