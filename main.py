@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -11,7 +10,12 @@ import yaml
 from ai_cowork.agents import BrowserAgent, DesktopAgent
 from ai_cowork.controller import Controller
 from ai_cowork.events import EventLog
-from ai_cowork.macos import find_pid, formatted_tree
+from ai_cowork.macos import (
+    accessibility_trusted,
+    find_pid,
+    formatted_tree,
+    system_events_probe,
+)
 from ai_cowork.state import RuntimeStore
 
 
@@ -28,7 +32,7 @@ def build_agents(cfg: dict):
     def desktop(key: str):
         item = cfg["agents"][key]
         cls = BrowserAgent if item.get("kind") == "browser" else DesktopAgent
-        kwargs = dict(
+        return cls(
             name=key,
             app_name=item["app_name"],
             poll_interval=float(cfg.get("poll_interval_seconds", 1)),
@@ -36,7 +40,6 @@ def build_agents(cfg: dict):
             enter_to_send=bool(item.get("enter_to_send", True)),
             events=events,
         )
-        return cls(**kwargs)
 
     return desktop("chatgpt"), desktop("claude"), desktop("deepseek"), events
 
@@ -47,8 +50,9 @@ def doctor(cfg: dict) -> int:
     print(f"macOS: {'yes' if sys.platform == 'darwin' else 'NO'}")
     print(f"osascript: {shutil.which('osascript') or 'MISSING'}")
     print(f"pbcopy: {shutil.which('pbcopy') or 'MISSING'}")
+    print(f"Accessibility trusted: {accessibility_trusted()}")
 
-    ok = sys.platform == "darwin"
+    ok = sys.platform == "darwin" and accessibility_trusted()
     for key in ("chatgpt", "claude", "deepseek"):
         item = cfg["agents"][key]
         pid = find_pid(item["app_name"])
@@ -57,19 +61,22 @@ def doctor(cfg: dict) -> int:
             ok = False
 
     print()
-    print("If inspect/send fails, grant Terminal Accessibility permission:")
+    print("If Accessibility trusted is False:")
     print("System Settings → Privacy & Security → Accessibility")
+    print("Enable your terminal app, then quit and reopen Terminal.")
     return 0 if ok else 2
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="ai-cowork")
     sub = parser.add_subparsers(dest="command", required=True)
-
     sub.add_parser("doctor")
 
     inspect_p = sub.add_parser("inspect")
     inspect_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+
+    probe_p = sub.add_parser("probe")
+    probe_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
 
     send_p = sub.add_parser("send")
     send_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
@@ -90,6 +97,17 @@ def main() -> int:
         print(formatted_tree(mapping[args.agent].app_name))
         return 0
 
+    if args.command == "probe":
+        item = cfg["agents"][args.agent]
+        print(f"agent={args.agent}")
+        print(f"app={item['app_name']}")
+        print(f"pid={find_pid(item['app_name'])}")
+        print(f"accessibility_trusted={accessibility_trusted()}")
+        probe = system_events_probe(item["app_name"])
+        print(f"system_events_ok={probe['ok']}")
+        print(probe["output"])
+        return 0
+
     if args.command == "send":
         mapping[args.agent].send(args.message)
         print("sent")
@@ -104,7 +122,7 @@ def main() -> int:
 
         store = RuntimeStore()
         store.load()
-        controller = Controller(
+        Controller(
             gpt=gpt,
             claude=claude,
             deepseek=deepseek,
@@ -112,8 +130,7 @@ def main() -> int:
             max_rounds=int(cfg["max_rounds"]),
             store=store,
             events=events,
-        )
-        controller.run()
+        ).run()
         return 0
 
     return 1
