@@ -655,3 +655,103 @@ def notify_user(title: str, message: str) -> None:
         )
     except Exception:
         pass
+
+
+CHAT_COMPOSER_HINTS = (
+    "message",
+    "send a message",
+    "ask anything",
+    "chatgpt",
+    "prompt",
+    "消息",
+    "发送消息",
+)
+
+SEND_BUTTON_HINTS = (
+    "send",
+    "send message",
+    "submit",
+    "发送",
+    "发送消息",
+)
+
+
+def _node_text(node) -> str:
+    return " ".join(
+        str(_attr(node, attr) or "")
+        for attr in ("AXTitle", "AXValue", "AXDescription", "AXHelp", "AXPlaceholderValue")
+    ).casefold()
+
+
+def _find_background_composer(app_name: str):
+    """Find a likely chat composer without activating the application."""
+    candidates = []
+    for role in ("AXTextArea", "AXTextField"):
+        try:
+            candidates.extend(_find_role_nodes(app_name, role, max_depth=40, max_nodes=16000))
+        except Exception:
+            continue
+
+    scored = []
+    for node in candidates:
+        text = _node_text(node)
+        score = sum(1 for hint in CHAT_COMPOSER_HINTS if hint in text)
+        if score:
+            scored.append((score, node))
+    if not scored:
+        return None
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return scored[0][1]
+
+
+def _find_background_send_button(app_name: str):
+    try:
+        buttons = _find_role_nodes(app_name, "AXButton", max_depth=40, max_nodes=16000)
+    except Exception:
+        return None
+    scored = []
+    for button in buttons:
+        text = _node_text(button)
+        score = sum(1 for hint in SEND_BUTTON_HINTS if hint in text)
+        if score:
+            scored.append((score, button))
+    if not scored:
+        return None
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return scored[0][1]
+
+
+def _perform_ax_action(element, action: str) -> bool:
+    fn = getattr(AS, "AXUIElementPerformAction", None)
+    if fn is None:
+        return False
+    try:
+        return fn(element, action) == 0
+    except Exception:
+        return False
+
+
+def background_send_chat_message(app_name: str, text: str) -> bool:
+    """Best-effort true background send using Accessibility only.
+
+    Does not activate the target application and does not touch the clipboard.
+    Returns False when the current app build does not expose a writable composer
+    and pressable send button, allowing callers to decide whether a foreground
+    fallback is acceptable.
+    """
+    try:
+        composer = _find_background_composer(app_name)
+        if composer is None:
+            return False
+        err = AXUIElementSetAttributeValue(composer, "AXValue", text)
+        if err != 0:
+            return False
+
+        # Give Chromium/Electron a moment to update the enabled state of Send.
+        time.sleep(0.08)
+        button = _find_background_send_button(app_name)
+        if button is None:
+            return False
+        return _perform_ax_action(button, "AXPress")
+    except Exception:
+        return False
