@@ -9,12 +9,16 @@ from ai_cowork.cursor_supervisor import (
     decide_cursor_action,
 )
 from ai_cowork.cooperation import (
+    AgentProtocolState,
     CoordinationSnapshot,
     GitCoordinationMonitor,
+    ProtocolGate,
     ProtocolState,
     chatgpt_peer_review_instruction,
+    coordination_message_filename,
     cursor_peer_review_instruction,
     evaluate_protocol_state,
+    render_coordination_message,
 )
 from ai_cowork.web_runtime import (
     SettingsStore,
@@ -155,6 +159,80 @@ class CoreTests(unittest.TestCase):
                 decide_cursor_action(state, True),
                 CursorAction.NONE,
             )
+
+    def test_protocol_ready_requires_new_review_before_next_cycle(self):
+        state = evaluate_protocol_state(
+            agent="chatgpt",
+            own_head="own123",
+            peer_head="peer123",
+            own_ts=200,
+            peer_ts=100,
+            review_ts=150,
+            status_ts=250,
+            reviewed_peer_head="peer123",
+            status_own_head="own123",
+        )
+        self.assertEqual(state.state, ProtocolState.READY)
+
+    def test_exact_review_head_mismatch_requires_review(self):
+        state = evaluate_protocol_state(
+            agent="cursor",
+            own_head="own123",
+            peer_head="peerNEW",
+            own_ts=100,
+            peer_ts=100,
+            review_ts=500,
+            status_ts=50,
+            reviewed_peer_head="peerOLD",
+        )
+        self.assertEqual(state.state, ProtocolState.REVIEW_REQUIRED)
+
+    def test_protocol_gate_fails_closed_until_snapshot(self):
+        gate = ProtocolGate()
+        gate.enable()
+        self.assertFalse(gate.allows_own_work("chatgpt"))
+        self.assertIn("WAITING_FOR_COORDINATION", gate.block_reason("chatgpt"))
+
+    def test_protocol_gate_allows_only_own_work_allowed(self):
+        gate = ProtocolGate()
+        gate.enable()
+        ready = AgentProtocolState(
+            "chatgpt", ProtocolState.READY, "ready", "peer", "own", "r", "s"
+        )
+        allowed = AgentProtocolState(
+            "cursor", ProtocolState.OWN_WORK_ALLOWED, "allowed", "peer", "own", "r", "s"
+        )
+        gate.update(
+            CoordinationSnapshot(
+                "chat",
+                "cursor",
+                "coord",
+                "messages/x.md",
+                ready,
+                allowed,
+            )
+        )
+        self.assertFalse(gate.allows_own_work("chatgpt"))
+        self.assertTrue(gate.allows_own_work("cursor"))
+
+    def test_coordination_message_template_records_heads(self):
+        text = render_coordination_message(
+            "chatgpt",
+            "review",
+            summary="Reviewed peer changes.",
+            peer_head="abc123",
+            own_head="def456",
+            status="READY",
+            next_action="Continue on agent/chatgpt.",
+        )
+        self.assertIn("- Peer head reviewed: abc123", text)
+        self.assertIn("- Own head: def456", text)
+        self.assertIn("## Next action", text)
+
+    def test_coordination_message_filename(self):
+        path = coordination_message_filename("cursor", "status")
+        self.assertTrue(path.startswith("messages/"))
+        self.assertTrue(path.endswith("-cursor-status.md"))
 
 
 if __name__ == "__main__":
