@@ -16,6 +16,7 @@ from .cursor_supervisor import (
     classify_cursor_text,
     decide_cursor_action,
 )
+from .cooperation import ProtocolGate
 
 
 CHATGPT_HOSTS = {"chatgpt.com", "www.chatgpt.com"}
@@ -117,9 +118,11 @@ class WebAutomationRuntime:
         settings: WebSettings,
         on_status: Callable[[str], None] | None = None,
         supervise: bool = True,
+        protocol_gate: ProtocolGate | None = None,
     ) -> None:
         self.settings = settings
         self.supervise = supervise
+        self.protocol_gate = protocol_gate
         self.on_status = on_status or (lambda _: None)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -439,8 +442,13 @@ class WebAutomationRuntime:
                 has_continue_control=continue_control is not None,
             )
 
+            cursor_gate_ok = (
+                self.protocol_gate is None
+                or self.protocol_gate.allows_own_work("cursor")
+            )
             if (
                 self.settings.cursor_auto_continue
+                and cursor_gate_ok
                 and action is CursorAction.CLICK_CONTINUE
                 and continue_control is not None
             ):
@@ -456,11 +464,18 @@ class WebAutomationRuntime:
 
         if force or snapshot.state != self._last_cursor_state:
             self._last_cursor_state = snapshot.state
-            suffix = (
-                " Auto-continue available."
-                if action is CursorAction.CLICK_CONTINUE
-                else ""
-            )
+            suffix = ""
+            if action is CursorAction.CLICK_CONTINUE:
+                if (
+                    self.protocol_gate is not None
+                    and not self.protocol_gate.allows_own_work("cursor")
+                ):
+                    suffix = (
+                        " Auto-continue blocked by Cooperation gate: "
+                        + self.protocol_gate.block_reason("cursor")
+                    )
+                else:
+                    suffix = " Auto-continue available."
             self._status(
                 f"Cursor Supervisor [{snapshot.state.value}]: "
                 f"{snapshot.detail}{suffix}"
@@ -616,6 +631,17 @@ class WebAutomationRuntime:
                         recovery_attempts = 0
                         self._status("ChatGPT Web is working — waiting.")
                         self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
+                        continue
+
+                    if (
+                        self.protocol_gate is not None
+                        and not self.protocol_gate.allows_own_work("chatgpt")
+                    ):
+                        self._status(
+                            "ChatGPT Supervisor [BLOCKED]: "
+                            + self.protocol_gate.block_reason("chatgpt")
+                        )
+                        self._stop.wait(max(1.0, self.settings.poll_interval_seconds))
                         continue
 
                     self._status("ChatGPT Web is idle — sending continue.")
