@@ -455,6 +455,18 @@ class CoreTests(unittest.TestCase):
                 cursor_path.read_text(encoding="utf-8"),
             )
 
+    def test_runtime_lifecycle_marks_clean_stop(self):
+        with tempfile.TemporaryDirectory() as d:
+            status = Path(d) / "runtime_status.json"
+            events = Path(d) / "events.jsonl"
+            store = RuntimeStateStore(status, events)
+            started = store.mark_started("test")
+            self.assertEqual(started.lifecycle, "RUNNING")
+            self.assertTrue(started.session_id)
+            stopped = store.mark_stopped("test done")
+            self.assertEqual(stopped.lifecycle, "STOPPED_CLEANLY")
+            self.assertTrue(stopped.stopped_at)
+
 
 if __name__ == "__main__":
     unittest.main()
