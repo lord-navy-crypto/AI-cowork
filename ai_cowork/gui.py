@@ -178,11 +178,15 @@ class WebControlWindowController(NSObject):
             return
         # Login sessions are always visible so the user can authenticate.
         settings.headless = False
-        self.runtime = WebAutomationRuntime(settings, on_status=self.status_from_worker)
+        self.runtime = WebAutomationRuntime(
+            settings,
+            on_status=self.status_from_worker,
+            supervise=False,
+        )
         try:
             self.runtime.start()
-            self.start_button.setTitle_("Stop Web Supervisor")
-            self.updateStatus_("Opening dedicated browser. Log in there if needed.")
+            self.start_button.setTitle_("Stop Session")
+            self.updateStatus_("Opening dedicated browser for login/connection only.")
         except Exception as exc:
             self.updateStatus_(f"Start error: {exc}")
 
