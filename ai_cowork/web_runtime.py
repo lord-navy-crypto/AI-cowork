@@ -123,6 +123,7 @@ class WebAutomationRuntime:
         self._cursor_page: Page | None = None
         self._last_cursor_state: CursorState | None = None
         self._last_cursor_poll = 0.0
+        self._chatgpt_paused_reason: str | None = None
 
     @property
     def running(self) -> bool:
@@ -507,7 +508,16 @@ class WebAutomationRuntime:
             while not self._stop.is_set():
                 self._tick_cursor()
                 if not self.settings.chatgpt_supervisor_enabled:
-                    self._status("ChatGPT Supervisor paused; Cursor monitoring remains active.")
+                    reason = (
+                        f" ({self._chatgpt_paused_reason})"
+                        if self._chatgpt_paused_reason
+                        else ""
+                    )
+                    self._status(
+                        "ChatGPT Supervisor paused"
+                        + reason
+                        + "; Cursor monitoring remains active."
+                    )
                     self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
                     continue
                 try:
@@ -515,8 +525,13 @@ class WebAutomationRuntime:
                         raise RuntimeError("ChatGPT page was closed.")
 
                     if self._context_limit_on_page(page):
-                        self._status("Context limit detected — supervisor stopped.")
-                        break
+                        self._chatgpt_paused_reason = "context limit detected"
+                        self.settings.chatgpt_supervisor_enabled = False
+                        self._status(
+                            "ChatGPT Supervisor paused: context limit detected. "
+                            "Cursor Supervisor remains active."
+                        )
+                        continue
 
                     if self._chatgpt_generating(page):
                         recovery_attempts = 0
@@ -533,14 +548,24 @@ class WebAutomationRuntime:
                 except Exception as exc:
                     recovery_attempts += 1
                     if recovery_attempts > 3:
-                        raise RuntimeError(
-                            f"ChatGPT page failed repeatedly; supervisor stopped: {exc}"
-                        ) from exc
+                        self._chatgpt_paused_reason = str(exc)
+                        self.settings.chatgpt_supervisor_enabled = False
+                        self._status(
+                            "ChatGPT Supervisor paused after repeated failures; "
+                            f"Cursor Supervisor remains active. Last error: {exc}"
+                        )
+                        recovery_attempts = 0
+                        continue
                     page = self._recover_chatgpt_page(page, recovery_attempts)
                     if self._login_required(page):
-                        raise RuntimeError(
-                            "ChatGPT session is no longer authenticated. Open/Login Session again."
+                        self._chatgpt_paused_reason = "login required"
+                        self.settings.chatgpt_supervisor_enabled = False
+                        self._status(
+                            "ChatGPT Supervisor paused: login required. "
+                            "Open/Login Session again; Cursor Supervisor remains active."
                         )
+                        recovery_attempts = 0
+                        continue
 
         except Exception as exc:
             self._status(f"Web supervisor error: {exc}")
