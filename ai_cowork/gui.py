@@ -310,6 +310,7 @@ class WebControlWindowController(NSObject):
                     poll_seconds=10.0,
                     on_status=self.cooperation_status_from_worker,
                     on_snapshot=self.cooperation_snapshot_from_worker,
+                    on_error=lambda exc: self.protocol_gate.invalidate(),
                 )
                 self.cooperation_monitor.start()
 
