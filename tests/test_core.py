@@ -13,6 +13,11 @@ class CoreTests(unittest.TestCase):
         after = "hello\nold\nnew response"
         self.assertEqual(_extract_delta(before, after), "new response")
 
+    def test_delta_append(self):
+        before = "sidebar user prompt old answer"
+        after = before + " NEW_REPLY"
+        self.assertEqual(_extract_delta(before, after), "NEW_REPLY")
+
     def test_safety(self):
         guard = SafetyGuard()
         self.assertTrue(guard.check_text("git status").allowed)
