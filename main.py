@@ -98,6 +98,8 @@ def doctor() -> int:
         print(f"Last runtime lifecycle: {runtime_state.lifecycle}")
         if runtime_state.lifecycle == "RUNNING":
             print("Previous run may have ended unexpectedly.")
+        elif runtime_state.lifecycle == "CRASHED":
+            print("Previous run ended with a recorded runtime crash.")
         if runtime_state.session_id:
             print(f"Last session: {runtime_state.session_id}")
         print(f"Last runtime update: {runtime_state.updated_at}")
@@ -262,10 +264,15 @@ def run_supervisor() -> int:
         if cooperation and cooperation.running:
             cooperation.stop()
         protocol_gate.disable()
-        state_store.mark_stopped("clean CLI stop")
         if runtime is not None:
             while runtime.running:
                 time.sleep(0.1)
+            if runtime.fatal_error and not runtime.stop_requested:
+                state_store.mark_crashed(runtime.fatal_error)
+            else:
+                state_store.mark_stopped("clean CLI stop")
+        else:
+            state_store.mark_stopped("clean CLI stop")
     return 0
 
 
