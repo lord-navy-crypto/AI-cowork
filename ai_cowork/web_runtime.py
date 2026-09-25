@@ -373,6 +373,33 @@ class WebAutomationRuntime:
                     return
             self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
 
+    def _recover_chatgpt_page(self, page: Page, attempt: int) -> Page:
+        """Best-effort recovery after a transient page/browser failure."""
+        if self._context is None:
+            raise RuntimeError("Browser context is unavailable.")
+
+        delay = min(8.0, 1.5 * attempt)
+        self._status(f"Transient page error — recovery attempt {attempt}/3.")
+        self._stop.wait(delay)
+        if self._stop.is_set():
+            return page
+
+        try:
+            if not page.is_closed():
+                page.reload(wait_until="domcontentloaded", timeout=45_000)
+                return page
+        except Exception:
+            pass
+
+        replacement = self._context.new_page()
+        replacement.goto(
+            self.settings.chatgpt_url,
+            wait_until="domcontentloaded",
+            timeout=60_000,
+        )
+        self._chatgpt_page = replacement
+        return replacement
+
     def _run(self) -> None:
         try:
             self._status("Opening dedicated web session…")
@@ -402,21 +429,40 @@ class WebAutomationRuntime:
 
             self._status("ChatGPT Web connected — supervisor active.")
 
+            recovery_attempts = 0
             while not self._stop.is_set():
-                page_text = self._page_text(page)
-                if context_limit_detected(page_text):
-                    self._status("Context limit detected — supervisor stopped.")
-                    break
+                try:
+                    if page.is_closed():
+                        raise RuntimeError("ChatGPT page was closed.")
 
-                if self._chatgpt_generating(page):
-                    self._status("ChatGPT Web is working — waiting.")
-                    self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
-                    continue
+                    page_text = self._page_text(page)
+                    if context_limit_detected(page_text):
+                        self._status("Context limit detected — supervisor stopped.")
+                        break
 
-                self._status("ChatGPT Web is idle — sending continue.")
-                before = self._message_state(page)
-                self._send_prompt(page, self.settings.continue_prompt)
-                self._wait_for_generation_cycle(page, before)
+                    if self._chatgpt_generating(page):
+                        recovery_attempts = 0
+                        self._status("ChatGPT Web is working — waiting.")
+                        self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
+                        continue
+
+                    self._status("ChatGPT Web is idle — sending continue.")
+                    before = self._message_state(page)
+                    self._send_prompt(page, self.settings.continue_prompt)
+                    self._wait_for_generation_cycle(page, before)
+                    recovery_attempts = 0
+
+                except Exception as exc:
+                    recovery_attempts += 1
+                    if recovery_attempts > 3:
+                        raise RuntimeError(
+                            f"ChatGPT page failed repeatedly; supervisor stopped: {exc}"
+                        ) from exc
+                    page = self._recover_chatgpt_page(page, recovery_attempts)
+                    if self._login_required(page):
+                        raise RuntimeError(
+                            "ChatGPT session is no longer authenticated. Open/Login Session again."
+                        )
 
         except Exception as exc:
             self._status(f"Web supervisor error: {exc}")
