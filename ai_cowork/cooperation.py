@@ -99,6 +99,16 @@ class ProtocolGate:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._snapshot: CoordinationSnapshot | None = None
+        self._enabled = False
+
+    def enable(self) -> None:
+        with self._lock:
+            self._enabled = True
+
+    def disable(self) -> None:
+        with self._lock:
+            self._enabled = False
+            self._snapshot = None
 
     def update(self, snapshot: CoordinationSnapshot) -> None:
         with self._lock:
@@ -119,20 +129,28 @@ class ProtocolGate:
         raise ValueError(f"Unknown agent: {agent}")
 
     def allows_own_work(self, agent: str) -> bool:
+        with self._lock:
+            enabled = self._enabled
+        if not enabled:
+            return True
         state = self.state_for(agent)
         if state is None:
-            # Fail open until the first successful coordination fetch. The UI
-            # still reports that protocol state is not yet known.
-            return True
+            # Cooperation is enabled, so do not act until the first valid
+            # coordination snapshot has been fetched.
+            return False
         return state.state in {
             ProtocolState.OWN_WORK_ALLOWED,
             ProtocolState.READY,
         }
 
     def block_reason(self, agent: str) -> str:
+        with self._lock:
+            enabled = self._enabled
+        if not enabled:
+            return ""
         state = self.state_for(agent)
         if state is None:
-            return ""
+            return "WAITING_FOR_COORDINATION: first protocol snapshot has not arrived yet."
         if self.allows_own_work(agent):
             return ""
         return f"{state.state.value}: {state.detail}"
