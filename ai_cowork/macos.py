@@ -3,9 +3,9 @@ from __future__ import annotations
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Iterable
 
 from ApplicationServices import (
+    AXIsProcessTrusted,
     AXUIElementCopyAttributeValue,
     AXUIElementCreateApplication,
 )
@@ -13,7 +13,7 @@ from AppKit import NSWorkspace
 
 
 TEXT_ATTRIBUTES = ("AXValue", "AXTitle", "AXDescription")
-CHILD_ATTRIBUTES = ("AXChildren", "AXContents", "AXRows")
+CHILD_ATTRIBUTES = ("AXChildren", "AXContents", "AXRows", "AXWindows")
 
 
 def run_osascript(script: str) -> str:
@@ -34,6 +34,13 @@ def get_clipboard() -> str:
     return subprocess.run(
         ["pbpaste"], text=True, capture_output=True, check=True
     ).stdout
+
+
+def accessibility_trusted() -> bool:
+    try:
+        return bool(AXIsProcessTrusted())
+    except Exception:
+        return False
 
 
 def find_pid(app_name: str) -> int | None:
@@ -67,6 +74,34 @@ def paste_and_enter(app_name: str, text: str, enter: bool = True) -> None:
     )
 
 
+def system_events_probe(app_name: str) -> dict[str, str]:
+    escaped = app_name.replace('"', '\\"')
+    script = f'''
+    tell application "System Events"
+        if not (exists process "{escaped}") then return "PROCESS_MISSING"
+        tell process "{escaped}"
+            set frontmost to true
+            set wc to count of windows
+            set ec to count of UI elements
+            set namesText to ""
+            repeat with w in windows
+                try
+                    set namesText to namesText & (name of w as text) & " | "
+                end try
+            end repeat
+            return "windows=" & wc & "; root_ui_elements=" & ec & "; window_names=" & namesText
+        end tell
+    end tell
+    '''
+    try:
+        return {"ok": "true", "output": run_osascript(script)}
+    except subprocess.CalledProcessError as e:
+        return {
+            "ok": "false",
+            "output": (e.stderr or e.stdout or str(e)).strip(),
+        }
+
+
 def _attr(element, name: str):
     try:
         err, value = AXUIElementCopyAttributeValue(element, name, None)
@@ -91,13 +126,13 @@ def walk_accessibility(app_name: str, max_depth: int = 12, max_nodes: int = 4000
 
     root = AXUIElementCreateApplication(pid)
     out: list[AXNode] = []
-    seen: set[int] = set()
+    seen: set[str] = set()
 
     def visit(node, depth: int) -> None:
         if depth > max_depth or len(out) >= max_nodes:
             return
 
-        ident = id(node)
+        ident = str(node)
         if ident in seen:
             return
         seen.add(ident)
@@ -131,11 +166,7 @@ def walk_accessibility(app_name: str, max_depth: int = 12, max_nodes: int = 4000
 
 def text_snapshot(app_name: str) -> str:
     nodes = walk_accessibility(app_name)
-    lines: list[str] = []
-    for node in nodes:
-        if node.value:
-            lines.append(node.value)
-    return "\n".join(lines)
+    return "\n".join(node.value for node in nodes if node.value)
 
 
 def formatted_tree(app_name: str) -> str:
