@@ -98,6 +98,15 @@ def main() -> int:
     send_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
     send_p.add_argument("message")
 
+    sar_p = sub.add_parser("send-and-read")
+    sar_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    sar_p.add_argument("message")
+    sar_p.add_argument("--timeout", type=float, default=300)
+
+    relay_p = sub.add_parser("relay")
+    relay_p.add_argument("message")
+    relay_p.add_argument("--timeout", type=float, default=300)
+
     run_p = sub.add_parser("run")
     run_p.add_argument("--dry-run", action="store_true")
 
@@ -143,6 +152,35 @@ def main() -> int:
     if args.command == "send":
         mapping[args.agent].send(args.message)
         print("sent")
+        return 0
+
+    if args.command == "send-and-read":
+        print(mapping[args.agent].send_and_read(args.message, timeout=args.timeout))
+        return 0
+
+    if args.command == "relay":
+        print("===== GPT ROUND 1 =====")
+        gpt_reply = gpt.send_and_read(args.message, timeout=args.timeout)
+        print(gpt_reply)
+
+        claude_prompt = (
+            "You are collaborating with ChatGPT on the same task. "
+            "Independently review the following ChatGPT response. "
+            "Identify errors, omissions, disagreements, and concrete improvements.\n\n"
+            "CHATGPT RESPONSE:\n" + gpt_reply
+        )
+        print("\n===== CLAUDE REVIEW =====")
+        claude_reply = claude.send_and_read(claude_prompt, timeout=args.timeout)
+        print(claude_reply)
+
+        gpt_followup = (
+            "Claude reviewed your previous response. Evaluate the review independently, "
+            "accept only well-supported suggestions, correct any mistakes, and produce the "
+            "next improved result.\n\nCLAUDE REVIEW:\n" + claude_reply
+        )
+        print("\n===== GPT ROUND 2 =====")
+        final_reply = gpt.send_and_read(gpt_followup, timeout=args.timeout)
+        print(final_reply)
         return 0
 
     if args.command == "run":
