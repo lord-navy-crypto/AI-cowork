@@ -132,10 +132,23 @@ class WebAutomationRuntime:
     def start(self) -> bool:
         if self.running:
             return False
-        if not validate_chatgpt_url(self.settings.chatgpt_url):
-            raise ValueError("Please enter a valid https://chatgpt.com/... URL.")
-        if self.settings.cursor_url and not validate_cursor_url(self.settings.cursor_url):
-            raise ValueError("Please enter a valid https://cursor.com/... URL.")
+        if (
+            self.supervise
+            and self.settings.chatgpt_supervisor_enabled
+            and not validate_chatgpt_url(self.settings.chatgpt_url)
+        ):
+            raise ValueError("ChatGPT Supervisor requires a valid https://chatgpt.com/... URL.")
+        if (
+            self.supervise
+            and self.settings.cursor_supervisor_enabled
+            and not validate_cursor_url(self.settings.cursor_url)
+        ):
+            raise ValueError("Cursor Supervisor requires a valid https://cursor.com/... URL.")
+        if not self.supervise:
+            if self.settings.chatgpt_url and not validate_chatgpt_url(self.settings.chatgpt_url):
+                raise ValueError("Invalid ChatGPT URL.")
+            if self.settings.cursor_url and not validate_cursor_url(self.settings.cursor_url):
+                raise ValueError("Invalid Cursor URL.")
 
         self._stop.clear()
         self._thread = threading.Thread(
@@ -164,20 +177,37 @@ class WebAutomationRuntime:
             args=["--disable-background-timer-throttling"],
         )
         pages = list(self._context.pages)
-        self._chatgpt_page = pages[0] if pages else self._context.new_page()
-        self._chatgpt_page.goto(
-            self.settings.chatgpt_url,
-            wait_until="domcontentloaded",
-            timeout=60_000,
+        reusable = pages[0] if pages else None
+
+        open_chatgpt = bool(self.settings.chatgpt_url) and (
+            not self.supervise or self.settings.chatgpt_supervisor_enabled
+        )
+        open_cursor = bool(self.settings.cursor_url) and (
+            not self.supervise or self.settings.cursor_supervisor_enabled
         )
 
-        if self.settings.cursor_url:
-            self._cursor_page = self._context.new_page()
+        if open_chatgpt:
+            self._chatgpt_page = reusable or self._context.new_page()
+            reusable = None
+            self._chatgpt_page.goto(
+                self.settings.chatgpt_url,
+                wait_until="domcontentloaded",
+                timeout=60_000,
+            )
+
+        if open_cursor:
+            self._cursor_page = reusable or self._context.new_page()
             self._cursor_page.goto(
                 self.settings.cursor_url,
                 wait_until="domcontentloaded",
                 timeout=60_000,
             )
+
+        if not open_chatgpt and not open_cursor and reusable is not None:
+            try:
+                reusable.close()
+            except Exception:
+                pass
 
     def _close(self) -> None:
         try:
@@ -479,23 +509,29 @@ class WebAutomationRuntime:
             self._status("Opening dedicated web session…")
             self._launch()
             page = self._chatgpt_page
-            if page is None:
-                raise RuntimeError("ChatGPT page could not be created.")
 
-            if self._login_required(page):
+            if page is not None and self._login_required(page):
                 if self.settings.headless:
-                    raise RuntimeError(
-                        "ChatGPT login expired. Open a visible Login Session once, sign in, then restart hidden mode."
+                    self._chatgpt_paused_reason = "login required"
+                    self.settings.chatgpt_supervisor_enabled = False
+                    self._status(
+                        "ChatGPT Supervisor paused: login required. "
+                        "Cursor Supervisor can continue."
                     )
-                self._status("ChatGPT login required — sign in in the dedicated browser, then leave it open.")
-                while not self._stop.is_set() and self._login_required(page):
-                    self._stop.wait(2.0)
+                else:
+                    self._status(
+                        "ChatGPT login required — sign in in the dedicated browser."
+                    )
+                    while not self._stop.is_set() and self._login_required(page):
+                        self._tick_cursor()
+                        self._stop.wait(2.0)
 
             if self._stop.is_set():
                 return
 
-            self._status(self._cursor_summary())
-            self._tick_cursor(force=True)
+            if self._cursor_page is not None:
+                self._status(self._cursor_summary())
+                self._tick_cursor(force=True)
             if not self.supervise:
                 self._status("Dedicated web session connected — login state will be saved locally.")
                 while not self._stop.is_set():
@@ -507,17 +543,18 @@ class WebAutomationRuntime:
             recovery_attempts = 0
             while not self._stop.is_set():
                 self._tick_cursor()
-                if not self.settings.chatgpt_supervisor_enabled:
+                if page is None or not self.settings.chatgpt_supervisor_enabled:
                     reason = (
                         f" ({self._chatgpt_paused_reason})"
                         if self._chatgpt_paused_reason
                         else ""
                     )
-                    self._status(
-                        "ChatGPT Supervisor paused"
-                        + reason
-                        + "; Cursor monitoring remains active."
-                    )
+                    if page is not None:
+                        self._status(
+                            "ChatGPT Supervisor paused"
+                            + reason
+                            + "; Cursor monitoring remains active."
+                        )
                     self._stop.wait(max(0.5, self.settings.poll_interval_seconds))
                     continue
                 try:
