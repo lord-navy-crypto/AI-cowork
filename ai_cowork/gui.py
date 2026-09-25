@@ -244,6 +244,9 @@ class WebControlWindowController(NSObject):
         settings = self._save()
         if settings is None:
             return
+        if not settings.chatgpt_url and not settings.cursor_url:
+            self.updateStatus_("Enter at least one ChatGPT or Cursor URL before opening a login session.")
+            return
         if self.runtime and self.runtime.running:
             self.updateStatus_("Dedicated browser session is already running.")
             return
