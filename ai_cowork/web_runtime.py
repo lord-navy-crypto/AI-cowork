@@ -275,14 +275,6 @@ class WebAutomationRuntime:
         if last_assistant and last_assistant != before_last:
             return True
 
-        # DOM variants without author-role attributes: verify that the newly
-        # submitted prompt is present in the rendered conversation.
-        try:
-            body = page.locator("body").inner_text(timeout=2_000)
-            if prompt_text.strip() and prompt_text.strip() in body:
-                return True
-        except Exception:
-            pass
         return False
 
     @staticmethod
@@ -390,6 +382,10 @@ class WebAutomationRuntime:
                 raise RuntimeError("ChatGPT page could not be created.")
 
             if self._login_required(page):
+                if self.settings.headless:
+                    raise RuntimeError(
+                        "ChatGPT login expired. Open a visible Login Session once, sign in, then restart hidden mode."
+                    )
                 self._status("ChatGPT login required — sign in in the dedicated browser, then leave it open.")
                 while not self._stop.is_set() and self._login_required(page):
                     self._stop.wait(2.0)
