@@ -262,6 +262,7 @@ class WebControlWindowController(NSObject):
                 self.runtime.stop()
             if self.cooperation_monitor and self.cooperation_monitor.running:
                 self.cooperation_monitor.stop()
+            self.protocol_gate.disable()
             self.start_button.setTitle_("Start Runtime")
             return
 
@@ -270,6 +271,11 @@ class WebControlWindowController(NSObject):
             return
 
         try:
+            if settings.cooperation_enabled:
+                self.protocol_gate.enable()
+            else:
+                self.protocol_gate.disable()
+
             web_enabled = (
                 settings.chatgpt_supervisor_enabled
                 or settings.cursor_supervisor_enabled
@@ -334,6 +340,7 @@ class WebControlWindowController(NSObject):
             self.runtime.stop()
         if self.cooperation_monitor and self.cooperation_monitor.running:
             self.cooperation_monitor.stop()
+        self.protocol_gate.disable()
         NSApplication.sharedApplication().terminate_(None)
 
 
