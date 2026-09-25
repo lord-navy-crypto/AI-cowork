@@ -91,11 +91,22 @@ def evaluate_protocol_state(
                 status_path or "(none)",
             )
 
-        if review_after_status is not False:
+        if review_after_status is True:
             return AgentProtocolState(
                 agent,
                 ProtocolState.OWN_WORK_ALLOWED,
                 f"{agent} completed the fresh peer review gate and may work on its owned branch.",
+                peer_head,
+                own_head,
+                review_path or "(none)",
+                status_path or "(none)",
+            )
+
+        if review_after_status is None:
+            return AgentProtocolState(
+                agent,
+                ProtocolState.REVIEW_REQUIRED,
+                f"{agent} has ambiguous review/status ordering; append a new review before own work.",
                 peer_head,
                 own_head,
                 review_path or "(none)",
@@ -300,6 +311,8 @@ class GitCoordinationMonitor:
             return False
         if not older:
             return True
+        if newer == older:
+            return None
         result = subprocess.run(
             [
                 "git",
