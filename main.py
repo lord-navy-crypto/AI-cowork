@@ -4,7 +4,12 @@ import argparse
 import time
 from pathlib import Path
 
-from ai_cowork.cooperation import GitCoordinationMonitor, ProtocolGate
+from ai_cowork.cooperation import (
+    GitCoordinationMonitor,
+    ProtocolGate,
+    draft_required_coordination_message,
+    protocol_next_action,
+)
 from ai_cowork.runtime_state import RuntimeStateStore, classify_status_message
 from ai_cowork.web_runtime import (
     SettingsStore,
@@ -108,7 +113,40 @@ def show_protocol() -> int:
         print(f"  own={state.own_head} peer={state.peer_head}")
         print(f"  review={state.latest_review}")
         print(f"  status={state.latest_status}")
+        print(f"  next={protocol_next_action(state)}")
     print(f"Latest coordination message: {snapshot.latest_message}")
+    return 0
+
+
+def draft_protocol_message(agent: str, summary: str) -> int:
+    monitor = GitCoordinationMonitor(".")
+    try:
+        snapshot = monitor.snapshot()
+    except Exception as exc:
+        print(f"Protocol check failed: {exc}")
+        return 2
+
+    state = (
+        snapshot.chatgpt_protocol
+        if agent == "chatgpt"
+        else snapshot.cursor_protocol
+    )
+    if state is None:
+        print(f"No protocol state available for {agent}.")
+        return 2
+
+    try:
+        path, body = draft_required_coordination_message(
+            state,
+            summary=summary,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return 2
+
+    print(path)
+    print()
+    print(body)
     return 0
 
 
@@ -198,6 +236,16 @@ def main() -> int:
     sub.add_parser("supervisor", help="Run the saved ChatGPT Web supervisor.")
     sub.add_parser("doctor", help="Check Playwright and browser installation.")
     sub.add_parser("protocol", help="Show current cooperation protocol gates.")
+    draft = sub.add_parser(
+        "draft-message",
+        help="Draft the protocol-required coordination message for an agent.",
+    )
+    draft.add_argument("agent", choices=("chatgpt", "cursor"))
+    draft.add_argument(
+        "--summary",
+        required=True,
+        help="Short review/status summary to place in the draft.",
+    )
 
     args = parser.parse_args()
 
@@ -207,6 +255,8 @@ def main() -> int:
         return run_supervisor()
     if args.command == "protocol":
         return show_protocol()
+    if args.command == "draft-message":
+        return draft_protocol_message(args.agent, args.summary)
 
     from ai_cowork.gui import run_gui
 
