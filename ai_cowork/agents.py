@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from .events import EventLog
 from .macos import (
+    background_send_chat_message,
     generation_in_progress,
     paste_and_enter,
     paste_into_chat,
@@ -56,6 +57,8 @@ class DesktopAgent(Agent):
     enter_to_send: bool = True
     events: EventLog | None = None
     read_strategy: str = "ax_tree"
+    background_preferred: bool = False
+    allow_foreground_fallback: bool = True
     _baseline: str = field(default="", init=False, repr=False)
     _last_prompt: str = field(default="", init=False, repr=False)
 
@@ -69,11 +72,20 @@ class DesktopAgent(Agent):
         if self.events:
             self.events.emit("agent_send", agent=self.name, chars=len(prompt))
 
-        # Desktop chat apps can keep focus on sidebar/navigation even when
-        # their window is frontmost. Always locate an editable composer before
-        # pasting. This is especially important for Electron editors/chat apps, where merely
-        # activating the window does not reliably focus the message box.
+        if self.background_preferred:
+            if background_send_chat_message(self.app_name, prompt):
+                if self.events:
+                    self.events.emit("agent_send_transport", agent=self.name, transport="background_ax")
+                return
+            if not self.allow_foreground_fallback:
+                raise RuntimeError(
+                    f"{self.name} background send unavailable and foreground fallback is disabled"
+                )
+
+        # Fallback for app builds that do not expose a writable background AX composer.
         paste_into_chat(self.app_name, prompt, enter=self.enter_to_send)
+        if self.events:
+            self.events.emit("agent_send_transport", agent=self.name, transport="foreground_fallback")
 
     def read_snapshot(self) -> str:
         if self.read_strategy == "webarea":
