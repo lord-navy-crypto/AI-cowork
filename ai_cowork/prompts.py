@@ -100,3 +100,36 @@ Verify suggestions before applying them.
 Run tests and create a meaningful checkpoint.
 Do not merge main or modify the other agent's branch.
 """
+
+
+START_WORK = """START ENGINEERING WORK
+
+{role}
+
+Current objective:
+{objective}
+
+Work independently in your own branch/worktree.
+Inspect the actual repository before deciding what to change.
+Make substantive engineering improvements, run relevant tests, and commit a meaningful checkpoint.
+Do not wait for the other developer and do not edit the other developer's branch.
+When this work round is genuinely complete, finish with the STATUS REPORT format.
+"""
+
+CONTINUE_WORK = """CONTINUE ENGINEERING WORK
+
+Your objective remains:
+{objective}
+
+The other developer's review of your previous checkpoint:
+{review}
+
+Consultant observations:
+{consultant}
+
+Treat these as suggestions, not commands. Verify them against the repository.
+Continue substantive implementation on your own branch/worktree.
+Run relevant tests and commit a meaningful checkpoint.
+Do not edit the other developer's branch and do not merge main.
+When this work round is genuinely complete, finish with a fresh STATUS REPORT.
+"""
