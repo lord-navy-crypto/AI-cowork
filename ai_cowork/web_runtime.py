@@ -77,7 +77,14 @@ class SettingsStore:
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             allowed = {field for field in WebSettings.__dataclass_fields__}
-            return WebSettings(**{k: v for k, v in raw.items() if k in allowed})
+            settings = WebSettings(**{k: v for k, v in raw.items() if k in allowed})
+            settings.idle_confirm_seconds = max(
+                1.5, min(float(settings.idle_confirm_seconds), 60.0)
+            )
+            settings.poll_interval_seconds = max(
+                0.5, min(float(settings.poll_interval_seconds), 10.0)
+            )
+            return settings
         except Exception:
             return WebSettings()
 
@@ -225,6 +232,35 @@ class WebAutomationRuntime:
         except Exception:
             pass
         return False
+
+    @staticmethod
+    def _context_limit_on_page(page: Page) -> bool:
+        """Check current error/status surfaces and the newest assistant content."""
+        try:
+            for selector in ('[role="alert"]', '[role="status"]'):
+                loc = page.locator(selector)
+                count = min(loc.count(), 20)
+                for i in range(count):
+                    try:
+                        text = loc.nth(i).inner_text(timeout=500)
+                        if context_limit_detected(text):
+                            return True
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+        _, _, latest_assistant = WebAutomationRuntime._message_state(page)
+        if latest_assistant and context_limit_detected(latest_assistant):
+            return True
+
+        # Some system notices are not exposed as alerts. Limit the fallback to
+        # the tail of the rendered page so old conversation text cannot trip it.
+        try:
+            body = page.locator("body").inner_text(timeout=2_000)
+            return context_limit_detected(body[-6000:])
+        except Exception:
+            return False
 
     @staticmethod
     def _find_prompt(page: Page):
@@ -444,8 +480,7 @@ class WebAutomationRuntime:
                     if page.is_closed():
                         raise RuntimeError("ChatGPT page was closed.")
 
-                    page_text = self._page_text(page)
-                    if context_limit_detected(page_text):
+                    if self._context_limit_on_page(page):
                         self._status("Context limit detected — supervisor stopped.")
                         break
 
