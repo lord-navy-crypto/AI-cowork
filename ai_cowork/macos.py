@@ -492,7 +492,8 @@ def select_all_copy_text(app_name: str, settle: float = 0.35) -> str:
 
     This is intended for Electron apps whose AX WebArea exposes no text-marker
     content (currently Claude on the tested macOS build). It restores the
-    user's clipboard after the read.
+    user's clipboard after the read. Deliberately do NOT press Escape: in
+    Claude, Escape can cancel an in-progress generation.
     """
     old_clipboard = get_clipboard()
     activate_app(app_name)
@@ -505,7 +506,6 @@ def select_all_copy_text(app_name: str, settle: float = 0.35) -> str:
                 delay 0.15
                 keystroke "c" using command down
                 delay 0.25
-                key code 53
             end tell
             '''
         )
