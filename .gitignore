@@ -10,3 +10,4 @@ state/runtime_status.json
 state/browser-profile/
 state/web_settings.json
 state/events*.jsonl
+state/protocol_drafts/
