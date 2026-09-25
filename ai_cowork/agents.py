@@ -5,7 +5,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from .events import EventLog
-from .macos import paste_and_enter, text_snapshot
+from .macos import (
+    paste_and_enter,
+    select_all_copy_text,
+    text_snapshot,
+    webarea_text,
+)
 
 
 class Agent(ABC):
@@ -20,19 +25,24 @@ class Agent(ABC):
 
 
 def _extract_delta(before: str, after: str) -> str:
-    """Best-effort extraction of newly appeared UI text.
+    if not before:
+        return after.strip()
+    if after.startswith(before):
+        return after[len(before):].strip()
 
-    Accessibility snapshots are flattened text, not a semantic message list.
-    We therefore remove the longest common prefix. If the app reorders the
-    accessibility tree, fall back to the full stable snapshot rather than
-    returning an empty response.
-    """
+    # UI chrome can mutate near the start of a flattened snapshot. Prefer the
+    # longest common suffix/prefix overlap before falling back to a character
+    # prefix diff.
+    max_overlap = min(len(before), len(after), 20000)
+    for size in range(max_overlap, 64, -1):
+        if before[-size:] == after[:size]:
+            return after[size:].strip()
+
     limit = min(len(before), len(after))
     i = 0
     while i < limit and before[i] == after[i]:
         i += 1
-    delta = after[i:].strip()
-    return delta or after.strip()
+    return after[i:].strip() or after.strip()
 
 
 @dataclass
@@ -43,11 +53,10 @@ class DesktopAgent(Agent):
     stable_seconds: float = 4.0
     enter_to_send: bool = True
     events: EventLog | None = None
+    read_strategy: str = "ax_tree"
     _baseline: str = field(default="", init=False, repr=False)
 
     def send(self, prompt: str) -> None:
-        # Capture the pre-send UI so wait_until_stable can return only the
-        # newly produced content instead of forwarding the entire conversation.
         try:
             self._baseline = self.read_snapshot()
         except Exception:
@@ -58,6 +67,12 @@ class DesktopAgent(Agent):
         paste_and_enter(self.app_name, prompt, enter=self.enter_to_send)
 
     def read_snapshot(self) -> str:
+        if self.read_strategy == "webarea":
+            value = webarea_text(self.app_name)
+            return value or text_snapshot(self.app_name)
+        if self.read_strategy == "clipboard":
+            value = select_all_copy_text(self.app_name)
+            return value or text_snapshot(self.app_name)
         return text_snapshot(self.app_name)
 
     def wait_until_stable(self, timeout: float = 300) -> str:
@@ -79,6 +94,7 @@ class DesktopAgent(Agent):
                             agent=self.name,
                             snapshot_chars=len(current),
                             output_chars=len(output),
+                            strategy=self.read_strategy,
                         )
                     return output
             else:
@@ -92,11 +108,4 @@ class DesktopAgent(Agent):
 
 @dataclass
 class BrowserAgent(DesktopAgent):
-    """MVP browser adapter.
-
-    v0.1 reuses macOS Accessibility against a dedicated browser window.
-    A DOM/Playwright adapter can later replace it without changing the
-    Controller interface.
-    """
-
     window_title_contains: str | None = None
