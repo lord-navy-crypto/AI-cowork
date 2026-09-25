@@ -7,7 +7,8 @@ AI-cowork now uses a **web-first** architecture.
 A small macOS control app for:
 
 - **ChatGPT Web Supervisor**
-- **Cursor Web connection/status**
+- **Cursor Web Supervisor**
+- **ChatGPT ↔ Cursor Cooperation**
 - persistent dedicated browser login state
 - optional hidden/headless running after login
 
@@ -34,10 +35,14 @@ The control window has:
 
 - ChatGPT work URL
 - Cursor Agent URL
-- Save URLs
-- Start Web Supervisor
+- independent ChatGPT Supervisor / Cursor Supervisor / Cooperation switches
+- separate status lines for all three modules
+- Save Settings
+- Start Web Runtime
 - Open/Login Session
 - Run hidden after login
+
+All three modules share one persistent Chromium runtime so the browser profile is never opened concurrently by multiple processes.
 
 Settings are stored locally in:
 
@@ -110,3 +115,14 @@ coordination
 ChatGPT and Cursor should communicate through the append-only `coordination` branch rather than copying chat text between UIs.
 
 DeepSeek is not part of the architecture.
+
+
+## Three-module product direction
+
+Desktop/App Accessibility automation is frozen for now. Active development is limited to:
+
+1. ChatGPT Web Supervisor
+2. Cursor Web Supervisor
+3. ChatGPT ↔ Cursor Cooperation
+
+See `WEB_ARCHITECTURE.md` for the current design and branch protocol.
