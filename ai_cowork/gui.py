@@ -6,6 +6,7 @@ from AppKit import (
     NSApplicationActivationPolicyRegular,
     NSBackingStoreBuffered,
     NSButton,
+    NSButtonTypeSwitch,
     NSMakeRect,
     NSTextField,
     NSWindow,
@@ -37,6 +38,7 @@ class WebControlWindowController(NSObject):
         self.cursor_field = None
         self.status_label = None
         self.start_button = None
+        self.headless_check = None
         return self
 
     @objc.python_method
@@ -79,24 +81,30 @@ class WebControlWindowController(NSObject):
         )
         content.addSubview_(self.cursor_field)
 
-        save_button = self._button("Save URLs", 24, 72, 145, 36, "saveURLs:")
+        self.headless_check = NSButton.alloc().initWithFrame_(NSMakeRect(24, 91, 240, 24))
+        self.headless_check.setButtonType_(NSButtonTypeSwitch)
+        self.headless_check.setTitle_("Run hidden after login")
+        self.headless_check.setState_(1 if self.settings.headless else 0)
+        content.addSubview_(self.headless_check)
+
+        save_button = self._button("Save URLs", 24, 50, 145, 34, "saveURLs:")
         content.addSubview_(save_button)
 
         self.start_button = self._button(
             "Start Web Supervisor",
-            183, 72, 200, 36,
+            183, 50, 200, 34,
             "toggleSupervisor:",
         )
         content.addSubview_(self.start_button)
 
         browser_button = self._button(
             "Open/Login Session",
-            397, 72, 197, 36,
+            397, 50, 197, 34,
             "openSession:",
         )
         content.addSubview_(browser_button)
 
-        self.status_label = self._label("Status: idle", 24, 30, 570, 26, 12)
+        self.status_label = self._label("Status: idle", 24, 17, 570, 24, 12)
         content.addSubview_(self.status_label)
 
         self.window.makeKeyAndOrderFront_(None)
@@ -133,6 +141,7 @@ class WebControlWindowController(NSObject):
         current = self.store.load()
         current.chatgpt_url = chatgpt_url
         current.cursor_url = cursor_url
+        current.headless = bool(self.headless_check.state()) if self.headless_check is not None else False
         return current
 
     @objc.python_method
@@ -167,6 +176,7 @@ class WebControlWindowController(NSObject):
         if self.runtime and self.runtime.running:
             self.updateStatus_("Dedicated browser session is already running.")
             return
+        # Login sessions are always visible so the user can authenticate.
         settings.headless = False
         self.runtime = WebAutomationRuntime(settings, on_status=self.status_from_worker)
         try:
