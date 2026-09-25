@@ -458,3 +458,58 @@ def webarea_text_dump(app_name: str) -> str:
             lines.append("no text-marker string parameter returned a value")
 
     return "\n".join(lines)
+
+
+def webarea_text(app_name: str) -> str:
+    """Return the longest non-empty Chromium WebArea text snapshot."""
+    webareas = _find_role_nodes(app_name, "AXWebArea")
+    range_create = getattr(AS, "AXTextMarkerRangeCreate", None)
+    if range_create is None:
+        return ""
+
+    candidates: list[str] = []
+    for area in webareas:
+        start = _attr(area, "AXStartTextMarker")
+        end = _attr(area, "AXEndTextMarker")
+        if start is None or end is None:
+            continue
+        try:
+            marker_range = range_create(None, start, end)
+        except Exception:
+            continue
+        params = _parameterized_names(area)
+        if "AXStringForTextMarkerRange" not in params:
+            continue
+        value = _parameterized_value(area, "AXStringForTextMarkerRange", marker_range)
+        if isinstance(value, str) and value.strip():
+            candidates.append(value.strip())
+
+    return max(candidates, key=len) if candidates else ""
+
+
+def select_all_copy_text(app_name: str, settle: float = 0.35) -> str:
+    """Best-effort read fallback using Cmd+A / Cmd+C.
+
+    This is intended for Electron apps whose AX WebArea exposes no text-marker
+    content (currently Claude on the tested macOS build). It restores the
+    user's clipboard after the read.
+    """
+    old_clipboard = get_clipboard()
+    activate_app(app_name)
+    time.sleep(settle)
+    try:
+        run_osascript(
+            '''
+            tell application "System Events"
+                keystroke "a" using command down
+                delay 0.15
+                keystroke "c" using command down
+                delay 0.25
+                key code 53
+            end tell
+            '''
+        )
+        copied = get_clipboard()
+        return copied.strip()
+    finally:
+        set_clipboard(old_clipboard)
