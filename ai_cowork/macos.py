@@ -154,8 +154,17 @@ def walk_accessibility(app_name: str, max_depth: int = 12, max_nodes: int = 4000
         children: list = []
         for attr_name in CHILD_ATTRIBUTES:
             value = _attr(node, attr_name)
-            if isinstance(value, (list, tuple)):
-                children.extend(value)
+            if value is None:
+                continue
+            # PyObjC commonly returns NSArray/CFArray proxy objects rather than
+            # native Python list/tuple instances. Treat any non-string iterable
+            # as a child collection.
+            if isinstance(value, (str, bytes)):
+                continue
+            try:
+                children.extend(list(value))
+            except TypeError:
+                pass
 
         for child in children:
             visit(child, depth + 1)
