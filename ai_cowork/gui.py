@@ -311,7 +311,6 @@ class WebControlWindowController(NSObject):
 
     @objc.python_method
     def status_from_worker(self, message: str) -> None:
-        self.runtime_state.update(classify_status_message(message), message)
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "updateStatus:", message, False
         )
