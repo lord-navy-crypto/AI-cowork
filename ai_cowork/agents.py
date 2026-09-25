@@ -89,6 +89,14 @@ class DesktopAgent(Agent):
         stable_since: float | None = None
         seen_change = False
 
+        # Clipboard reading is invasive compared with passive AX WebArea
+        # reading. Give Claude time to start generating before the first copy
+        # and poll it less aggressively.
+        interval = self.poll_interval
+        if self.read_strategy == "clipboard":
+            time.sleep(2.5)
+            interval = max(interval, 2.5)
+
         while time.monotonic() - started < timeout:
             current = self.read_snapshot()
 
@@ -113,7 +121,7 @@ class DesktopAgent(Agent):
                 previous = current
                 stable_since = None
 
-            time.sleep(self.poll_interval)
+            time.sleep(interval)
 
         raise TimeoutError(f"{self.name} output did not become stable")
 
