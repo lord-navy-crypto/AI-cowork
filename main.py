@@ -4,6 +4,7 @@ import argparse
 import time
 from pathlib import Path
 
+from ai_cowork.cooperation import GitCoordinationMonitor
 from ai_cowork.web_runtime import (
     SettingsStore,
     WebAutomationRuntime,
@@ -64,11 +65,22 @@ def run_supervisor() -> int:
         on_status=lambda message: print(f"[web] {message}", flush=True),
     )
     runtime.start()
+    cooperation = None
+    if settings.cooperation_enabled:
+        cooperation = GitCoordinationMonitor(
+            ".",
+            poll_seconds=10.0,
+            on_status=lambda message: print(f"[cooperation] {message}", flush=True),
+        )
+        cooperation.start()
     try:
         while runtime.running:
             time.sleep(0.5)
     except KeyboardInterrupt:
         runtime.stop()
+    finally:
+        if cooperation and cooperation.running:
+            cooperation.stop()
         while runtime.running:
             time.sleep(0.1)
     return 0
