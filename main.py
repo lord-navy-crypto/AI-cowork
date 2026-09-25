@@ -42,6 +42,7 @@ def build_agents(cfg: dict):
             stable_seconds=float(cfg.get("stable_output_seconds", 4)),
             enter_to_send=bool(item.get("enter_to_send", True)),
             events=events,
+            read_strategy=item.get("read_strategy", "ax_tree"),
         )
 
     return desktop("chatgpt"), desktop("claude"), desktop("deepseek"), events
@@ -90,6 +91,9 @@ def main() -> int:
     text_p = sub.add_parser("web-text")
     text_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
 
+    snap_p = sub.add_parser("snapshot")
+    snap_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+
     send_p = sub.add_parser("send")
     send_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
     send_p.add_argument("message")
@@ -130,6 +134,10 @@ def main() -> int:
 
     if args.command == "web-text":
         print(webarea_text_dump(mapping[args.agent].app_name))
+        return 0
+
+    if args.command == "snapshot":
+        print(mapping[args.agent].read_snapshot())
         return 0
 
     if args.command == "send":
