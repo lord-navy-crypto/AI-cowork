@@ -7,3 +7,6 @@ state/runtime.json
 state/events.jsonl
 reports/*.md
 state/runtime_status.json
+state/browser-profile/
+state/web_settings.json
+state/events*.jsonl
