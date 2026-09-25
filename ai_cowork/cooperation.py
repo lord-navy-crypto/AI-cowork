@@ -172,10 +172,12 @@ class CoordinationSnapshot:
 class ProtocolGate:
     """Thread-safe latest cooperation state shared with web supervisors."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_snapshot_age_seconds: float = 35.0) -> None:
         self._lock = threading.Lock()
         self._snapshot: CoordinationSnapshot | None = None
+        self._snapshot_at: float | None = None
         self._enabled = False
+        self.max_snapshot_age_seconds = max(5.0, float(max_snapshot_age_seconds))
 
     def enable(self) -> None:
         with self._lock:
@@ -185,10 +187,21 @@ class ProtocolGate:
         with self._lock:
             self._enabled = False
             self._snapshot = None
+            self._snapshot_at = None
 
     def update(self, snapshot: CoordinationSnapshot) -> None:
         with self._lock:
             self._snapshot = snapshot
+            self._snapshot_at = time.monotonic()
+
+    def is_fresh(self) -> bool:
+        with self._lock:
+            if not self._enabled:
+                return True
+            if self._snapshot is None or self._snapshot_at is None:
+                return False
+            age = time.monotonic() - self._snapshot_at
+            return age <= self.max_snapshot_age_seconds
 
     def snapshot(self) -> CoordinationSnapshot | None:
         with self._lock:
@@ -209,10 +222,10 @@ class ProtocolGate:
             enabled = self._enabled
         if not enabled:
             return True
+        if not self.is_fresh():
+            return False
         state = self.state_for(agent)
         if state is None:
-            # Cooperation is enabled, so do not act until the first valid
-            # coordination snapshot has been fetched.
             return False
         return state.state is ProtocolState.OWN_WORK_ALLOWED
 
@@ -221,6 +234,12 @@ class ProtocolGate:
             enabled = self._enabled
         if not enabled:
             return ""
+        if not self.is_fresh():
+            with self._lock:
+                has_snapshot = self._snapshot is not None
+            if has_snapshot:
+                return "STALE_COORDINATION: protocol snapshot expired; waiting for a fresh Git fetch."
+            return "WAITING_FOR_COORDINATION: first protocol snapshot has not arrived yet."
         state = self.state_for(agent)
         if state is None:
             return "WAITING_FOR_COORDINATION: first protocol snapshot has not arrived yet."
