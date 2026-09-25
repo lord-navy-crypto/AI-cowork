@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError, wait
 from pathlib import Path
 
 import yaml
@@ -19,6 +19,7 @@ from ai_cowork.macos import (
     accessibility_debug,
     meaningful_accessibility_dump,
     webarea_text_dump,
+    cancel_generation,
 )
 from ai_cowork.state import RuntimeStore
 
@@ -114,6 +115,8 @@ def main() -> int:
     ping_p.add_argument("message")
     ping_p.add_argument("--rounds", type=int, default=0,
                         help="Number of barrier rounds; 0 means continue until Ctrl+C.")
+    ping_p.add_argument("--stuck-minutes", type=float, default=0,
+                        help="Optional watchdog; 0 disables forced cancellation.")
 
     run_p = sub.add_parser("run")
     run_p.add_argument("--dry-run", action="store_true")
@@ -200,9 +203,35 @@ def main() -> int:
                     "chatgpt": pool.submit(gpt.wait_until_stable, None),
                     "claude": pool.submit(claude.wait_until_stable, None),
                 }
+
+                if args.stuck_minutes > 0:
+                    watchdog_seconds = args.stuck_minutes * 60.0
+                    done, not_done = wait(futures.values(), timeout=watchdog_seconds)
+                    if not_done:
+                        stuck_names = [
+                            name for name, future in futures.items() if future in not_done
+                        ]
+                        print(
+                            "[ping-pong] watchdog: cancelling stuck generation(s): "
+                            + ", ".join(stuck_names),
+                            flush=True,
+                        )
+                        for name in stuck_names:
+                            cancel_generation(mapping[name].app_name)
+
                 replies = {}
                 for name in ("chatgpt", "claude"):
-                    replies[name] = futures[name].result()
+                    try:
+                        # With no watchdog this is an unlimited barrier wait.
+                        # After watchdog cancellation, allow the UI time to settle
+                        # and return its partial/final visible output.
+                        settle_timeout = 20.0 if args.stuck_minutes > 0 else None
+                        replies[name] = futures[name].result(timeout=settle_timeout)
+                    except FutureTimeoutError:
+                        raise RuntimeError(
+                            f"{name} did not settle after watchdog cancellation; "
+                            "manual intervention is required"
+                        )
                     print(
                         f"[ping-pong] round {round_index}: {name} READY; "
                         "handoff blocked until the other side is also READY",
