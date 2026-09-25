@@ -253,3 +253,83 @@ def accessibility_debug(app_name: str, max_depth: int = 10) -> str:
 
     visit(root, 0)
     return "\n".join(lines)
+
+
+MEANINGFUL_ROLES = {
+    "AXTextArea", "AXTextField", "AXStaticText", "AXButton", "AXLink",
+    "AXHeading", "AXWebArea", "AXCheckBox", "AXRadioButton",
+    "AXList", "AXListItem", "AXScrollArea"
+}
+
+
+def meaningful_accessibility_dump(app_name: str, max_depth: int = 30, max_nodes: int = 12000) -> str:
+    """Deep dump focused on actionable/text-bearing nodes plus a role histogram."""
+    pid = find_pid(app_name)
+    if pid is None:
+        raise RuntimeError(f"{app_name} is not running")
+    enable_enhanced_accessibility(app_name)
+    root = AXUIElementCreateApplication(pid)
+
+    seen: set[str] = set()
+    lines: list[str] = []
+    counts: dict[str, int] = {}
+    visited = 0
+
+    def visit(node, depth: int) -> None:
+        nonlocal visited
+        if depth > max_depth or visited >= max_nodes:
+            return
+        ident = str(node)
+        if ident in seen:
+            return
+        seen.add(ident)
+        visited += 1
+
+        role = str(_attr(node, "AXRole") or "")
+        counts[role] = counts.get(role, 0) + 1
+
+        title = str(_attr(node, "AXTitle") or "")
+        value = str(_attr(node, "AXValue") or "")
+        desc = str(_attr(node, "AXDescription") or "")
+        placeholder = str(_attr(node, "AXPlaceholderValue") or "")
+        domid = str(_attr(node, "AXDOMIdentifier") or "")
+        classes = _attr(node, "AXDOMClassList")
+        class_text = ""
+        if classes is not None and not isinstance(classes, (str, bytes)):
+            try:
+                class_text = " ".join(str(x) for x in list(classes))
+            except TypeError:
+                class_text = str(classes)
+
+        if role in MEANINGFUL_ROLES or any((title, value, desc, placeholder, domid)):
+            bits = []
+            if title: bits.append(f"title={title[:160]!r}")
+            if value: bits.append(f"value={value[:240]!r}")
+            if desc: bits.append(f"desc={desc[:160]!r}")
+            if placeholder: bits.append(f"placeholder={placeholder[:160]!r}")
+            if domid: bits.append(f"id={domid[:120]!r}")
+            if class_text: bits.append(f"class={class_text[:180]!r}")
+            lines.append(f'{"  " * min(depth, 20)}{role}: ' + " | ".join(bits))
+
+        children: list = []
+        for attr_name in ("AXChildren", "AXContents", "AXRows", "AXWindows", "AXChildrenInNavigationOrder"):
+            obj = _attr(node, attr_name)
+            if obj is None or isinstance(obj, (str, bytes)):
+                continue
+            try:
+                children.extend(list(obj))
+            except TypeError:
+                pass
+        for child in children:
+            visit(child, depth + 1)
+
+    visit(root, 0)
+    histogram = "\n".join(
+        f"{role or '(none)'}={count}"
+        for role, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    )
+    return (
+        f"visited_nodes={visited}\n"
+        f"===== ROLE HISTOGRAM =====\n{histogram}\n"
+        f"===== MEANINGFUL NODES =====\n" + "\n".join(lines)
+    )
