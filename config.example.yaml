@@ -1,43 +1,24 @@
-checkpoint_seconds: 600
-stable_output_seconds: 4
-poll_interval_seconds: 1
-max_rounds: 12
+poll_interval_seconds: 5
+
+coordination:
+  branch: coordination
+  messages_path: messages
+  append_only: true
+  require_peer_review_before_work: true
 
 agents:
   chatgpt:
-    kind: desktop
+    surface: desktop
     app_name: ChatGPT
-    role: developer_a
-    branch: agent/gpt
-    enter_to_send: true
-    read_strategy: webarea
+    work_branch: agent/chatgpt
+    peer_branch: agent/cursor
 
   cursor:
-    kind: desktop
-    app_name: Cursor
-    role: developer_b
-    branch: agent/cursor
-    enter_to_send: true
-    # Cursor is Electron/VS Code based. Start conservative; switch to webarea
-    # later if AX inspection proves its chat pane exposes stable text markers.
-    read_strategy: clipboard
+    surface: web
+    work_branch: agent/cursor
+    peer_branch: agent/chatgpt
 
-  deepseek:
-    kind: browser
-    app_name: Google Chrome
-    role: consultant
-    # Keep one dedicated DeepSeek window/profile open.
-    window_title_contains: DeepSeek
-    enter_to_send: true
-    read_strategy: ax_tree
-
-safety:
-  blocked_fragments:
-    - "git push --force"
-    - "git push -f"
-    - "git reset --hard"
-    - "rm -rf"
-    - "git checkout -- ."
-    - "git clean -fd"
-    - "git branch -D"
-    - "git merge main"
+integration:
+  protected_branch: main
+  agents_may_write_main: false
+  auto_merge: false
