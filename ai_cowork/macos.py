@@ -6,8 +6,10 @@ from dataclasses import dataclass
 
 from ApplicationServices import (
     AXIsProcessTrusted,
+    AXUIElementCopyAttributeNames,
     AXUIElementCopyAttributeValue,
     AXUIElementCreateApplication,
+    AXUIElementSetAttributeValue,
 )
 from AppKit import NSWorkspace
 
@@ -112,6 +114,31 @@ def _attr(element, name: str):
     return None
 
 
+def _attr_names(element) -> list[str]:
+    try:
+        err, names = AXUIElementCopyAttributeNames(element, None)
+        if err == 0 and names:
+            return [str(x) for x in names]
+    except Exception:
+        pass
+    return []
+
+
+def enable_enhanced_accessibility(app_name: str) -> bool:
+    pid = find_pid(app_name)
+    if pid is None:
+        return False
+    app = AXUIElementCreateApplication(pid)
+    # Electron/Chromium apps may keep the deep web accessibility tree lazy
+    # until an assistive technology requests enhanced UI.
+    for attr in ("AXEnhancedUserInterface", "AXManualAccessibility"):
+        try:
+            AXUIElementSetAttributeValue(app, attr, True)
+        except Exception:
+            pass
+    return True
+
+
 @dataclass
 class AXNode:
     role: str
@@ -124,6 +151,7 @@ def walk_accessibility(app_name: str, max_depth: int = 12, max_nodes: int = 4000
     if pid is None:
         raise RuntimeError(f"{app_name} is not running")
 
+    enable_enhanced_accessibility(app_name)
     root = AXUIElementCreateApplication(pid)
     out: list[AXNode] = []
     seen: set[str] = set()
@@ -184,3 +212,44 @@ def formatted_tree(app_name: str) -> str:
         f'{"  " * node.depth}{node.role}: {node.value[:240]}'
         for node in nodes
     )
+
+
+def accessibility_debug(app_name: str, max_depth: int = 10) -> str:
+    """Dump roles plus available AX attributes for WebArea/text-like nodes."""
+    pid = find_pid(app_name)
+    if pid is None:
+        raise RuntimeError(f"{app_name} is not running")
+    enable_enhanced_accessibility(app_name)
+    root = AXUIElementCreateApplication(pid)
+    lines: list[str] = []
+    seen: set[str] = set()
+
+    def visit(node, depth: int) -> None:
+        if depth > max_depth:
+            return
+        ident = str(node)
+        if ident in seen:
+            return
+        seen.add(ident)
+
+        role = str(_attr(node, "AXRole") or "")
+        value = str(_attr(node, "AXTitle") or _attr(node, "AXValue") or "")
+        if role in ("AXWebArea", "AXTextArea", "AXStaticText", "AXGroup"):
+            names = ",".join(_attr_names(node))
+            lines.append(f'{"  " * depth}{role}: {value[:120]}')
+            lines.append(f'{"  " * depth}  attrs=[{names}]')
+
+        children: list = []
+        for attr_name in ("AXChildren", "AXContents", "AXRows", "AXWindows", "AXChildrenInNavigationOrder"):
+            value_obj = _attr(node, attr_name)
+            if value_obj is None or isinstance(value_obj, (str, bytes)):
+                continue
+            try:
+                children.extend(list(value_obj))
+            except TypeError:
+                pass
+        for child in children:
+            visit(child, depth + 1)
+
+    visit(root, 0)
+    return "\n".join(lines)
