@@ -6,8 +6,10 @@ from ai_cowork.cursor_supervisor import CursorState, classify_cursor_text
 from ai_cowork.cooperation import (
     CoordinationSnapshot,
     GitCoordinationMonitor,
+    ProtocolState,
     chatgpt_peer_review_instruction,
     cursor_peer_review_instruction,
+    evaluate_protocol_state,
 )
 from ai_cowork.web_runtime import (
     SettingsStore,
@@ -91,6 +93,42 @@ class CoreTests(unittest.TestCase):
         self.assertIn("agent/chatgpt", cursor_peer_review_instruction())
         self.assertIn("Never write main", chatgpt_peer_review_instruction())
         self.assertIn("Never write main", cursor_peer_review_instruction())
+
+    def test_protocol_requires_review_after_peer_update(self):
+        state = evaluate_protocol_state(
+            agent="chatgpt",
+            own_head="own",
+            peer_head="peer",
+            own_ts=100,
+            peer_ts=200,
+            review_ts=150,
+            status_ts=100,
+        )
+        self.assertEqual(state.state, ProtocolState.REVIEW_REQUIRED)
+
+    def test_protocol_requires_status_after_own_work(self):
+        state = evaluate_protocol_state(
+            agent="cursor",
+            own_head="own",
+            peer_head="peer",
+            own_ts=300,
+            peer_ts=100,
+            review_ts=200,
+            status_ts=250,
+        )
+        self.assertEqual(state.state, ProtocolState.STATUS_REQUIRED)
+
+    def test_protocol_allows_work_after_fresh_review(self):
+        state = evaluate_protocol_state(
+            agent="chatgpt",
+            own_head="own",
+            peer_head="peer",
+            own_ts=100,
+            peer_ts=200,
+            review_ts=250,
+            status_ts=100,
+        )
+        self.assertEqual(state.state, ProtocolState.OWN_WORK_ALLOWED)
 
 
 if __name__ == "__main__":
