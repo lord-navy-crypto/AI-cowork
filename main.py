@@ -10,7 +10,6 @@ import yaml
 
 from ai_cowork.agents import DesktopAgent
 from ai_cowork.events import EventLog
-from ai_cowork.gui import run_gui
 from ai_cowork.macos import accessibility_trusted, find_pid
 from ai_cowork.supervisor import ChatGPTSupervisor, SupervisorConfig
 
@@ -113,7 +112,11 @@ def main() -> int:
     if args.command == "supervisor":
         return run_headless(supervisor)
 
-    # No command defaults to the product UI.
+    # Import Cocoa UI only when the GUI is actually requested. This keeps
+    # doctor/supervisor usable even if a future GUI-specific compatibility
+    # issue appears in PyObjC.
+    from ai_cowork.gui import run_gui
+
     run_gui(supervisor)
     return 0
 
