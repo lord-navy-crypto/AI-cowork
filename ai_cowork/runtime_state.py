@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -60,12 +61,20 @@ class RuntimeStateStore:
 
     def _write_status_locked(self) -> None:
         self.status_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(self.status_path.parent, 0o700)
+        except OSError:
+            pass
         temp = self.status_path.with_suffix(self.status_path.suffix + ".tmp")
         temp.write_text(
             json.dumps(asdict(self._status), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         temp.replace(self.status_path)
+        try:
+            os.chmod(self.status_path, 0o600)
+        except OSError:
+            pass
 
     def _append_event_locked(self, module: str, message: str) -> None:
         self.events_path.parent.mkdir(parents=True, exist_ok=True)
@@ -77,6 +86,10 @@ class RuntimeStateStore:
         }
         with self.events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+        try:
+            os.chmod(self.events_path, 0o600)
+        except OSError:
+            pass
 
     def _rotate_events_locked(self) -> None:
         if not self.events_path.exists():
