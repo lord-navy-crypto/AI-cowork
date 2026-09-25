@@ -4,6 +4,8 @@ import subprocess
 import time
 from dataclasses import dataclass
 
+import ApplicationServices as AS
+
 from ApplicationServices import (
     AXIsProcessTrusted,
     AXUIElementCopyAttributeNames,
@@ -333,3 +335,126 @@ def meaningful_accessibility_dump(app_name: str, max_depth: int = 30, max_nodes:
         f"===== ROLE HISTOGRAM =====\n{histogram}\n"
         f"===== MEANINGFUL NODES =====\n" + "\n".join(lines)
     )
+
+
+def _parameterized_names(element) -> list[str]:
+    fn = getattr(AS, "AXUIElementCopyParameterizedAttributeNames", None)
+    if fn is None:
+        return []
+    try:
+        err, names = fn(element, None)
+        if err == 0 and names:
+            return [str(x) for x in names]
+    except Exception:
+        pass
+    return []
+
+
+def _parameterized_value(element, name: str, parameter):
+    fn = getattr(AS, "AXUIElementCopyParameterizedAttributeValue", None)
+    if fn is None:
+        return None
+    try:
+        err, value = fn(element, name, parameter, None)
+        if err == 0:
+            return value
+    except Exception:
+        pass
+    return None
+
+
+def _find_role_nodes(app_name: str, wanted_role: str, max_depth: int = 40, max_nodes: int = 20000):
+    pid = find_pid(app_name)
+    if pid is None:
+        raise RuntimeError(f"{app_name} is not running")
+    enable_enhanced_accessibility(app_name)
+    root = AXUIElementCreateApplication(pid)
+    found = []
+    seen: set[str] = set()
+    visited = 0
+
+    def visit(node, depth: int):
+        nonlocal visited
+        if depth > max_depth or visited >= max_nodes:
+            return
+        ident = str(node)
+        if ident in seen:
+            return
+        seen.add(ident)
+        visited += 1
+
+        if str(_attr(node, "AXRole") or "") == wanted_role:
+            found.append(node)
+
+        children = []
+        for attr_name in ("AXChildren", "AXContents", "AXRows", "AXWindows", "AXChildrenInNavigationOrder"):
+            obj = _attr(node, attr_name)
+            if obj is None or isinstance(obj, (str, bytes)):
+                continue
+            try:
+                children.extend(list(obj))
+            except TypeError:
+                pass
+        for child in children:
+            visit(child, depth + 1)
+
+    visit(root, 0)
+    return found
+
+
+def webarea_text_dump(app_name: str) -> str:
+    """Try Chromium's text-marker API to read WebArea text as one string."""
+    webareas = _find_role_nodes(app_name, "AXWebArea")
+    lines = [f"webareas={len(webareas)}"]
+
+    range_create = getattr(AS, "AXTextMarkerRangeCreate", None)
+    if range_create is None:
+        lines.append("AXTextMarkerRangeCreate unavailable in this PyObjC build")
+
+    for i, area in enumerate(webareas):
+        title = str(_attr(area, "AXTitle") or "")
+        loaded = _attr(area, "AXLoaded")
+        busy = _attr(area, "AXElementBusy")
+        count = _attr(area, "AXNumberOfCharacters")
+        params = _parameterized_names(area)
+        lines.append(
+            f"===== WEBAREA {i} title={title!r} loaded={loaded!r} busy={busy!r} chars={count!r} ====="
+        )
+        lines.append("parameterized=" + ",".join(params))
+
+        direct_value = _attr(area, "AXValue")
+        if isinstance(direct_value, str) and direct_value.strip():
+            lines.append("AXValue:")
+            lines.append(direct_value)
+
+        start = _attr(area, "AXStartTextMarker")
+        end = _attr(area, "AXEndTextMarker")
+        if start is None or end is None or range_create is None:
+            lines.append("text-marker range unavailable")
+            continue
+
+        try:
+            marker_range = range_create(None, start, end)
+        except Exception as exc:
+            lines.append(f"marker-range-create-error={exc}")
+            continue
+
+        candidates = [
+            "AXStringForTextMarkerRange",
+            "AXAttributedStringForTextMarkerRange",
+        ]
+        got = False
+        for attr_name in candidates:
+            if attr_name not in params:
+                continue
+            value = _parameterized_value(area, attr_name, marker_range)
+            if value is None:
+                continue
+            lines.append(attr_name + ":")
+            lines.append(str(value))
+            got = True
+            break
+        if not got:
+            lines.append("no text-marker string parameter returned a value")
+
+    return "\n".join(lines)
