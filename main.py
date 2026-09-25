@@ -4,7 +4,7 @@ import argparse
 import time
 from pathlib import Path
 
-from ai_cowork.cooperation import GitCoordinationMonitor
+from ai_cowork.cooperation import GitCoordinationMonitor, ProtocolGate
 from ai_cowork.web_runtime import (
     SettingsStore,
     WebAutomationRuntime,
@@ -103,6 +103,7 @@ def run_supervisor() -> int:
         print("No module is enabled.")
         return 2
 
+    protocol_gate = ProtocolGate()
     runtime = None
     web_enabled = (
         settings.chatgpt_supervisor_enabled
@@ -112,6 +113,7 @@ def run_supervisor() -> int:
         runtime = WebAutomationRuntime(
             settings,
             on_status=lambda message: print(f"[web] {message}", flush=True),
+            protocol_gate=protocol_gate,
         )
         runtime.start()
 
@@ -121,6 +123,7 @@ def run_supervisor() -> int:
             ".",
             poll_seconds=10.0,
             on_status=lambda message: print(f"[cooperation] {message}", flush=True),
+            on_snapshot=protocol_gate.update,
         )
         cooperation.start()
     try:
