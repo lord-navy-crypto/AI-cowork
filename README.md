@@ -92,3 +92,23 @@ Do not restart or summarize unless necessary; continue the actual work.
 ## Design rule
 
 The supervisor is intentionally mechanical. It does not decide what project work should be done. It only keeps an already-running ChatGPT work session moving when the user does not want to watch the window continuously.
+
+
+## Background operation
+
+AI-cowork is designed to stay out of the way while you use the Mac for other work.
+
+The supervisor now uses a background-first send path:
+
+1. **Background Accessibility transport** — writes directly to the ChatGPT composer and presses Send through Accessibility. This does not activate ChatGPT and does not touch the clipboard.
+2. **Foreground fallback** — used only when the current ChatGPT build does not expose a reliable writable composer. This fallback may briefly bring ChatGPT forward because macOS keyboard events target the frontmost application.
+
+To require strict background-only behavior, set:
+
+```yaml
+chatgpt:
+  background_preferred: true
+  allow_foreground_fallback: false
+```
+
+Passive reading of the ChatGPT WebArea and generation-state checks do not require bringing ChatGPT to the foreground.
