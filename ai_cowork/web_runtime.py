@@ -145,10 +145,20 @@ class WebAutomationRuntime:
         self._cursor_paused_reason: str | None = None
         self._cursor_action_armed = True
         self._chatgpt_paused_reason: str | None = None
+        self._fatal_error: str | None = None
+        self._stop_requested = False
 
     @property
     def running(self) -> bool:
         return bool(self._thread and self._thread.is_alive())
+
+    @property
+    def fatal_error(self) -> str | None:
+        return self._fatal_error
+
+    @property
+    def stop_requested(self) -> bool:
+        return self._stop_requested
 
     def start(self) -> bool:
         if self.running:
@@ -172,6 +182,8 @@ class WebAutomationRuntime:
                 raise ValueError("Invalid Cursor URL.")
 
         self._stop.clear()
+        self._stop_requested = False
+        self._fatal_error = None
         self._thread = threading.Thread(
             target=self._run,
             name="ai-cowork-web-runtime",
@@ -181,6 +193,7 @@ class WebAutomationRuntime:
         return True
 
     def stop(self) -> None:
+        self._stop_requested = True
         self._stop.set()
         self._status("Stopping web supervisor…")
 
@@ -748,6 +761,7 @@ class WebAutomationRuntime:
                         continue
 
         except Exception as exc:
+            self._fatal_error = str(exc)
             self._status(f"Web supervisor error: {exc}")
         finally:
             self._close()
