@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import objc
 from AppKit import (
-    NSApp,
     NSApplication,
     NSApplicationActivationPolicyRegular,
     NSBackingStoreBuffered,
     NSButton,
     NSMakeRect,
-    NSObject,
     NSTextField,
     NSWindow,
     NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable,
     NSWindowStyleMaskTitled,
 )
+from Foundation import NSObject
 
 from .macos import notify_user
 from .supervisor import ChatGPTSupervisor
@@ -126,17 +125,21 @@ class SupervisorWindowController(NSObject):
 
     def windowWillClose_(self, notification):
         self.supervisor.stop()
-        NSApp.terminate_(None)
+        NSApplication.sharedApplication().terminate_(None)
+
+
+_controller_ref = None
 
 
 def run_gui(supervisor: ChatGPTSupervisor) -> None:
+    global _controller_ref
     app = NSApplication.sharedApplication()
     app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
 
     controller = SupervisorWindowController.alloc().initWithSupervisor_(supervisor)
     controller.build()
 
-    # Keep a strong reference for the lifetime of the Cocoa event loop.
-    app._ai_cowork_controller = controller
+    # Keep a strong Python reference for the lifetime of the Cocoa event loop.
+    _controller_ref = controller
     app.activateIgnoringOtherApps_(True)
     app.run()
