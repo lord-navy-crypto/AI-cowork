@@ -47,7 +47,7 @@ def build_agents(cfg: dict):
             read_strategy=item.get("read_strategy", "ax_tree"),
         )
 
-    return desktop("chatgpt"), desktop("claude"), desktop("deepseek"), events
+    return desktop("chatgpt"), desktop("cursor"), desktop("deepseek"), events
 
 
 def doctor(cfg: dict) -> int:
@@ -59,11 +59,11 @@ def doctor(cfg: dict) -> int:
     print(f"Accessibility trusted: {accessibility_trusted()}")
 
     ok = sys.platform == "darwin" and accessibility_trusted()
-    for key in ("chatgpt", "claude", "deepseek"):
+    for key in ("chatgpt", "cursor", "deepseek"):
         item = cfg["agents"][key]
         pid = find_pid(item["app_name"])
         print(f"{key:10} app={item['app_name']!r} pid={pid or 'not running'}")
-        if key in ("chatgpt", "claude") and pid is None:
+        if key in ("chatgpt", "cursor") and pid is None:
             ok = False
 
     print()
@@ -79,29 +79,29 @@ def main() -> int:
     sub.add_parser("doctor")
 
     inspect_p = sub.add_parser("inspect")
-    inspect_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    inspect_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
 
     probe_p = sub.add_parser("probe")
-    probe_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    probe_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
 
     debug_p = sub.add_parser("debug-ax")
-    debug_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    debug_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
 
     deep_p = sub.add_parser("deep-ax")
-    deep_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    deep_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
 
     text_p = sub.add_parser("web-text")
-    text_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    text_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
 
     snap_p = sub.add_parser("snapshot")
-    snap_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    snap_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
 
     send_p = sub.add_parser("send")
-    send_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    send_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
     send_p.add_argument("message")
 
     sar_p = sub.add_parser("send-and-read")
-    sar_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+    sar_p.add_argument("agent", choices=["chatgpt", "cursor", "deepseek"])
     sar_p.add_argument("message")
     sar_p.add_argument("--timeout", type=float, default=None,
                        help="Optional hard timeout in seconds; default waits indefinitely.")
@@ -122,13 +122,13 @@ def main() -> int:
     run_p.add_argument("--dry-run", action="store_true")
     run_p.add_argument("--preset", choices=["redstone"])
     run_p.add_argument("--gpt-objective")
-    run_p.add_argument("--claude-objective")
+    run_p.add_argument("--cursor-objective")
     run_p.add_argument("--with-deepseek", action="store_true")
 
     args = parser.parse_args()
     cfg = load_config()
-    gpt, claude, deepseek, events = build_agents(cfg)
-    mapping = {"chatgpt": gpt, "claude": claude, "deepseek": deepseek}
+    gpt, cursor, deepseek, events = build_agents(cfg)
+    mapping = {"chatgpt": gpt, "cursor": cursor, "deepseek": deepseek}
 
     if args.command == "doctor":
         return doctor(cfg)
@@ -176,7 +176,7 @@ def main() -> int:
     if args.command == "ping-pong":
         prompts = {
             "chatgpt": args.message,
-            "claude": args.message,
+            "cursor": args.message,
         }
         round_index = 0
 
@@ -192,7 +192,7 @@ def main() -> int:
 
                 # Start both work turns before waiting on either result.
                 gpt.send(prompts["chatgpt"])
-                claude.send(prompts["claude"])
+                cursor.send(prompts["cursor"])
 
                 print(
                     f"[ping-pong] round {round_index}: both working; waiting for BOTH to complete...",
@@ -201,7 +201,7 @@ def main() -> int:
 
                 futures = {
                     "chatgpt": pool.submit(gpt.wait_until_stable, None),
-                    "claude": pool.submit(claude.wait_until_stable, None),
+                    "cursor": pool.submit(cursor.wait_until_stable, None),
                 }
 
                 if args.stuck_minutes > 0:
@@ -220,7 +220,7 @@ def main() -> int:
                             cancel_generation(mapping[name].app_name)
 
                 replies = {}
-                for name in ("chatgpt", "claude"):
+                for name in ("chatgpt", "cursor"):
                     try:
                         # With no watchdog this is an unlimited barrier wait.
                         # After watchdog cancellation, allow the UI time to settle
@@ -244,24 +244,24 @@ def main() -> int:
                 )
                 print("===== CHATGPT WORK REPORT =====")
                 print(replies["chatgpt"])
-                print("===== CLAUDE WORK REPORT =====")
-                print(replies["claude"])
+                print("===== CURSOR WORK REPORT =====")
+                print(replies["cursor"])
 
                 if args.rounds != 0 and round_index >= args.rounds:
                     break
 
                 prompts["chatgpt"] = (
-                    "DEVELOPER HANDOFF FROM CLAUDE\n\n"
-                    "Claude has completed its work round. Continue engineering work using "
+                    "DEVELOPER HANDOFF FROM CURSOR\n\n"
+                    "Cursor has completed its work round. Continue engineering work using "
                     "this report as context. Inspect the repository/branch before editing. "
                     "Do real implementation and testing. Do not merge main or force push. "
                     "When genuinely complete, reply with a concise WORK REPORT containing "
                     "branch, completed work, files changed, tests, problems, commit, and "
                     "the next useful step.\n\n"
-                    "CLAUDE REPORT:\n"
-                    + replies["claude"]
+                    "CURSOR REPORT:\n"
+                    + replies["cursor"]
                 )
-                prompts["claude"] = (
+                prompts["cursor"] = (
                     "DEVELOPER HANDOFF FROM CHATGPT\n\n"
                     "ChatGPT has completed its work round. Continue engineering work using "
                     "this report as context. Inspect the repository/branch before editing. "
@@ -282,22 +282,22 @@ def main() -> int:
         print("===== GPT ROUND 1 =====")
         print(gpt_reply)
 
-        claude_prompt = (
+        cursor_prompt = (
             "You are collaborating with ChatGPT on the same task. "
             "Independently review the following ChatGPT response. "
             "Identify errors, omissions, disagreements, and concrete improvements.\n\n"
             "CHATGPT RESPONSE:\n" + gpt_reply
         )
-        print("[relay] Claude review: sending + waiting...", flush=True)
-        claude_reply = claude.send_and_read(claude_prompt, timeout=args.timeout)
-        print("[relay] Claude review: complete", flush=True)
-        print("\n===== CLAUDE REVIEW =====")
-        print(claude_reply)
+        print("[relay] Cursor review: sending + waiting...", flush=True)
+        cursor_reply = cursor.send_and_read(cursor_prompt, timeout=args.timeout)
+        print("[relay] Cursor review: complete", flush=True)
+        print("\n===== CURSOR REVIEW =====")
+        print(cursor_reply)
 
         gpt_followup = (
-            "Claude reviewed your previous response. Evaluate the review independently, "
+            "Cursor reviewed your previous response. Evaluate the review independently, "
             "accept only well-supported suggestions, correct any mistakes, and produce the "
-            "next improved result.\n\nCLAUDE REVIEW:\n" + claude_reply
+            "next improved result.\n\nCURSOR REVIEW:\n" + cursor_reply
         )
         print("[relay] GPT round 2: sending + waiting...", flush=True)
         final_reply = gpt.send_and_read(gpt_followup, timeout=args.timeout)
@@ -322,19 +322,19 @@ def main() -> int:
                 "not-ready information and strengthen end-to-end engineering correctness. "
                 "Run the relevant verification/build checks and commit the work on agent/gpt."
             )
-            claude_objective = args.claude_objective or (
+            cursor_objective = args.cursor_objective or (
                 "Work independently on lord-navy-crypto/redstones-engineering as the HMI/"
                 "instrumentation developer. Inspect the real repository first. Improve a "
                 "substantive weakness in player-facing diagnostics, visualization, instrument "
                 "readability, commissioning workflow, or operations feedback. Keep the work "
                 "architecturally compatible with the existing engineering systems, run relevant "
-                "tests, and commit the work on agent/claude."
+                "tests, and commit the work on agent/cursor."
             )
         else:
             gpt_objective = args.gpt_objective or (
                 "Inspect the repository and implement a substantive systems/reliability improvement."
             )
-            claude_objective = args.claude_objective or (
+            cursor_objective = args.cursor_objective or (
                 "Inspect the repository independently and implement a substantive complementary improvement."
             )
 
@@ -342,14 +342,14 @@ def main() -> int:
         store.load()
         Controller(
             gpt=gpt,
-            claude=claude,
+            cursor=cursor,
             deepseek=deepseek if args.with_deepseek else None,
             checkpoint_seconds=int(cfg["checkpoint_seconds"]),
             max_rounds=int(cfg["max_rounds"]),
             store=store,
             events=events,
             gpt_objective=gpt_objective,
-            claude_objective=claude_objective,
+            cursor_objective=cursor_objective,
         ).run()
         return 0
 
