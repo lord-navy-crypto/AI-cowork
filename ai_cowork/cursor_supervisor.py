@@ -13,6 +13,11 @@ class CursorState(str, Enum):
     WAITING = "WAITING"
 
 
+class CursorAction(str, Enum):
+    NONE = "NONE"
+    CLICK_CONTINUE = "CLICK_CONTINUE"
+
+
 @dataclass(frozen=True)
 class CursorSnapshot:
     state: CursorState
@@ -74,3 +79,14 @@ def classify_cursor_text(text: str, url: str = "") -> CursorSnapshot:
         return CursorSnapshot(CursorState.READY, "Cursor Agent appears finished/ready.")
 
     return CursorSnapshot(CursorState.UNKNOWN, "Cursor page connected; state is not recognized yet.")
+
+
+
+def decide_cursor_action(
+    state: CursorState,
+    has_continue_control: bool,
+) -> CursorAction:
+    """Conservative action gate: never act on ambiguous or terminal states."""
+    if state is CursorState.WAITING and has_continue_control:
+        return CursorAction.CLICK_CONTINUE
+    return CursorAction.NONE
