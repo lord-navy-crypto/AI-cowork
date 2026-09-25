@@ -83,40 +83,6 @@ class DesktopAgent(Agent):
             return value or text_snapshot(self.app_name)
         return text_snapshot(self.app_name)
 
-    def _looks_generating(self, snapshot: str) -> bool:
-        low = snapshot.casefold()
-        markers = (
-            "chatgpt 正在回应",
-            "正在回应",
-            "responding",
-            "stop generating",
-            "停止生成",
-            "claude is responding",
-        )
-        return any(marker in low for marker in markers)
-
-    def _has_real_response(self, snapshot: str) -> bool:
-        if not self._last_prompt:
-            return snapshot != self._baseline
-        idx = snapshot.rfind(self._last_prompt)
-        if idx < 0:
-            return snapshot != self._baseline
-        tail = snapshot[idx + len(self._last_prompt):].strip()
-        if not tail:
-            return False
-        ui_only = (
-            "chatgpt 正在回应",
-            "responding",
-            "stop generating",
-            "停止生成",
-            "来源",
-            "查看全部",
-        )
-        normalized = tail.casefold()
-        if all(token in normalized for token in ("responding",)) and len(tail) < 200:
-            return False
-        return len(tail) >= 3 and not self._looks_generating(tail)
-
     def wait_until_stable(self, timeout: float = 300) -> str:
         started = time.monotonic()
         previous = ""
@@ -140,10 +106,7 @@ class DesktopAgent(Agent):
             if current and current != self._baseline:
                 seen_change = True
 
-            generating = self._looks_generating(current)
-            has_response = self._has_real_response(current)
-
-            if seen_change and has_response and not generating and current and current == previous:
+            if seen_change and current and current == previous:
                 # Clipboard mode already requires two identical full-page
                 # snapshots. Return immediately instead of waiting another
                 # stable_seconds window; this removes several seconds of lag.
