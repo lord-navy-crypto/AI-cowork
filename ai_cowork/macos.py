@@ -643,3 +643,15 @@ def paste_into_chat(app_name: str, text: str, enter: bool = True) -> None:
         end tell
         '''
     )
+
+
+def notify_user(title: str, message: str) -> None:
+    """Show a macOS notification without stealing focus."""
+    safe_title = title.replace("\\", "\\\\").replace('"', '\\"')
+    safe_message = message.replace("\\", "\\\\").replace('"', '\\"')
+    try:
+        run_osascript(
+            f'display notification "{safe_message}" with title "{safe_title}"'
+        )
+    except Exception:
+        pass
