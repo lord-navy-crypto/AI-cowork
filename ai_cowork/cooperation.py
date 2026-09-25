@@ -558,3 +558,64 @@ def render_coordination_message(
         lines.extend(["", "## Next action", "", next_action.strip()])
     lines.append("")
     return "\n".join(lines)
+
+
+def protocol_next_action(state: AgentProtocolState) -> str:
+    if state.state is ProtocolState.REVIEW_REQUIRED:
+        return (
+            f"Review peer head {state.peer_head}, then append a NEW review message "
+            f"that records Peer head reviewed={state.peer_head} and Own head={state.own_head}."
+        )
+    if state.state is ProtocolState.STATUS_REQUIRED:
+        return (
+            f"Append a NEW status message for own head {state.own_head}; "
+            "include completed work, validation, blockers, and the next action."
+        )
+    if state.state is ProtocolState.OWN_WORK_ALLOWED:
+        return (
+            f"Work only on the owned branch at {state.own_head}; do not write main. "
+            "After committing, append a NEW status message for the new own head."
+        )
+    return (
+        "The previous cycle is complete. Start the next cycle with a NEW peer review "
+        "before doing more own-branch work."
+    )
+
+
+def draft_required_coordination_message(
+    state: AgentProtocolState,
+    *,
+    summary: str,
+    status: str = "",
+    next_action: str = "",
+) -> tuple[str, str]:
+    if state.state in {ProtocolState.REVIEW_REQUIRED, ProtocolState.READY}:
+        kind = "review"
+        path = coordination_message_filename(state.agent, kind)
+        body = render_coordination_message(
+            state.agent,
+            kind,
+            summary=summary,
+            peer_head=state.peer_head,
+            own_head=state.own_head,
+            status=status or "REVIEWED",
+            next_action=next_action or protocol_next_action(state),
+        )
+        return path, body
+
+    if state.state is ProtocolState.STATUS_REQUIRED:
+        kind = "status"
+        path = coordination_message_filename(state.agent, kind)
+        body = render_coordination_message(
+            state.agent,
+            kind,
+            summary=summary,
+            own_head=state.own_head,
+            status=status or "READY",
+            next_action=next_action or protocol_next_action(state),
+        )
+        return path, body
+
+    raise ValueError(
+        "No protocol message is required while OWN_WORK_ALLOWED; work first, then status."
+    )
