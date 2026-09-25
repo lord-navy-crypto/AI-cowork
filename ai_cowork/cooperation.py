@@ -4,6 +4,7 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Callable
@@ -92,6 +93,51 @@ class CoordinationSnapshot:
     cursor_protocol: AgentProtocolState | None = None
 
 
+class ProtocolGate:
+    """Thread-safe latest cooperation state shared with web supervisors."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._snapshot: CoordinationSnapshot | None = None
+
+    def update(self, snapshot: CoordinationSnapshot) -> None:
+        with self._lock:
+            self._snapshot = snapshot
+
+    def snapshot(self) -> CoordinationSnapshot | None:
+        with self._lock:
+            return self._snapshot
+
+    def state_for(self, agent: str) -> AgentProtocolState | None:
+        snap = self.snapshot()
+        if snap is None:
+            return None
+        if agent == "chatgpt":
+            return snap.chatgpt_protocol
+        if agent == "cursor":
+            return snap.cursor_protocol
+        raise ValueError(f"Unknown agent: {agent}")
+
+    def allows_own_work(self, agent: str) -> bool:
+        state = self.state_for(agent)
+        if state is None:
+            # Fail open until the first successful coordination fetch. The UI
+            # still reports that protocol state is not yet known.
+            return True
+        return state.state in {
+            ProtocolState.OWN_WORK_ALLOWED,
+            ProtocolState.READY,
+        }
+
+    def block_reason(self, agent: str) -> str:
+        state = self.state_for(agent)
+        if state is None:
+            return ""
+        if self.allows_own_work(agent):
+            return ""
+        return f"{state.state.value}: {state.detail}"
+
+
 class GitCoordinationMonitor:
     """GitHub-native protocol monitor using the repository's existing git remote."""
 
@@ -100,10 +146,12 @@ class GitCoordinationMonitor:
         repo_path: str | Path = ".",
         poll_seconds: float = 10.0,
         on_status: Callable[[str], None] | None = None,
+        on_snapshot: Callable[[CoordinationSnapshot], None] | None = None,
     ) -> None:
         self.repo_path = Path(repo_path).resolve()
         self.poll_seconds = max(3.0, float(poll_seconds))
         self.on_status = on_status or (lambda _: None)
+        self.on_snapshot = on_snapshot or (lambda _: None)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last: CoordinationSnapshot | None = None
@@ -279,6 +327,7 @@ class GitCoordinationMonitor:
                     current = self.snapshot()
                     message = self._describe_change(self._last, current)
                     self._last = current
+                    self.on_snapshot(current)
                     if message:
                         self.on_status(message)
                 except Exception as exc:
@@ -305,3 +354,50 @@ def cursor_peer_review_instruction() -> str:
         "review/advice message on coordination. Then continue only on agent/cursor. "
         "Never write main."
     )
+
+
+MESSAGE_KINDS = {"review", "status", "handoff"}
+
+
+def coordination_message_filename(
+    agent: str,
+    kind: str,
+    when: datetime | None = None,
+) -> str:
+    if agent not in {"chatgpt", "cursor"}:
+        raise ValueError("agent must be chatgpt or cursor")
+    if kind not in MESSAGE_KINDS:
+        raise ValueError("kind must be review, status, or handoff")
+    stamp = (when or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    return f"messages/{stamp:%Y%m%d-%H%M%S}-{agent}-{kind}.md"
+
+
+def render_coordination_message(
+    agent: str,
+    kind: str,
+    *,
+    summary: str,
+    peer_head: str = "",
+    own_head: str = "",
+    status: str = "",
+    next_action: str = "",
+) -> str:
+    if kind not in MESSAGE_KINDS:
+        raise ValueError("kind must be review, status, or handoff")
+    lines = [
+        f"# {kind.title()} — {agent}",
+        "",
+        f"- Agent: {agent}",
+        f"- Type: {kind}",
+    ]
+    if status:
+        lines.append(f"- Status: {status}")
+    if peer_head:
+        lines.append(f"- Peer head reviewed: {peer_head}")
+    if own_head:
+        lines.append(f"- Own head: {own_head}")
+    lines.extend(["", "## Summary", "", summary.strip() or "(none)"])
+    if next_action:
+        lines.extend(["", "## Next action", "", next_action.strip()])
+    lines.append("")
+    return "\n".join(lines)
