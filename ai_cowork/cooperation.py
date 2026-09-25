@@ -27,6 +27,61 @@ class AgentProtocolState:
     latest_status: str
 
 
+def evaluate_protocol_state(
+    agent: str,
+    own_head: str,
+    peer_head: str,
+    own_ts: int,
+    peer_ts: int,
+    review_ts: int,
+    status_ts: int,
+    review_path: str = "",
+    status_path: str = "",
+) -> AgentProtocolState:
+    if peer_ts > review_ts:
+        return AgentProtocolState(
+            agent,
+            ProtocolState.REVIEW_REQUIRED,
+            f"{agent} must review the peer branch before doing more own work.",
+            peer_head,
+            own_head,
+            review_path or "(none)",
+            status_path or "(none)",
+        )
+
+    if own_ts > status_ts:
+        return AgentProtocolState(
+            agent,
+            ProtocolState.STATUS_REQUIRED,
+            f"{agent} has newer own-branch work and must append a status message.",
+            peer_head,
+            own_head,
+            review_path or "(none)",
+            status_path or "(none)",
+        )
+
+    if review_ts >= own_ts and review_ts >= peer_ts:
+        return AgentProtocolState(
+            agent,
+            ProtocolState.OWN_WORK_ALLOWED,
+            f"{agent} has reviewed the current peer state and may work on its owned branch.",
+            peer_head,
+            own_head,
+            review_path or "(none)",
+            status_path or "(none)",
+        )
+
+    return AgentProtocolState(
+        agent,
+        ProtocolState.READY,
+        f"{agent} protocol obligations are currently satisfied.",
+        peer_head,
+        own_head,
+        review_path or "(none)",
+        status_path or "(none)",
+    )
+
+
 @dataclass(frozen=True)
 class CoordinationSnapshot:
     chatgpt_head: str
@@ -117,49 +172,16 @@ class GitCoordinationMonitor:
         review_ts = self._path_timestamp("origin/coordination", review_path)
         status_ts = self._path_timestamp("origin/coordination", status_path)
 
-        if peer_ts > review_ts:
-            return AgentProtocolState(
-                agent,
-                ProtocolState.REVIEW_REQUIRED,
-                f"{agent} must review the peer branch before doing more own work.",
-                peer_head,
-                own_head,
-                review_path or "(none)",
-                status_path or "(none)",
-            )
-
-        if own_ts > status_ts:
-            return AgentProtocolState(
-                agent,
-                ProtocolState.STATUS_REQUIRED,
-                f"{agent} has newer own-branch work and must append a status message.",
-                peer_head,
-                own_head,
-                review_path or "(none)",
-                status_path or "(none)",
-            )
-
-        # A review newer than the latest own work means the start-of-run gate is
-        # satisfied and the agent may begin/continue its own branch work.
-        if review_ts >= own_ts and review_ts >= peer_ts:
-            return AgentProtocolState(
-                agent,
-                ProtocolState.OWN_WORK_ALLOWED,
-                f"{agent} has reviewed the current peer state and may work on its owned branch.",
-                peer_head,
-                own_head,
-                review_path or "(none)",
-                status_path or "(none)",
-            )
-
-        return AgentProtocolState(
-            agent,
-            ProtocolState.READY,
-            f"{agent} protocol obligations are currently satisfied.",
-            peer_head,
-            own_head,
-            review_path or "(none)",
-            status_path or "(none)",
+        return evaluate_protocol_state(
+            agent=agent,
+            own_head=own_head,
+            peer_head=peer_head,
+            own_ts=own_ts,
+            peer_ts=peer_ts,
+            review_ts=review_ts,
+            status_ts=status_ts,
+            review_path=review_path,
+            status_path=status_path,
         )
 
     def snapshot(self) -> CoordinationSnapshot:
