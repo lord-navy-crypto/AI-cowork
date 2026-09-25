@@ -20,6 +20,7 @@ from ai_cowork.cooperation import (
     evaluate_protocol_state,
     render_coordination_message,
 )
+from ai_cowork.runtime_state import RuntimeStateStore, classify_status_message
 from ai_cowork.web_runtime import (
     SettingsStore,
     WebSettings,
@@ -281,6 +282,35 @@ class CoreTests(unittest.TestCase):
                 "status",
                 summary="missing own head",
             )
+
+    def test_runtime_state_roundtrip_and_journal(self):
+        with tempfile.TemporaryDirectory() as d:
+            status = Path(d) / "runtime_status.json"
+            events = Path(d) / "events.jsonl"
+            store = RuntimeStateStore(status, events)
+            store.update("chatgpt", "ChatGPT Web is working — waiting.")
+            loaded = RuntimeStateStore(status, events).load()
+            self.assertEqual(
+                loaded.chatgpt,
+                "ChatGPT Web is working — waiting.",
+            )
+            self.assertTrue(loaded.updated_at)
+            self.assertIn('"module": "chatgpt"', events.read_text(encoding="utf-8"))
+
+    def test_status_message_classifier(self):
+        self.assertEqual(
+            classify_status_message("ChatGPT Supervisor [BLOCKED]: review"),
+            "chatgpt",
+        )
+        self.assertEqual(
+            classify_status_message("Cursor Supervisor [READY]: done"),
+            "cursor",
+        )
+        self.assertEqual(
+            classify_status_message("Cooperation connected"),
+            "cooperation",
+        )
+        self.assertEqual(classify_status_message("Opening browser"), "system")
 
 
 if __name__ == "__main__":
