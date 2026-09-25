@@ -334,9 +334,11 @@ class WebControlWindowController(NSObject):
             self.chatgpt_status_label.setStringValue_(message)
         if self.cursor_status_label is not None and message.startswith("Cursor"):
             self.cursor_status_label.setStringValue_(message)
-        if self.start_button is not None and not (
-            self.runtime and self.runtime.running
-        ):
+        any_running = (
+            (self.runtime and self.runtime.running)
+            or (self.cooperation_monitor and self.cooperation_monitor.running)
+        )
+        if self.start_button is not None and not any_running:
             self.start_button.setTitle_("Start Runtime")
 
     def windowWillClose_(self, notification):
