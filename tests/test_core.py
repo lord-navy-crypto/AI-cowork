@@ -478,6 +478,33 @@ class CoreTests(unittest.TestCase):
             self.assertIn("boom", crashed.system)
             self.assertTrue(crashed.stopped_at)
 
+    def test_protocol_gate_blocks_stale_snapshot(self):
+        gate = ProtocolGate(max_snapshot_age_seconds=5)
+        gate.enable()
+        allowed = AgentProtocolState(
+            "chatgpt",
+            ProtocolState.OWN_WORK_ALLOWED,
+            "allowed",
+            "peer",
+            "own",
+            "review.md",
+            "status.md",
+        )
+        gate.update(
+            CoordinationSnapshot(
+                "chat",
+                "cursor",
+                "coord",
+                "messages/x.md",
+                allowed,
+                allowed,
+            )
+        )
+        self.assertTrue(gate.allows_own_work("chatgpt"))
+        gate._snapshot_at -= 10
+        self.assertFalse(gate.allows_own_work("chatgpt"))
+        self.assertIn("STALE_COORDINATION", gate.block_reason("chatgpt"))
+
 
 if __name__ == "__main__":
     unittest.main()
