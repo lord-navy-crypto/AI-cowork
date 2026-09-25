@@ -50,12 +50,20 @@ python main.py inspect chatgpt
 python main.py inspect claude
 ```
 
-Test sending a harmless message:
+Test send + automatic response capture:
 
 ```bash
-python main.py send chatgpt "Reply exactly: GPT_READY"
-python main.py send claude "Reply exactly: CLAUDE_READY"
+python main.py send-and-read chatgpt "Reply exactly: GPT_READY"
+python main.py send-and-read claude "Reply exactly: CLAUDE_READY"
 ```
+
+Test one complete collaboration relay:
+
+```bash
+python main.py relay "Analyze this task and propose the first implementation step."
+```
+
+The relay performs: ChatGPT initial answer → Claude independent review → ChatGPT revised answer.
 
 Start a dry-run orchestration session:
 
