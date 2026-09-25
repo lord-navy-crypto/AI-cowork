@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from .events import EventLog
 from .macos import (
     paste_and_enter,
+    paste_into_chat,
     select_all_copy_text,
     text_snapshot,
     webarea_text,
@@ -55,16 +56,25 @@ class DesktopAgent(Agent):
     events: EventLog | None = None
     read_strategy: str = "ax_tree"
     _baseline: str = field(default="", init=False, repr=False)
+    _last_prompt: str = field(default="", init=False, repr=False)
 
     def send(self, prompt: str) -> None:
         try:
             self._baseline = self.read_snapshot()
         except Exception:
             self._baseline = ""
+        self._last_prompt = prompt
 
         if self.events:
             self.events.emit("agent_send", agent=self.name, chars=len(prompt))
-        paste_and_enter(self.app_name, prompt, enter=self.enter_to_send)
+
+        # ChatGPT's desktop app can keep focus on sidebar/navigation. For
+        # WebArea-based agents, explicitly find an editable composer before
+        # pasting. Clipboard-based Claude already focuses its content reliably.
+        if self.read_strategy == "webarea":
+            paste_into_chat(self.app_name, prompt, enter=self.enter_to_send)
+        else:
+            paste_and_enter(self.app_name, prompt, enter=self.enter_to_send)
 
     def read_snapshot(self) -> str:
         if self.read_strategy == "webarea":
@@ -91,7 +101,7 @@ class DesktopAgent(Agent):
                 if stable_since is None:
                     stable_since = time.monotonic()
                 if time.monotonic() - stable_since >= self.stable_seconds:
-                    output = _extract_delta(self._baseline, current)
+                    output = self._extract_response(current)
                     if self.events:
                         self.events.emit(
                             "agent_stable",
@@ -108,6 +118,18 @@ class DesktopAgent(Agent):
             time.sleep(self.poll_interval)
 
         raise TimeoutError(f"{self.name} output did not become stable")
+
+    def _extract_response(self, current: str) -> str:
+        # In flattened WebArea text the prompt itself is normally echoed into
+        # the conversation. Taking text after its last occurrence is more
+        # robust than diffing huge pages with changing sidebar chrome.
+        if self._last_prompt:
+            idx = current.rfind(self._last_prompt)
+            if idx >= 0:
+                tail = current[idx + len(self._last_prompt):].strip()
+                if tail:
+                    return tail
+        return _extract_delta(self._baseline, current)
 
     def send_and_read(self, prompt: str, timeout: float = 300) -> str:
         self.send(prompt)
