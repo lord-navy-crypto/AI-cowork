@@ -21,8 +21,17 @@ def load_config(path: str = "config.yaml") -> dict:
     return yaml.safe_load(p.read_text(encoding="utf-8"))
 
 
+def get_chatgpt_config(cfg: dict) -> dict:
+    if isinstance(cfg.get("chatgpt"), dict):
+        return cfg["chatgpt"]
+    agents = cfg.get("agents")
+    if isinstance(agents, dict) and isinstance(agents.get("chatgpt"), dict):
+        return agents["chatgpt"]
+    return {}
+
+
 def build_chatgpt(cfg: dict) -> DesktopAgent:
-    item = cfg["chatgpt"]
+    item = get_chatgpt_config(cfg)
     return DesktopAgent(
         name="chatgpt",
         app_name=item.get("app_name", "ChatGPT"),
@@ -56,7 +65,8 @@ def build_supervisor(cfg: dict) -> ChatGPTSupervisor:
 
 
 def doctor(cfg: dict) -> int:
-    app_name = cfg["chatgpt"].get("app_name", "ChatGPT")
+    item = get_chatgpt_config(cfg)
+    app_name = item.get("app_name", "ChatGPT")
     pid = find_pid(app_name)
     print("AI-cowork supervisor doctor")
     print("==========================")
