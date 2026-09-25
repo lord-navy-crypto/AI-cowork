@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ai_cowork.cooperation import (
     GitCoordinationMonitor,
+    ProtocolDraftStore,
     ProtocolGate,
     draft_required_coordination_message,
     protocol_next_action,
@@ -192,6 +193,7 @@ def run_supervisor() -> int:
 
     state_store = RuntimeStateStore()
     protocol_gate = ProtocolGate()
+    protocol_drafts = ProtocolDraftStore()
     if settings.cooperation_enabled:
         protocol_gate.enable()
 
@@ -213,6 +215,10 @@ def run_supervisor() -> int:
 
     cooperation = None
     if settings.cooperation_enabled:
+        def handle_snapshot(snapshot):
+            protocol_gate.update(snapshot)
+            protocol_drafts.write_snapshot(snapshot)
+
         cooperation = GitCoordinationMonitor(
             ".",
             poll_seconds=10.0,
@@ -220,7 +226,7 @@ def run_supervisor() -> int:
                 state_store.update("cooperation", message),
                 print(f"[cooperation] {message}", flush=True),
             )[-1],
-            on_snapshot=protocol_gate.update,
+            on_snapshot=handle_snapshot,
         )
         cooperation.start()
     try:
