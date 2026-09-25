@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import time
 from pathlib import Path
 
@@ -23,31 +24,45 @@ def doctor() -> int:
     print("AI-cowork web doctor")
     print("====================")
 
-    ok = True
-    try:
-        import playwright  # noqa: F401
-        print("Playwright Python package: yes")
-    except Exception as exc:
-        print(f"Playwright Python package: NO ({exc})")
-        ok = False
-
-    try:
-        from playwright.sync_api import sync_playwright
-
-        p = sync_playwright().start()
-        executable = Path(p.chromium.executable_path)
-        installed = executable.exists()
-        print(f"Chromium installed: {'yes' if installed else 'NO'}")
-        print(f"Chromium path: {executable}")
-        p.stop()
-        if not installed:
-            ok = False
-    except Exception as exc:
-        print(f"Chromium installed: NO ({exc})")
-        ok = False
-
     settings = SettingsStore().load()
     runtime_state = RuntimeStateStore().load()
+    web_needed = (
+        settings.chatgpt_supervisor_enabled
+        or settings.cursor_supervisor_enabled
+    )
+
+    ok = True
+    if web_needed:
+        try:
+            import playwright  # noqa: F401
+            print("Playwright Python package: yes")
+        except Exception as exc:
+            print(f"Playwright Python package: NO ({exc})")
+            ok = False
+
+        try:
+            from playwright.sync_api import sync_playwright
+
+            p = sync_playwright().start()
+            executable = Path(p.chromium.executable_path)
+            installed = executable.exists()
+            print(f"Chromium installed: {'yes' if installed else 'NO'}")
+            print(f"Chromium path: {executable}")
+            p.stop()
+            if not installed:
+                ok = False
+        except Exception as exc:
+            print(f"Chromium installed: NO ({exc})")
+            ok = False
+    else:
+        print("Playwright/Chromium: not required (web supervisors disabled)")
+
+    git_path = shutil.which("git")
+    if settings.cooperation_enabled:
+        print(f"Git: {git_path or 'MISSING'}")
+        if not git_path:
+            ok = False
+
     chat_ok = validate_chatgpt_url(settings.chatgpt_url)
     cursor_ok = validate_cursor_url(settings.cursor_url)
     print(
@@ -84,10 +99,11 @@ def doctor() -> int:
         print(f"Last Cursor state: {runtime_state.cursor}")
         print(f"Last Cooperation state: {runtime_state.cooperation}")
 
-    if not ok:
+    if web_needed and not ok:
         print()
-        print("Run: pip install -r requirements.txt")
-        print("Then: python -m playwright install chromium")
+        print("For web supervisors:")
+        print("  pip install -r requirements.txt")
+        print("  python -m playwright install chromium")
     return 0 if ok else 2
 
 
