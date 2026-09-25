@@ -127,9 +127,12 @@ class DesktopAgent(Agent):
         # reading. Give Claude time to start generating before the first copy
         # and poll it less aggressively.
         interval = self.poll_interval
-        if self.read_strategy == "clipboard":
-            time.sleep(2.5)
-            interval = max(interval, 2.5)
+        clipboard_mode = self.read_strategy == "clipboard"
+        if clipboard_mode:
+            # Claude's clipboard fallback briefly touches the foreground UI.
+            # Poll sparsely so it does not make the Mac feel "stuck" on Claude.
+            time.sleep(1.5)
+            interval = max(interval, 1.5)
 
         while time.monotonic() - started < timeout:
             current = self.read_snapshot()
@@ -141,6 +144,21 @@ class DesktopAgent(Agent):
             has_response = self._has_real_response(current)
 
             if seen_change and has_response and not generating and current and current == previous:
+                # Clipboard mode already requires two identical full-page
+                # snapshots. Return immediately instead of waiting another
+                # stable_seconds window; this removes several seconds of lag.
+                if clipboard_mode:
+                    output = self._extract_response(current)
+                    if self.events:
+                        self.events.emit(
+                            "agent_stable",
+                            agent=self.name,
+                            snapshot_chars=len(current),
+                            output_chars=len(output),
+                            strategy=self.read_strategy,
+                        )
+                    return output
+
                 if stable_since is None:
                     stable_since = time.monotonic()
                 if time.monotonic() - stable_since >= self.stable_seconds:
