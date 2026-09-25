@@ -251,6 +251,13 @@ class WebAutomationRuntime:
             assistants = page.locator('[data-message-author-role="assistant"]')
             user_count = users.count()
             assistant_count = assistants.count()
+
+            # Fallback for ChatGPT builds that do not expose author-role on
+            # the outer turn but still render assistant Markdown blocks.
+            if assistant_count == 0:
+                assistants = page.locator("div.markdown, .markdown.prose")
+                assistant_count = assistants.count()
+
             last_text = ""
             if assistant_count:
                 try:
@@ -350,14 +357,16 @@ class WebAutomationRuntime:
             )
 
         idle_since: float | None = None
-        last_state = before
-        saw_response_change = False
+        _, before_assistants, before_last = before
+        saw_assistant_change = False
 
         while not self._stop.is_set():
-            current_state = self._message_state(page)
-            if current_state != last_state:
-                saw_response_change = True
-                last_state = current_state
+            _, assistant_count, assistant_last = self._message_state(page)
+            if (
+                assistant_count > before_assistants
+                or (assistant_last and assistant_last != before_last)
+            ):
+                saw_assistant_change = True
 
             if self._chatgpt_generating(page):
                 idle_since = None
@@ -367,7 +376,7 @@ class WebAutomationRuntime:
                 if idle_since is None:
                     idle_since = now
                 elif (
-                    saw_response_change
+                    saw_assistant_change
                     and now - idle_since >= self.settings.idle_confirm_seconds
                 ):
                     return
