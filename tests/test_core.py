@@ -17,7 +17,9 @@ from ai_cowork.cooperation import (
     chatgpt_peer_review_instruction,
     coordination_message_filename,
     cursor_peer_review_instruction,
+    draft_required_coordination_message,
     evaluate_protocol_state,
+    protocol_next_action,
     render_coordination_message,
 )
 from ai_cowork.runtime_state import RuntimeStateStore, classify_status_message
@@ -311,6 +313,78 @@ class CoreTests(unittest.TestCase):
             "cooperation",
         )
         self.assertEqual(classify_status_message("Opening browser"), "system")
+
+    def test_protocol_next_action_matches_state(self):
+        review_state = AgentProtocolState(
+            "chatgpt",
+            ProtocolState.REVIEW_REQUIRED,
+            "review",
+            "peer123",
+            "own123",
+            "(none)",
+            "(none)",
+        )
+        status_state = AgentProtocolState(
+            "cursor",
+            ProtocolState.STATUS_REQUIRED,
+            "status",
+            "peer456",
+            "own456",
+            "review.md",
+            "(none)",
+        )
+        self.assertIn("Review peer head peer123", protocol_next_action(review_state))
+        self.assertIn("own head own456", protocol_next_action(status_state))
+
+    def test_draft_required_review_records_current_heads(self):
+        state = AgentProtocolState(
+            "chatgpt",
+            ProtocolState.REVIEW_REQUIRED,
+            "review",
+            "peerABC",
+            "ownXYZ",
+            "(none)",
+            "(none)",
+        )
+        path, body = draft_required_coordination_message(
+            state,
+            summary="Reviewed current Cursor changes.",
+        )
+        self.assertTrue(path.endswith("-chatgpt-review.md"))
+        self.assertIn("- Peer head reviewed: peerABC", body)
+        self.assertIn("- Own head: ownXYZ", body)
+
+    def test_draft_required_status_records_current_own_head(self):
+        state = AgentProtocolState(
+            "cursor",
+            ProtocolState.STATUS_REQUIRED,
+            "status",
+            "peerABC",
+            "ownXYZ",
+            "review.md",
+            "(none)",
+        )
+        path, body = draft_required_coordination_message(
+            state,
+            summary="Finished the current Cursor work.",
+        )
+        self.assertTrue(path.endswith("-cursor-status.md"))
+        self.assertIn("- Own head: ownXYZ", body)
+
+    def test_runtime_event_rotation(self):
+        with tempfile.TemporaryDirectory() as d:
+            status = Path(d) / "runtime_status.json"
+            events = Path(d) / "events.jsonl"
+            store = RuntimeStateStore(
+                status,
+                events,
+                max_event_bytes=100_000,
+            )
+            events.write_text("x" * 100_001, encoding="utf-8")
+            store.update("system", "rotated")
+            rotated = Path(d) / "events.1.jsonl"
+            self.assertTrue(rotated.exists())
+            self.assertIn('"message": "rotated"', events.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
