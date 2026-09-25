@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,10 @@ class RuntimeStatus:
     chatgpt: str = "idle"
     cursor: str = "idle"
     cooperation: str = "idle"
+    lifecycle: str = "UNKNOWN"
+    session_id: str = ""
+    started_at: str = ""
+    stopped_at: str = ""
     updated_at: str = ""
 
 
@@ -45,6 +50,36 @@ class RuntimeStateStore:
             return RuntimeStatus(**{k: raw[k] for k in allowed if k in raw})
         except Exception:
             return RuntimeStatus()
+
+    def mark_started(self, mode: str) -> RuntimeStatus:
+        with self._lock:
+            now = self._now()
+            self._status.lifecycle = "RUNNING"
+            self._status.session_id = uuid.uuid4().hex
+            self._status.started_at = now
+            self._status.stopped_at = ""
+            self._status.system = f"Runtime started ({mode})"
+            self._status.updated_at = now
+            self._write_status_locked()
+            self._append_event_locked(
+                "system",
+                f"Runtime started ({mode}); session={self._status.session_id}",
+            )
+            return RuntimeStatus(**asdict(self._status))
+
+    def mark_stopped(self, reason: str = "clean stop") -> RuntimeStatus:
+        with self._lock:
+            now = self._now()
+            self._status.lifecycle = "STOPPED_CLEANLY"
+            self._status.stopped_at = now
+            self._status.system = f"Runtime stopped: {reason}"
+            self._status.updated_at = now
+            self._write_status_locked()
+            self._append_event_locked(
+                "system",
+                f"Runtime stopped: {reason}; session={self._status.session_id}",
+            )
+            return RuntimeStatus(**asdict(self._status))
 
     def update(self, module: str, message: str) -> RuntimeStatus:
         if module not in {"system", "chatgpt", "cursor", "cooperation"}:
