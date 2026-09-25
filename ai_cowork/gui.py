@@ -42,6 +42,7 @@ class WebControlWindowController(NSObject):
         self.chatgpt_status_label = None
         self.cursor_status_label = None
         self.cooperation_status_label = None
+        self.gate_status_label = None
         self.start_button = None
         self.headless_check = None
         self.chatgpt_check = None
@@ -142,11 +143,16 @@ class WebControlWindowController(NSObject):
 
         self.chatgpt_status_label = self._label("ChatGPT: idle", 24, 82, 630, 22, 12)
         self.cursor_status_label = self._label("Cursor: idle", 24, 60, 630, 22, 12)
-        self.cooperation_status_label = self._label("Cooperation: idle", 24, 38, 630, 22, 12)
-        self.status_label = self._label("System: idle", 24, 14, 630, 20, 12)
+        self.cooperation_status_label = self._label("Cooperation: idle", 24, 38, 630, 20, 11)
+        self.gate_status_label = self._label(
+            "Gates: ChatGPT=unknown | Cursor=unknown",
+            24, 20, 630, 18, 11,
+        )
+        self.status_label = self._label("System: idle", 24, 4, 630, 16, 10)
         content.addSubview_(self.chatgpt_status_label)
         content.addSubview_(self.cursor_status_label)
         content.addSubview_(self.cooperation_status_label)
+        content.addSubview_(self.gate_status_label)
         content.addSubview_(self.status_label)
 
         self.window.makeKeyAndOrderFront_(None)
@@ -297,7 +303,7 @@ class WebControlWindowController(NSObject):
                     ".",
                     poll_seconds=10.0,
                     on_status=self.cooperation_status_from_worker,
-                    on_snapshot=self.protocol_gate.update,
+                    on_snapshot=self.cooperation_snapshot_from_worker,
                 )
                 self.cooperation_monitor.start()
 
@@ -321,6 +327,28 @@ class WebControlWindowController(NSObject):
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "updateCooperationStatus:", message, False
         )
+
+    @objc.python_method
+    def cooperation_snapshot_from_worker(self, snapshot) -> None:
+        self.protocol_gate.update(snapshot)
+        chat = (
+            snapshot.chatgpt_protocol.state.value
+            if snapshot.chatgpt_protocol is not None
+            else "UNKNOWN"
+        )
+        cursor = (
+            snapshot.cursor_protocol.state.value
+            if snapshot.cursor_protocol is not None
+            else "UNKNOWN"
+        )
+        summary = f"Gates: ChatGPT={chat} | Cursor={cursor}"
+        self.performSelectorOnMainThread_withObject_waitUntilDone_(
+            "updateGateStatus:", summary, False
+        )
+
+    def updateGateStatus_(self, message):
+        if self.gate_status_label is not None:
+            self.gate_status_label.setStringValue_(message)
 
     def updateCooperationStatus_(self, message):
         if self.cooperation_status_label is not None:
