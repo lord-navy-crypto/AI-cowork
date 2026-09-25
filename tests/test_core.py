@@ -12,6 +12,7 @@ from ai_cowork.cooperation import (
     AgentProtocolState,
     CoordinationSnapshot,
     GitCoordinationMonitor,
+    ProtocolDraftStore,
     ProtocolGate,
     ProtocolState,
     chatgpt_peer_review_instruction,
@@ -412,6 +413,47 @@ class CoreTests(unittest.TestCase):
             review_after_status=None,
         )
         self.assertEqual(state.state, ProtocolState.REVIEW_REQUIRED)
+
+    def test_protocol_draft_store_writes_local_guidance(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = ProtocolDraftStore(Path(d))
+            chat = AgentProtocolState(
+                "chatgpt",
+                ProtocolState.REVIEW_REQUIRED,
+                "review needed",
+                "peer123",
+                "own123",
+                "(none)",
+                "(none)",
+            )
+            cursor = AgentProtocolState(
+                "cursor",
+                ProtocolState.OWN_WORK_ALLOWED,
+                "allowed",
+                "peer456",
+                "own456",
+                "review.md",
+                "status.md",
+            )
+            snapshot = CoordinationSnapshot(
+                "chat",
+                "cursor",
+                "coord",
+                "messages/x.md",
+                chat,
+                cursor,
+            )
+            chat_path, cursor_path = store.write_snapshot(snapshot)
+            self.assertTrue(chat_path.exists())
+            self.assertTrue(cursor_path.exists())
+            self.assertIn(
+                "Target path:",
+                chat_path.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "OWN_WORK_ALLOWED",
+                cursor_path.read_text(encoding="utf-8"),
+            )
 
 
 if __name__ == "__main__":
