@@ -46,3 +46,36 @@ The local Cooperation module monitors branch heads and coordination messages. It
 ## Product rule
 
 The three modules share browser/session infrastructure but have independent state and controls. The desktop Accessibility implementation is archived and receives no new feature work until these three web modules are stable.
+
+
+## Cooperation gate semantics
+
+When Cooperation is enabled, automatic ChatGPT/Cursor actions are **fail-closed** until the first valid Git snapshot arrives.
+
+Protocol states:
+
+- `REVIEW_REQUIRED` — own work is blocked. A fresh review must record both the current peer head and the current own head baseline.
+- `OWN_WORK_ALLOWED` — the fresh review gate has passed. This is the only state that permits automatic own-work actions.
+- `STATUS_REQUIRED` — own branch changed after review; append a status that records the current own head.
+- `READY` — the previous work cycle is fully closed. It does **not** permit another automatic work cycle; a new review is required first.
+
+New-format coordination messages use exact Git SHA metadata rather than cross-branch wall-clock ordering:
+
+```text
+Review:
+  Peer head reviewed: <peer SHA>
+  Own head: <own SHA at review>
+
+Status:
+  Own head: <current own SHA>
+```
+
+The coordination branch's own Git history determines whether review or status is newer.
+
+## Fault isolation
+
+- ChatGPT page failures pause only ChatGPT Supervisor.
+- Cursor page failures pause only Cursor Supervisor.
+- Cooperation fetch failures keep the protocol gate closed but do not close Chromium.
+- Cooperation-only mode does not start Chromium.
+- Runtime state and an event journal are persisted under `state/` for diagnostics.
