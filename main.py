@@ -101,14 +101,20 @@ def main() -> int:
     sar_p = sub.add_parser("send-and-read")
     sar_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
     sar_p.add_argument("message")
-    sar_p.add_argument("--timeout", type=float, default=300)
+    sar_p.add_argument("--timeout", type=float, default=None,
+                       help="Optional hard timeout in seconds; default waits indefinitely.")
 
     relay_p = sub.add_parser("relay")
     relay_p.add_argument("message")
-    relay_p.add_argument("--timeout", type=float, default=300)
+    relay_p.add_argument("--timeout", type=float, default=None,
+                         help="Optional hard timeout in seconds; default waits indefinitely.")
 
     run_p = sub.add_parser("run")
     run_p.add_argument("--dry-run", action="store_true")
+    run_p.add_argument("--preset", choices=["redstone"])
+    run_p.add_argument("--gpt-objective")
+    run_p.add_argument("--claude-objective")
+    run_p.add_argument("--with-deepseek", action="store_true")
 
     args = parser.parse_args()
     cfg = load_config()
@@ -196,16 +202,43 @@ def main() -> int:
             print(f"max_rounds={cfg['max_rounds']}")
             return 0
 
+        if args.preset == "redstone":
+            gpt_objective = args.gpt_objective or (
+                "Work on lord-navy-crypto/redstones-engineering as the systems/reliability "
+                "developer. Inspect the real repository first. Improve a substantive weakness "
+                "in signal semantics, device-state handling, control/reliability behavior, or "
+                "verification. Prefer changes that make real zero distinct from missing/stale/"
+                "not-ready information and strengthen end-to-end engineering correctness. "
+                "Run the relevant verification/build checks and commit the work on agent/gpt."
+            )
+            claude_objective = args.claude_objective or (
+                "Work independently on lord-navy-crypto/redstones-engineering as the HMI/"
+                "instrumentation developer. Inspect the real repository first. Improve a "
+                "substantive weakness in player-facing diagnostics, visualization, instrument "
+                "readability, commissioning workflow, or operations feedback. Keep the work "
+                "architecturally compatible with the existing engineering systems, run relevant "
+                "tests, and commit the work on agent/claude."
+            )
+        else:
+            gpt_objective = args.gpt_objective or (
+                "Inspect the repository and implement a substantive systems/reliability improvement."
+            )
+            claude_objective = args.claude_objective or (
+                "Inspect the repository independently and implement a substantive complementary improvement."
+            )
+
         store = RuntimeStore()
         store.load()
         Controller(
             gpt=gpt,
             claude=claude,
-            deepseek=deepseek,
+            deepseek=deepseek if args.with_deepseek else None,
             checkpoint_seconds=int(cfg["checkpoint_seconds"]),
             max_rounds=int(cfg["max_rounds"]),
             store=store,
             events=events,
+            gpt_objective=gpt_objective,
+            claude_objective=claude_objective,
         ).run()
         return 0
 
