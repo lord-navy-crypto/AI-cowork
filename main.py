@@ -95,6 +95,11 @@ def doctor() -> int:
         + ("enabled" if settings.cursor_auto_continue else "disabled")
     )
     if runtime_state.updated_at:
+        print(f"Last runtime lifecycle: {runtime_state.lifecycle}")
+        if runtime_state.lifecycle == "RUNNING":
+            print("Previous run may have ended unexpectedly.")
+        if runtime_state.session_id:
+            print(f"Last session: {runtime_state.session_id}")
         print(f"Last runtime update: {runtime_state.updated_at}")
         print(f"Last ChatGPT state: {runtime_state.chatgpt}")
         print(f"Last Cursor state: {runtime_state.cursor}")
@@ -192,6 +197,7 @@ def run_supervisor() -> int:
         return 2
 
     state_store = RuntimeStateStore()
+    state_store.mark_started("cli")
     protocol_gate = ProtocolGate()
     protocol_drafts = ProtocolDraftStore()
     if settings.cooperation_enabled:
@@ -242,6 +248,7 @@ def run_supervisor() -> int:
         if cooperation and cooperation.running:
             cooperation.stop()
         protocol_gate.disable()
+        state_store.mark_stopped("clean CLI stop")
         if runtime is not None:
             while runtime.running:
                 time.sleep(0.1)
