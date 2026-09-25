@@ -505,6 +505,32 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(gate.allows_own_work("chatgpt"))
         self.assertIn("STALE_COORDINATION", gate.block_reason("chatgpt"))
 
+    def test_protocol_gate_invalidate_blocks_cached_permission(self):
+        gate = ProtocolGate()
+        gate.enable()
+        allowed = AgentProtocolState(
+            "chatgpt",
+            ProtocolState.OWN_WORK_ALLOWED,
+            "allowed",
+            "peer",
+            "own",
+            "review.md",
+            "status.md",
+        )
+        gate.update(
+            CoordinationSnapshot(
+                "chat",
+                "cursor",
+                "coord",
+                "messages/x.md",
+                allowed,
+                allowed,
+            )
+        )
+        self.assertTrue(gate.allows_own_work("chatgpt"))
+        gate.invalidate()
+        self.assertFalse(gate.allows_own_work("chatgpt"))
+
 
 if __name__ == "__main__":
     unittest.main()
