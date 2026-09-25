@@ -109,6 +109,12 @@ def main() -> int:
     relay_p.add_argument("--timeout", type=float, default=None,
                          help="Optional hard timeout in seconds; default waits indefinitely.")
 
+    ping_p = sub.add_parser("ping-pong")
+    ping_p.add_argument("message")
+    ping_p.add_argument("--start", choices=["chatgpt", "claude"], default="chatgpt")
+    ping_p.add_argument("--turns", type=int, default=0,
+                        help="Number of AI turns; 0 means continue until Ctrl+C.")
+
     run_p = sub.add_parser("run")
     run_p.add_argument("--dry-run", action="store_true")
     run_p.add_argument("--preset", choices=["redstone"])
@@ -162,6 +168,51 @@ def main() -> int:
 
     if args.command == "send-and-read":
         print(mapping[args.agent].send_and_read(args.message, timeout=args.timeout))
+        return 0
+
+    if args.command == "ping-pong":
+        current_name = args.start
+        current = mapping[current_name]
+        other_name = "claude" if current_name == "chatgpt" else "chatgpt"
+        other = mapping[other_name]
+        prompt = args.message
+        turn = 0
+
+        print(
+            f"[ping-pong] starting with {current_name}; "
+            + ("continuous mode" if args.turns == 0 else f"{args.turns} turns"),
+            flush=True,
+        )
+
+        while args.turns == 0 or turn < args.turns:
+            turn += 1
+            print(f"[ping-pong] turn {turn}: waiting for {current_name}...", flush=True)
+            reply = current.send_and_read(prompt, timeout=None)
+            print(f"[ping-pong] turn {turn}: {current_name} complete", flush=True)
+            print(f"===== {current_name.upper()} HANDOFF =====")
+            print(reply)
+
+            if args.turns != 0 and turn >= args.turns:
+                break
+
+            prompt = (
+                "DEVELOPER HANDOFF\n\n"
+                f"The other developer ({current_name}) has completed a work turn. "
+                "Continue the engineering work from this handoff. "
+                "Inspect the repository and current branch state before editing. "
+                "If the handoff names a branch, continue on that branch; otherwise stay on "
+                "the branch you are already using. Do not merge main and do not force push. "
+                "Do real implementation/testing, not just commentary. "
+                "When your turn is genuinely complete, reply with a concise WORK REPORT "
+                "including: branch, completed work, files changed, tests, problems, commit, "
+                "and the next useful step for the other developer.\n\n"
+                "OTHER DEVELOPER HANDOFF:\n"
+                + reply
+            )
+
+            current_name, other_name = other_name, current_name
+            current, other = other, current
+
         return 0
 
     if args.command == "relay":
