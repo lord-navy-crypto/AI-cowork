@@ -67,6 +67,20 @@ class RuntimeStateStore:
             )
             return RuntimeStatus(**asdict(self._status))
 
+    def mark_crashed(self, reason: str) -> RuntimeStatus:
+        with self._lock:
+            now = self._now()
+            self._status.lifecycle = "CRASHED"
+            self._status.stopped_at = now
+            self._status.system = f"Runtime crashed: {reason}"
+            self._status.updated_at = now
+            self._write_status_locked()
+            self._append_event_locked(
+                "system",
+                f"Runtime crashed: {reason}; session={self._status.session_id}",
+            )
+            return RuntimeStatus(**asdict(self._status))
+
     def mark_stopped(self, reason: str = "clean stop") -> RuntimeStatus:
         with self._lock:
             now = self._now()
