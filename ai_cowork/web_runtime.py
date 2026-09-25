@@ -97,8 +97,10 @@ class WebAutomationRuntime:
         self,
         settings: WebSettings,
         on_status: Callable[[str], None] | None = None,
+        supervise: bool = True,
     ) -> None:
         self.settings = settings
+        self.supervise = supervise
         self.on_status = on_status or (lambda _: None)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -322,6 +324,12 @@ class WebAutomationRuntime:
                 return
 
             self._status(self._cursor_summary())
+            if not self.supervise:
+                self._status("Dedicated web session connected — login state will be saved locally.")
+                while not self._stop.is_set():
+                    self._stop.wait(1.0)
+                return
+
             self._status("ChatGPT Web connected — supervisor active.")
 
             while not self._stop.is_set():
