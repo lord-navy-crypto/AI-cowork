@@ -375,6 +375,13 @@ class WebControlWindowController(NSObject):
 
     def updateStatus_(self, message):
         self.runtime_state.update(classify_status_message(message), str(message))
+        if (
+            self.runtime is not None
+            and not self.runtime.running
+            and self.runtime.fatal_error
+            and not self.runtime.stop_requested
+        ):
+            self.runtime_state.mark_crashed(self.runtime.fatal_error)
         if self.status_label is not None:
             self.status_label.setStringValue_(f"System: {message}")
         if self.chatgpt_status_label is not None and message.startswith("ChatGPT"):
