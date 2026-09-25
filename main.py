@@ -231,7 +231,13 @@ def run_supervisor() -> int:
     if settings.cooperation_enabled:
         def handle_snapshot(snapshot):
             protocol_gate.update(snapshot)
-            protocol_drafts.write_snapshot(snapshot)
+            try:
+                protocol_drafts.write_snapshot(snapshot)
+            except Exception as exc:
+                state_store.update(
+                    "cooperation",
+                    f"Cooperation draft error: {exc}",
+                )
 
         try:
             cooperation = GitCoordinationMonitor(
@@ -242,6 +248,7 @@ def run_supervisor() -> int:
                     print(f"[cooperation] {message}", flush=True),
                 )[-1],
                 on_snapshot=handle_snapshot,
+                on_error=lambda exc: protocol_gate.invalidate(),
             )
             cooperation.start()
         except Exception as exc:
