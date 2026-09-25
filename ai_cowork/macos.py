@@ -513,3 +513,66 @@ def select_all_copy_text(app_name: str, settle: float = 0.35) -> str:
         return copied.strip()
     finally:
         set_clipboard(old_clipboard)
+
+
+def focused_element_info(app_name: str) -> tuple[str, str, str]:
+    """Return (role, placeholder, description) for the focused AX element."""
+    pid = find_pid(app_name)
+    if pid is None:
+        return "", "", ""
+    enable_enhanced_accessibility(app_name)
+    app = AXUIElementCreateApplication(pid)
+    focused = _attr(app, "AXFocusedUIElement")
+    if focused is None:
+        return "", "", ""
+    role = str(_attr(focused, "AXRole") or "")
+    placeholder = str(_attr(focused, "AXPlaceholderValue") or "")
+    desc = str(_attr(focused, "AXDescription") or "")
+    return role, placeholder, desc
+
+
+def focus_chat_input(app_name: str, max_tabs: int = 24) -> bool:
+    """Best-effort keyboard focus search for a chat composer.
+
+    Avoids fixed screen coordinates. It activates the app and cycles Tab until
+    the focused AX element looks editable.
+    """
+    activate_app(app_name)
+    time.sleep(0.25)
+
+    for _ in range(max_tabs + 1):
+        role, placeholder, desc = focused_element_info(app_name)
+        hint = (placeholder + " " + desc).casefold()
+        if role in ("AXTextArea", "AXTextField") or any(
+            token in hint
+            for token in ("message", "chatgpt", "claude", "消息", "发送消息", "发消息")
+        ):
+            return True
+
+        run_osascript(
+            '''
+            tell application "System Events"
+                key code 48
+                delay 0.08
+            end tell
+            '''
+        )
+
+    return False
+
+
+def paste_into_chat(app_name: str, text: str, enter: bool = True) -> None:
+    """Focus a chat composer if possible, then paste and optionally send."""
+    set_clipboard(text)
+    focus_chat_input(app_name)
+    time.sleep(0.1)
+    enter_line = "key code 36" if enter else ""
+    run_osascript(
+        f'''
+        tell application "System Events"
+            keystroke "v" using command down
+            delay 0.12
+            {enter_line}
+        end tell
+        '''
+    )
