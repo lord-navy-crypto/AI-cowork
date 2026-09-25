@@ -134,6 +134,7 @@ class WebAutomationRuntime:
         self._last_cursor_poll = 0.0
         self._cursor_failure_count = 0
         self._cursor_paused_reason: str | None = None
+        self._cursor_action_armed = True
         self._chatgpt_paused_reason: str | None = None
 
     @property
@@ -480,6 +481,9 @@ class WebAutomationRuntime:
             text = self._page_text(page)
             snapshot = classify_cursor_text(text, page.url)
 
+            if snapshot.state is not CursorState.WAITING:
+                self._cursor_action_armed = True
+
             if snapshot.state is CursorState.LOGIN_REQUIRED:
                 self._cursor_paused_reason = "login required"
                 if self.settings.headless:
@@ -502,13 +506,16 @@ class WebAutomationRuntime:
             )
             if (
                 self.settings.cursor_auto_continue
+                and self._cursor_action_armed
                 and cursor_gate_ok
                 and action is CursorAction.CLICK_CONTINUE
                 and continue_control is not None
             ):
                 continue_control.click()
+                self._cursor_action_armed = False
                 self._status(
-                    "Cursor Supervisor [ACTION]: clicked verified Continue/Resume control."
+                    "Cursor Supervisor [ACTION]: clicked verified Continue/Resume control; "
+                    "waiting for state change before another automatic action."
                 )
                 self._last_cursor_state = snapshot.state
                 return
