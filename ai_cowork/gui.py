@@ -46,6 +46,7 @@ class WebControlWindowController(NSObject):
         self.chatgpt_check = None
         self.cursor_check = None
         self.cooperation_check = None
+        self.cursor_auto_continue_check = None
         self.cooperation_monitor = None
         return self
 
@@ -113,27 +114,33 @@ class WebControlWindowController(NSObject):
         self.cooperation_check.setState_(1 if self.settings.cooperation_enabled else 0)
         content.addSubview_(self.cooperation_check)
 
-        save_button = self._button("Save Settings", 24, 135, 145, 34, "saveURLs:")
+        self.cursor_auto_continue_check = NSButton.alloc().initWithFrame_(NSMakeRect(238, 151, 300, 22))
+        self.cursor_auto_continue_check.setButtonType_(NSButtonTypeSwitch)
+        self.cursor_auto_continue_check.setTitle_("Cursor: auto Continue/Resume when verified")
+        self.cursor_auto_continue_check.setState_(1 if self.settings.cursor_auto_continue else 0)
+        content.addSubview_(self.cursor_auto_continue_check)
+
+        save_button = self._button("Save Settings", 24, 115, 145, 34, "saveURLs:")
         content.addSubview_(save_button)
 
         self.start_button = self._button(
             "Start Web Runtime",
-            183, 135, 220, 34,
+            183, 115, 220, 34,
             "toggleSupervisor:",
         )
         content.addSubview_(self.start_button)
 
         browser_button = self._button(
             "Open/Login Session",
-            417, 135, 235, 34,
+            417, 115, 235, 34,
             "openSession:",
         )
         content.addSubview_(browser_button)
 
-        self.chatgpt_status_label = self._label("ChatGPT: idle", 24, 98, 630, 22, 12)
-        self.cursor_status_label = self._label("Cursor: idle", 24, 74, 630, 22, 12)
-        self.cooperation_status_label = self._label("Cooperation: idle", 24, 50, 630, 22, 12)
-        self.status_label = self._label("System: idle", 24, 20, 630, 24, 12)
+        self.chatgpt_status_label = self._label("ChatGPT: idle", 24, 82, 630, 22, 12)
+        self.cursor_status_label = self._label("Cursor: idle", 24, 60, 630, 22, 12)
+        self.cooperation_status_label = self._label("Cooperation: idle", 24, 38, 630, 22, 12)
+        self.status_label = self._label("System: idle", 24, 14, 630, 20, 12)
         content.addSubview_(self.chatgpt_status_label)
         content.addSubview_(self.cursor_status_label)
         content.addSubview_(self.cooperation_status_label)
@@ -177,6 +184,11 @@ class WebControlWindowController(NSObject):
         current.chatgpt_supervisor_enabled = bool(self.chatgpt_check.state()) if self.chatgpt_check is not None else True
         current.cursor_supervisor_enabled = bool(self.cursor_check.state()) if self.cursor_check is not None else True
         current.cooperation_enabled = bool(self.cooperation_check.state()) if self.cooperation_check is not None else True
+        current.cursor_auto_continue = (
+            bool(self.cursor_auto_continue_check.state())
+            if self.cursor_auto_continue_check is not None
+            else False
+        )
         return current
 
     @objc.python_method
