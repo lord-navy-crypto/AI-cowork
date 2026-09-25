@@ -16,7 +16,7 @@ from AppKit import (
 )
 from Foundation import NSObject
 
-from .cooperation import GitCoordinationMonitor
+from .cooperation import GitCoordinationMonitor, ProtocolGate
 from .web_runtime import (
     SettingsStore,
     WebAutomationRuntime,
@@ -48,6 +48,7 @@ class WebControlWindowController(NSObject):
         self.cooperation_check = None
         self.cursor_auto_continue_check = None
         self.cooperation_monitor = None
+        self.protocol_gate = ProtocolGate()
         return self
 
     @objc.python_method
@@ -277,6 +278,7 @@ class WebControlWindowController(NSObject):
                 self.runtime = WebAutomationRuntime(
                     settings,
                     on_status=self.status_from_worker,
+                    protocol_gate=self.protocol_gate,
                 )
                 self.runtime.start()
             else:
@@ -287,6 +289,7 @@ class WebControlWindowController(NSObject):
                     ".",
                     poll_seconds=10.0,
                     on_status=self.cooperation_status_from_worker,
+                    on_snapshot=self.protocol_gate.update,
                 )
                 self.cooperation_monitor.start()
 
@@ -324,7 +327,7 @@ class WebControlWindowController(NSObject):
         if self.start_button is not None and not (
             self.runtime and self.runtime.running
         ):
-            self.start_button.setTitle_("Start Web Runtime")
+            self.start_button.setTitle_("Start Runtime")
 
     def windowWillClose_(self, notification):
         if self.runtime and self.runtime.running:
