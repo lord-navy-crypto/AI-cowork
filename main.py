@@ -16,6 +16,7 @@ from ai_cowork.macos import (
     formatted_tree,
     system_events_probe,
     accessibility_debug,
+    meaningful_accessibility_dump,
 )
 from ai_cowork.state import RuntimeStore
 
@@ -82,6 +83,9 @@ def main() -> int:
     debug_p = sub.add_parser("debug-ax")
     debug_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
 
+    deep_p = sub.add_parser("deep-ax")
+    deep_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
+
     send_p = sub.add_parser("send")
     send_p.add_argument("agent", choices=["chatgpt", "claude", "deepseek"])
     send_p.add_argument("message")
@@ -114,6 +118,10 @@ def main() -> int:
 
     if args.command == "debug-ax":
         print(accessibility_debug(mapping[args.agent].app_name))
+        return 0
+
+    if args.command == "deep-ax":
+        print(meaningful_accessibility_dump(mapping[args.agent].app_name))
         return 0
 
     if args.command == "send":
