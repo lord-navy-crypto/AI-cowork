@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from .events import EventLog
 from .macos import (
+    generation_in_progress,
     paste_and_enter,
     paste_into_chat,
     select_all_copy_text,
@@ -89,18 +90,25 @@ class DesktopAgent(Agent):
         stable_since: float | None = None
         seen_change = False
 
-        # Clipboard reading is invasive compared with passive AX WebArea
-        # reading. Give Claude time to start generating before the first copy
-        # and poll it less aggressively.
         interval = self.poll_interval
         clipboard_mode = self.read_strategy == "clipboard"
-        if clipboard_mode:
-            # Claude's clipboard fallback briefly touches the foreground UI.
-            # Poll sparsely so it does not make the Mac feel "stuck" on Claude.
-            time.sleep(1.5)
-            interval = max(interval, 1.5)
+        clipboard_fallback_after = started + 5.0
+        saw_generating = False
 
         while timeout is None or time.monotonic() - started < timeout:
+            if clipboard_mode:
+                # Do not steal focus from Claude while it is visibly thinking
+                # or generating. Use Accessibility as a passive completion
+                # probe and only copy the page after generation has ended.
+                busy = generation_in_progress(self.app_name)
+                if busy:
+                    saw_generating = True
+                    time.sleep(max(interval, 0.75))
+                    continue
+                if not saw_generating and time.monotonic() < clipboard_fallback_after:
+                    time.sleep(max(interval, 0.75))
+                    continue
+
             current = self.read_snapshot()
 
             if current and current != self._baseline:
@@ -139,7 +147,7 @@ class DesktopAgent(Agent):
                 previous = current
                 stable_since = None
 
-            time.sleep(interval)
+            time.sleep(max(interval, 1.5) if clipboard_mode else interval)
 
         raise TimeoutError(f"{self.name} output did not become stable within {timeout} seconds")
 
