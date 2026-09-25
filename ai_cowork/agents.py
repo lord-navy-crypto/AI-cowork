@@ -79,11 +79,15 @@ class DesktopAgent(Agent):
         started = time.monotonic()
         previous = ""
         stable_since: float | None = None
+        seen_change = False
 
         while time.monotonic() - started < timeout:
             current = self.read_snapshot()
 
-            if current and current == previous:
+            if current and current != self._baseline:
+                seen_change = True
+
+            if seen_change and current and current == previous:
                 if stable_since is None:
                     stable_since = time.monotonic()
                 if time.monotonic() - stable_since >= self.stable_seconds:
@@ -104,6 +108,10 @@ class DesktopAgent(Agent):
             time.sleep(self.poll_interval)
 
         raise TimeoutError(f"{self.name} output did not become stable")
+
+    def send_and_read(self, prompt: str, timeout: float = 300) -> str:
+        self.send(prompt)
+        return self.wait_until_stable(timeout=timeout)
 
 
 @dataclass
