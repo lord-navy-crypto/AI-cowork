@@ -16,6 +16,7 @@ from AppKit import (
 )
 from Foundation import NSObject
 
+from .cooperation import GitCoordinationMonitor
 from .web_runtime import (
     SettingsStore,
     WebAutomationRuntime,
@@ -37,8 +38,15 @@ class WebControlWindowController(NSObject):
         self.chatgpt_field = None
         self.cursor_field = None
         self.status_label = None
+        self.chatgpt_status_label = None
+        self.cursor_status_label = None
+        self.cooperation_status_label = None
         self.start_button = None
         self.headless_check = None
+        self.chatgpt_check = None
+        self.cursor_check = None
+        self.cooperation_check = None
+        self.cooperation_monitor = None
         return self
 
     @objc.python_method
@@ -49,7 +57,7 @@ class WebControlWindowController(NSObject):
             | NSWindowStyleMaskMiniaturizable
         )
         self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 620, 350),
+            NSMakeRect(0, 0, 680, 470),
             style,
             NSBackingStoreBuffered,
             False,
@@ -59,52 +67,76 @@ class WebControlWindowController(NSObject):
         self.window.setDelegate_(self)
         content = self.window.contentView()
 
-        content.addSubview_(self._label("AI-cowork Web Controller", 24, 298, 570, 30, 21))
+        content.addSubview_(self._label("AI-cowork Web Controller", 24, 418, 630, 30, 21))
         content.addSubview_(
             self._label(
                 "Dedicated ChatGPT + Cursor web sessions. Passwords and cookies stay in the browser profile.",
-                24, 270, 570, 20, 12,
+                24, 390, 630, 20, 12,
             )
         )
 
-        content.addSubview_(self._label("ChatGPT work URL", 24, 224, 170, 20, 13))
+        content.addSubview_(self._label("ChatGPT work URL", 24, 344, 170, 20, 13))
         self.chatgpt_field = self._text_field(
             self.settings.chatgpt_url,
-            24, 192, 570, 28,
+            24, 312, 630, 28,
         )
         content.addSubview_(self.chatgpt_field)
 
-        content.addSubview_(self._label("Cursor Agent URL", 24, 155, 170, 20, 13))
+        content.addSubview_(self._label("Cursor Agent URL", 24, 275, 170, 20, 13))
         self.cursor_field = self._text_field(
             self.settings.cursor_url,
-            24, 123, 570, 28,
+            24, 243, 630, 28,
         )
         content.addSubview_(self.cursor_field)
 
-        self.headless_check = NSButton.alloc().initWithFrame_(NSMakeRect(24, 91, 240, 24))
+        self.headless_check = NSButton.alloc().initWithFrame_(NSMakeRect(24, 207, 240, 24))
         self.headless_check.setButtonType_(NSButtonTypeSwitch)
         self.headless_check.setTitle_("Run hidden after login")
         self.headless_check.setState_(1 if self.settings.headless else 0)
         content.addSubview_(self.headless_check)
 
-        save_button = self._button("Save URLs", 24, 50, 145, 34, "saveURLs:")
+        self.chatgpt_check = NSButton.alloc().initWithFrame_(NSMakeRect(24, 177, 210, 24))
+        self.chatgpt_check.setButtonType_(NSButtonTypeSwitch)
+        self.chatgpt_check.setTitle_("ChatGPT Supervisor")
+        self.chatgpt_check.setState_(1 if self.settings.chatgpt_supervisor_enabled else 0)
+        content.addSubview_(self.chatgpt_check)
+
+        self.cursor_check = NSButton.alloc().initWithFrame_(NSMakeRect(238, 177, 210, 24))
+        self.cursor_check.setButtonType_(NSButtonTypeSwitch)
+        self.cursor_check.setTitle_("Cursor Supervisor")
+        self.cursor_check.setState_(1 if self.settings.cursor_supervisor_enabled else 0)
+        content.addSubview_(self.cursor_check)
+
+        self.cooperation_check = NSButton.alloc().initWithFrame_(NSMakeRect(452, 177, 200, 24))
+        self.cooperation_check.setButtonType_(NSButtonTypeSwitch)
+        self.cooperation_check.setTitle_("Cooperation")
+        self.cooperation_check.setState_(1 if self.settings.cooperation_enabled else 0)
+        content.addSubview_(self.cooperation_check)
+
+        save_button = self._button("Save Settings", 24, 135, 145, 34, "saveURLs:")
         content.addSubview_(save_button)
 
         self.start_button = self._button(
-            "Start Web Supervisor",
-            183, 50, 200, 34,
+            "Start Web Runtime",
+            183, 135, 220, 34,
             "toggleSupervisor:",
         )
         content.addSubview_(self.start_button)
 
         browser_button = self._button(
             "Open/Login Session",
-            397, 50, 197, 34,
+            417, 135, 235, 34,
             "openSession:",
         )
         content.addSubview_(browser_button)
 
-        self.status_label = self._label("Status: idle", 24, 17, 570, 24, 12)
+        self.chatgpt_status_label = self._label("ChatGPT: idle", 24, 98, 630, 22, 12)
+        self.cursor_status_label = self._label("Cursor: idle", 24, 74, 630, 22, 12)
+        self.cooperation_status_label = self._label("Cooperation: idle", 24, 50, 630, 22, 12)
+        self.status_label = self._label("System: idle", 24, 20, 630, 24, 12)
+        content.addSubview_(self.chatgpt_status_label)
+        content.addSubview_(self.cursor_status_label)
+        content.addSubview_(self.cooperation_status_label)
         content.addSubview_(self.status_label)
 
         self.window.makeKeyAndOrderFront_(None)
@@ -142,6 +174,9 @@ class WebControlWindowController(NSObject):
         current.chatgpt_url = chatgpt_url
         current.cursor_url = cursor_url
         current.headless = bool(self.headless_check.state()) if self.headless_check is not None else False
+        current.chatgpt_supervisor_enabled = bool(self.chatgpt_check.state()) if self.chatgpt_check is not None else True
+        current.cursor_supervisor_enabled = bool(self.cursor_check.state()) if self.cursor_check is not None else True
+        current.cooperation_enabled = bool(self.cooperation_check.state()) if self.cooperation_check is not None else True
         return current
 
     @objc.python_method
@@ -194,7 +229,9 @@ class WebControlWindowController(NSObject):
     def toggleSupervisor_(self, sender):
         if self.runtime and self.runtime.running:
             self.runtime.stop()
-            self.start_button.setTitle_("Start Web Supervisor")
+            if self.cooperation_monitor and self.cooperation_monitor.running:
+                self.cooperation_monitor.stop()
+            self.start_button.setTitle_("Start Web Runtime")
             return
 
         settings = self._save()
@@ -204,8 +241,15 @@ class WebControlWindowController(NSObject):
         self.runtime = WebAutomationRuntime(settings, on_status=self.status_from_worker)
         try:
             self.runtime.start()
-            self.start_button.setTitle_("Stop Web Supervisor")
-            self.updateStatus_("Web Supervisor starting…")
+            if settings.cooperation_enabled:
+                self.cooperation_monitor = GitCoordinationMonitor(
+                    ".",
+                    poll_seconds=10.0,
+                    on_status=self.cooperation_status_from_worker,
+                )
+                self.cooperation_monitor.start()
+            self.start_button.setTitle_("Stop Web Runtime")
+            self.updateStatus_("Shared web runtime starting…")
         except Exception as exc:
             self.updateStatus_(f"Start error: {exc}")
 
@@ -215,9 +259,23 @@ class WebControlWindowController(NSObject):
             "updateStatus:", message, False
         )
 
+    @objc.python_method
+    def cooperation_status_from_worker(self, message: str) -> None:
+        self.performSelectorOnMainThread_withObject_waitUntilDone_(
+            "updateCooperationStatus:", message, False
+        )
+
+    def updateCooperationStatus_(self, message):
+        if self.cooperation_status_label is not None:
+            self.cooperation_status_label.setStringValue_(message)
+
     def updateStatus_(self, message):
         if self.status_label is not None:
-            self.status_label.setStringValue_(f"Status: {message}")
+            self.status_label.setStringValue_(f"System: {message}")
+        if self.chatgpt_status_label is not None and message.startswith("ChatGPT"):
+            self.chatgpt_status_label.setStringValue_(message)
+        if self.cursor_status_label is not None and message.startswith("Cursor"):
+            self.cursor_status_label.setStringValue_(message)
         if self.start_button is not None and not (
             self.runtime and self.runtime.running
         ):
@@ -226,6 +284,8 @@ class WebControlWindowController(NSObject):
     def windowWillClose_(self, notification):
         if self.runtime and self.runtime.running:
             self.runtime.stop()
+        if self.cooperation_monitor and self.cooperation_monitor.running:
+            self.cooperation_monitor.stop()
         NSApplication.sharedApplication().terminate_(None)
 
 
