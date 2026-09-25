@@ -386,6 +386,17 @@ class CoreTests(unittest.TestCase):
             self.assertTrue(rotated.exists())
             self.assertIn('"message": "rotated"', events.read_text(encoding="utf-8"))
 
+    def test_runtime_state_deduplicates_identical_events(self):
+        with tempfile.TemporaryDirectory() as d:
+            status = Path(d) / "runtime_status.json"
+            events = Path(d) / "events.jsonl"
+            store = RuntimeStateStore(status, events)
+            store.update("cursor", "Cursor Supervisor [WORKING]: active")
+            first = events.read_text(encoding="utf-8")
+            store.update("cursor", "Cursor Supervisor [WORKING]: active")
+            second = events.read_text(encoding="utf-8")
+            self.assertEqual(first, second)
+
 
 if __name__ == "__main__":
     unittest.main()
