@@ -104,6 +104,9 @@ def run_supervisor() -> int:
         return 2
 
     protocol_gate = ProtocolGate()
+    if settings.cooperation_enabled:
+        protocol_gate.enable()
+
     runtime = None
     web_enabled = (
         settings.chatgpt_supervisor_enabled
@@ -138,6 +141,7 @@ def run_supervisor() -> int:
     finally:
         if cooperation and cooperation.running:
             cooperation.stop()
+        protocol_gate.disable()
         if runtime is not None:
             while runtime.running:
                 time.sleep(0.1)
