@@ -259,6 +259,7 @@ class WebControlWindowController(NSObject):
             self.start_button.setTitle_("Stop Session")
             self.updateStatus_("Opening dedicated browser for login/connection only.")
         except Exception as exc:
+            self.runtime_state.mark_stopped(f"start error: {exc}")
             self.updateStatus_(f"Start error: {exc}")
 
     @objc.IBAction
@@ -272,6 +273,7 @@ class WebControlWindowController(NSObject):
             if self.cooperation_monitor and self.cooperation_monitor.running:
                 self.cooperation_monitor.stop()
             self.protocol_gate.disable()
+            self.runtime_state.mark_stopped("user stop")
             self.start_button.setTitle_("Start Runtime")
             return
 
@@ -280,6 +282,7 @@ class WebControlWindowController(NSObject):
             return
 
         try:
+            self.runtime_state.mark_started("gui")
             if settings.cooperation_enabled:
                 self.protocol_gate.enable()
             else:
@@ -383,6 +386,7 @@ class WebControlWindowController(NSObject):
         if self.cooperation_monitor and self.cooperation_monitor.running:
             self.cooperation_monitor.stop()
         self.protocol_gate.disable()
+        self.runtime_state.mark_stopped("window closed")
         NSApplication.sharedApplication().terminate_(None)
 
 
