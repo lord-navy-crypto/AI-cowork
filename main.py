@@ -103,11 +103,18 @@ def run_supervisor() -> int:
         print("No module is enabled.")
         return 2
 
-    runtime = WebAutomationRuntime(
-        settings,
-        on_status=lambda message: print(f"[web] {message}", flush=True),
+    runtime = None
+    web_enabled = (
+        settings.chatgpt_supervisor_enabled
+        or settings.cursor_supervisor_enabled
     )
-    runtime.start()
+    if web_enabled:
+        runtime = WebAutomationRuntime(
+            settings,
+            on_status=lambda message: print(f"[web] {message}", flush=True),
+        )
+        runtime.start()
+
     cooperation = None
     if settings.cooperation_enabled:
         cooperation = GitCoordinationMonitor(
@@ -117,15 +124,20 @@ def run_supervisor() -> int:
         )
         cooperation.start()
     try:
-        while runtime.running:
+        while (
+            (runtime is not None and runtime.running)
+            or (cooperation is not None and cooperation.running)
+        ):
             time.sleep(0.5)
     except KeyboardInterrupt:
-        runtime.stop()
+        if runtime is not None:
+            runtime.stop()
     finally:
         if cooperation and cooperation.running:
             cooperation.stop()
-        while runtime.running:
-            time.sleep(0.1)
+        if runtime is not None:
+            while runtime.running:
+                time.sleep(0.1)
     return 0
 
 
