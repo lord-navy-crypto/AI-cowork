@@ -1,114 +1,112 @@
 # AI-cowork
 
-AI-cowork is currently focused on one reliable macOS feature:
+AI-cowork now uses a **web-first** architecture.
 
-**ChatGPT Work Supervisor** — watch the ChatGPT desktop app, wait while it is generating, and send a short continue instruction after the current work turn is genuinely finished.
+## Current main product
 
-Previous multi-agent experiments are preserved on:
+A small macOS control app for:
 
-`future/multi-agent-orchestration`
+- **ChatGPT Web Supervisor**
+- **Cursor Web connection/status**
+- persistent dedicated browser login state
+- optional hidden/headless running after login
 
-They are intentionally not part of the current `main` product.
+The old ChatGPT desktop Accessibility implementation remains in repository history, but is no longer the default path.
 
-## What the supervisor does
-
-1. Watches the ChatGPT desktop app through macOS Accessibility.
-2. Does not interrupt while ChatGPT is visibly generating.
-3. Waits for a short confirmed idle period.
-4. Sends the configured continue prompt.
-5. Waits for the next complete response.
-6. Repeats until stopped.
-7. If a clear conversation/context-limit message is detected, pauses and shows a macOS notification.
-
-## Window
-
-The native macOS window contains three controls:
-
-- **Start / Stop ChatGPT Supervisor** — active.
-- **Multi-agent collaboration** — Under development.
-- **Repository automation** — Under development.
-
-The latter two are placeholders only. Their previous implementation work is preserved on the future branch.
-
-## Install
+## Install / update
 
 ```bash
-git clone https://github.com/lord-navy-crypto/AI-cowork.git
-cd AI-cowork
-
-python3 -m venv .venv
+cd ~/AI-cowork
+git checkout main
+git pull
 source .venv/bin/activate
 pip install -r requirements.txt
-cp config.example.yaml config.yaml
+python -m playwright install chromium
 ```
 
-Enable Accessibility permission for the terminal/application running AI-cowork:
-
-**System Settings → Privacy & Security → Accessibility**
-
-## Run
-
-Open the native window:
+## Launch
 
 ```bash
 python main.py
 ```
 
-or explicitly:
+The control window has:
 
-```bash
-python main.py gui
+- ChatGPT work URL
+- Cursor Agent URL
+- Save URLs
+- Start Web Supervisor
+- Open/Login Session
+- Run hidden after login
+
+Settings are stored locally in:
+
+```text
+state/web_settings.json
 ```
 
-Check permissions and whether ChatGPT is running:
+Browser login/session state is stored locally in:
 
-```bash
-python main.py doctor
+```text
+state/browser-profile/
 ```
 
-Run without the GUI:
+Do not put passwords, cookies, or session tokens into configuration files.
 
-```bash
-python main.py supervisor
-```
+## First run
 
-Print the current ChatGPT snapshot:
+1. Paste the dedicated ChatGPT work conversation URL.
+2. Paste the Cursor Agent URL.
+3. Click **Open/Login Session**.
+4. Sign in to ChatGPT and Cursor inside the dedicated Chromium window if needed.
+5. Close/stop the session after login state is saved.
+6. Optionally enable **Run hidden after login**.
+7. Click **Start Web Supervisor**.
 
-```bash
-python main.py snapshot
-```
+## Supervisor behavior
 
-## Configuration
+The ChatGPT supervisor:
 
-`config.yaml` can change the continue text and the idle confirmation delay.
+1. opens the saved ChatGPT conversation;
+2. waits while ChatGPT is generating;
+3. confirms the page is idle;
+4. checks for context-limit messages;
+5. enters the configured continue prompt;
+6. sends it;
+7. waits for the next generation cycle;
+8. repeats until stopped.
 
-The supervisor defaults to:
+Default prompt:
 
 ```text
 Continue doing the current task. Keep working from where you stopped.
 Do not restart or summarize unless necessary; continue the actual work.
 ```
 
-## Design rule
+## CLI
 
-The supervisor is intentionally mechanical. It does not decide what project work should be done. It only keeps an already-running ChatGPT work session moving when the user does not want to watch the window continuously.
+Check Playwright and Chromium:
 
-
-## Background operation
-
-AI-cowork is designed to stay out of the way while you use the Mac for other work.
-
-The supervisor now uses a background-first send path:
-
-1. **Background Accessibility transport** — writes directly to the ChatGPT composer and presses Send through Accessibility. This does not activate ChatGPT and does not touch the clipboard.
-2. **Foreground fallback** — used only when the current ChatGPT build does not expose a reliable writable composer. This fallback may briefly bring ChatGPT forward because macOS keyboard events target the frontmost application.
-
-To require strict background-only behavior, set:
-
-```yaml
-chatgpt:
-  background_preferred: true
-  allow_foreground_fallback: false
+```bash
+python main.py doctor
 ```
 
-Passive reading of the ChatGPT WebArea and generation-state checks do not require bringing ChatGPT to the foreground.
+Run without opening the control panel:
+
+```bash
+python main.py supervisor
+```
+
+## Cursor + GitHub coordination
+
+The future multi-agent architecture remains GitHub-native:
+
+```text
+agent/chatgpt
+agent/cursor
+coordination
+```
+
+ChatGPT and Cursor should communicate through the append-only `coordination` branch rather than copying chat text between UIs.
+
+DeepSeek is not part of the architecture.
