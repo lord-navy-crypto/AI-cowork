@@ -316,6 +316,11 @@ class WebControlWindowController(NSObject):
             else:
                 self.updateStatus_("Cooperation monitor starting without Chromium.")
         except Exception as exc:
+            if self.runtime and self.runtime.running:
+                self.runtime.stop()
+            if self.cooperation_monitor and self.cooperation_monitor.running:
+                self.cooperation_monitor.stop()
+            self.protocol_gate.disable()
             self.runtime_state.mark_stopped(f"start error: {exc}")
             self.updateStatus_(f"Start error: {exc}")
 
