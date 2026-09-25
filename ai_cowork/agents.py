@@ -114,25 +114,13 @@ class DesktopAgent(Agent):
             if current and current != self._baseline:
                 seen_change = True
 
-            if seen_change and current and current == previous:
-                # Clipboard mode already requires two identical full-page
-                # snapshots. Return immediately instead of waiting another
-                # stable_seconds window; this removes several seconds of lag.
-                if clipboard_mode:
-                    output = self._extract_response(current)
-                    if self.events:
-                        self.events.emit(
-                            "agent_stable",
-                            agent=self.name,
-                            snapshot_chars=len(current),
-                            output_chars=len(output),
-                            strategy=self.read_strategy,
-                        )
-                    return output
+            still_generating = generation_in_progress(self.app_name)
 
+            if seen_change and current and current == previous and not still_generating:
                 if stable_since is None:
                     stable_since = time.monotonic()
-                if time.monotonic() - stable_since >= self.stable_seconds:
+                required_stable = max(1.5, self.stable_seconds if not clipboard_mode else 2.0)
+                if time.monotonic() - stable_since >= required_stable:
                     output = self._extract_response(current)
                     if self.events:
                         self.events.emit(
