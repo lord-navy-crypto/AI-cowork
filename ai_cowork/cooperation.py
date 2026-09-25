@@ -39,7 +39,9 @@ def evaluate_protocol_state(
     review_path: str = "",
     status_path: str = "",
     reviewed_peer_head: str = "",
+    review_own_head: str = "",
     status_own_head: str = "",
+    review_after_status: bool | None = None,
 ) -> AgentProtocolState:
     review_current = (
         reviewed_peer_head == peer_head
@@ -63,9 +65,45 @@ def evaluate_protocol_state(
             status_path or "(none)",
         )
 
-    # Own-branch commits after the latest review mean work has happened in this
-    # cycle. That cycle is not complete until a status matching the current
-    # own head is appended.
+    # New-format messages carry enough exact SHA metadata to avoid comparing
+    # timestamps across separate Git branches.
+    if review_own_head:
+        if review_after_status is False and status_current:
+            return AgentProtocolState(
+                agent,
+                ProtocolState.READY,
+                f"{agent} finished the previous cycle; write a new review before starting another work cycle.",
+                peer_head,
+                own_head,
+                review_path or "(none)",
+                status_path or "(none)",
+            )
+
+        own_changed_since_review = own_head != review_own_head
+        if own_changed_since_review and not status_current:
+            return AgentProtocolState(
+                agent,
+                ProtocolState.STATUS_REQUIRED,
+                f"{agent} changed its own branch after review and must append a status for the current own head.",
+                peer_head,
+                own_head,
+                review_path or "(none)",
+                status_path or "(none)",
+            )
+
+        if review_after_status is not False:
+            return AgentProtocolState(
+                agent,
+                ProtocolState.OWN_WORK_ALLOWED,
+                f"{agent} completed the fresh peer review gate and may work on its owned branch.",
+                peer_head,
+                own_head,
+                review_path or "(none)",
+                status_path or "(none)",
+            )
+
+    # Legacy fallback for older coordination messages that lack exact SHA
+    # metadata. This remains for backward compatibility only.
     if own_ts > review_ts and not status_current:
         return AgentProtocolState(
             agent,
@@ -77,8 +115,6 @@ def evaluate_protocol_state(
             status_path or "(none)",
         )
 
-    # A fresh review newer than the previous status opens exactly one work
-    # cycle. Automatic own-work actions are allowed only in this state.
     if review_ts > status_ts and review_current:
         return AgentProtocolState(
             agent,
@@ -247,6 +283,44 @@ class GitCoordinationMonitor:
         matches = sorted(name for name in names if name.endswith(needle))
         return matches[-1] if matches else ""
 
+    def _path_commit(self, path: str) -> str:
+        if not path or path.startswith("("):
+            return ""
+        return self._git(
+            "log",
+            "-1",
+            "--format=%H",
+            "origin/coordination",
+            "--",
+            path,
+        )
+
+    def _is_commit_after(self, newer: str, older: str) -> bool | None:
+        if not newer:
+            return False
+        if not older:
+            return True
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.repo_path),
+                "merge-base",
+                "--is-ancestor",
+                older,
+                newer,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15.0,
+            check=False,
+        )
+        if result.returncode == 0:
+            return True
+        if result.returncode == 1:
+            return False
+        return None
+
     def _read_coordination_path(self, path: str) -> str:
         if not path or path.startswith("("):
             return ""
@@ -282,8 +356,17 @@ class GitCoordinationMonitor:
         reviewed_peer_head = self._message_field(
             review_content, "Peer head reviewed"
         )
+        review_own_head = self._message_field(
+            review_content, "Own head"
+        )
         status_own_head = self._message_field(
             status_content, "Own head"
+        )
+        review_commit = self._path_commit(review_path)
+        status_commit = self._path_commit(status_path)
+        review_after_status = self._is_commit_after(
+            review_commit,
+            status_commit,
         )
 
         return evaluate_protocol_state(
@@ -297,7 +380,9 @@ class GitCoordinationMonitor:
             review_path=review_path,
             status_path=status_path,
             reviewed_peer_head=reviewed_peer_head,
+            review_own_head=review_own_head,
             status_own_head=status_own_head,
+            review_after_status=review_after_status,
         )
 
     def snapshot(self) -> CoordinationSnapshot:
@@ -452,6 +537,10 @@ def render_coordination_message(
 ) -> str:
     if kind not in MESSAGE_KINDS:
         raise ValueError("kind must be review, status, or handoff")
+    if kind == "review" and (not peer_head or not own_head):
+        raise ValueError("review messages require peer_head and own_head")
+    if kind == "status" and not own_head:
+        raise ValueError("status messages require own_head")
     lines = [
         f"# {kind.title()} — {agent}",
         "",
