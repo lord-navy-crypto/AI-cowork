@@ -42,6 +42,17 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(loaded.cursor_url, original.cursor_url)
             self.assertTrue(loaded.headless)
 
+    def test_settings_clamp_unsafe_timings(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "settings.json"
+            path.write_text(
+                '{"idle_confirm_seconds": 0, "poll_interval_seconds": -10}',
+                encoding="utf-8",
+            )
+            loaded = SettingsStore(path).load()
+            self.assertEqual(loaded.idle_confirm_seconds, 1.5)
+            self.assertEqual(loaded.poll_interval_seconds, 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()
