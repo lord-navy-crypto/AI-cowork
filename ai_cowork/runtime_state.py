@@ -49,10 +49,13 @@ class RuntimeStateStore:
         if module not in {"system", "chatgpt", "cursor", "cooperation"}:
             raise ValueError(f"unknown runtime module: {module}")
         with self._lock:
-            setattr(self._status, module, str(message))
+            message = str(message)
+            if getattr(self._status, module) == message:
+                return RuntimeStatus(**asdict(self._status))
+            setattr(self._status, module, message)
             self._status.updated_at = self._now()
             self._write_status_locked()
-            self._append_event_locked(module, str(message))
+            self._append_event_locked(module, message)
             return RuntimeStatus(**asdict(self._status))
 
     def _write_status_locked(self) -> None:
