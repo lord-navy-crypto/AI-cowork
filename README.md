@@ -1,25 +1,34 @@
 # AI-cowork
 
-A local macOS orchestrator for coordinating:
+AI-cowork is currently focused on one reliable macOS feature:
 
-- **ChatGPT.app** — Developer A
-- **Claude.app** — Developer B
-- **DeepSeek (browser)** — read-only consultant / project brief
+**ChatGPT Work Supervisor** — watch the ChatGPT desktop app, wait while it is generating, and send a short continue instruction after the current work turn is genuinely finished.
 
-The first milestone is intentionally terminal-first. The controller uses macOS Accessibility + AppleScript/clipboard fallbacks rather than screen coordinates.
+Previous multi-agent experiments are preserved on:
 
-## Safety model
+`future/multi-agent-orchestration`
 
-AI-cowork does **not** auto-merge `main`, force-push, run `git reset --hard`, or allow destructive `rm -rf` operations. Developer agents should work in isolated Git worktrees.
+They are intentionally not part of the current `main` product.
 
-## macOS requirements
+## What the supervisor does
 
-- macOS
-- Python 3.11+
-- ChatGPT desktop app
-- Claude desktop app
-- Chrome (or another Chromium browser) logged into DeepSeek
-- Accessibility permission for Terminal (later, for the packaged app, permission for AI-cowork itself)
+1. Watches the ChatGPT desktop app through macOS Accessibility.
+2. Does not interrupt while ChatGPT is visibly generating.
+3. Waits for a short confirmed idle period.
+4. Sends the configured continue prompt.
+5. Waits for the next complete response.
+6. Repeats until stopped.
+7. If a clear conversation/context-limit message is detected, pauses and shows a macOS notification.
+
+## Window
+
+The native macOS window contains three controls:
+
+- **Start / Stop ChatGPT Supervisor** — active.
+- **Multi-agent collaboration** — Under development.
+- **Repository automation** — Under development.
+
+The latter two are placeholders only. Their previous implementation work is preserved on the future branch.
 
 ## Install
 
@@ -33,88 +42,53 @@ pip install -r requirements.txt
 cp config.example.yaml config.yaml
 ```
 
-Then enable:
+Enable Accessibility permission for the terminal/application running AI-cowork:
 
-**System Settings → Privacy & Security → Accessibility → Terminal**
+**System Settings → Privacy & Security → Accessibility**
 
-Run the diagnostics first:
+## Run
+
+Open the native window:
+
+```bash
+python main.py
+```
+
+or explicitly:
+
+```bash
+python main.py gui
+```
+
+Check permissions and whether ChatGPT is running:
 
 ```bash
 python main.py doctor
 ```
 
-Inspect the accessibility trees:
+Run without the GUI:
 
 ```bash
-python main.py inspect chatgpt
-python main.py inspect claude
+python main.py supervisor
 ```
 
-Test send + automatic response capture:
+Print the current ChatGPT snapshot:
 
 ```bash
-python main.py send-and-read chatgpt "Reply exactly: GPT_READY"
-python main.py send-and-read claude "Reply exactly: CLAUDE_READY"
+python main.py snapshot
 ```
 
-Test one complete collaboration relay:
+## Configuration
 
-```bash
-python main.py relay "Analyze this task and propose the first implementation step."
-```
+`config.yaml` can change the continue text and the idle confirmation delay.
 
-The relay performs: ChatGPT initial answer → Claude independent review → ChatGPT revised answer.
-
-Start a dry-run orchestration session:
-
-```bash
-python main.py run --dry-run
-```
-
-## Architecture
+The supervisor defaults to:
 
 ```text
-                   AI-cowork Controller
-                           |
-          +----------------+----------------+
-          |                |                |
-      ChatGPT.app       Claude.app     DeepSeek Web
-      Developer A       Developer B     Consultant
-          |                |
-      agent/gpt        agent/claude
-          \______________/
-             cross-review
+Continue doing the current task. Keep working from where you stopped.
+Do not restart or summarize unless necessary; continue the actual work.
 ```
 
-### Agent states
+## Design rule
 
-`IDLE → WORKING → WAITING → REPORTING → REVIEWING → BLOCKED / ERROR / DONE`
-
-### Checkpoint protocol
-
-By default the scheduler requests a checkpoint every 10 minutes. A checkpoint asks each developer to safely finish its current atomic step and report:
-
-1. completed work
-2. changed files
-3. tests
-4. failures/blockers
-5. branch and commit
-6. questions for the other developer
-7. next actions
-
-The controller then routes reports for cross-review and can send a consolidated brief to DeepSeek.
-
-## Current status
-
-This repository contains the **MVP foundation**. The desktop adapters already include:
-
-- app discovery
-- app activation
-- clipboard paste + Enter
-- Accessibility-tree text extraction
-- stable-output polling
-- event logging
-- state persistence
-- safety command screening
-
-The exact Accessibility hierarchy of ChatGPT/Claude can vary by app version. Run `inspect` on your Mac and, if necessary, tune the selectors in `config.yaml`.
+The supervisor is intentionally mechanical. It does not decide what project work should be done. It only keeps an already-running ChatGPT work session moving when the user does not want to watch the window continuously.
