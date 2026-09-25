@@ -15,20 +15,28 @@ from AppKit import (
 )
 from Foundation import NSObject
 
-from .macos import notify_user
-from .supervisor import ChatGPTSupervisor
+from .web_runtime import (
+    SettingsStore,
+    WebAutomationRuntime,
+    WebSettings,
+    validate_chatgpt_url,
+    validate_cursor_url,
+)
 
 
-class SupervisorWindowController(NSObject):
-    def initWithSupervisor_(self, supervisor: ChatGPTSupervisor):
-        self = objc.super(SupervisorWindowController, self).init()
+class WebControlWindowController(NSObject):
+    def init(self):
+        self = objc.super(WebControlWindowController, self).init()
         if self is None:
             return None
-        self.supervisor = supervisor
+        self.store = SettingsStore()
+        self.settings = self.store.load()
+        self.runtime = None
         self.window = None
+        self.chatgpt_field = None
+        self.cursor_field = None
         self.status_label = None
-        self.supervisor_button = None
-        self.supervisor.on_status = self.status_from_worker
+        self.start_button = None
         return self
 
     @objc.python_method
@@ -39,44 +47,57 @@ class SupervisorWindowController(NSObject):
             | NSWindowStyleMaskMiniaturizable
         )
         self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 520, 320),
+            NSMakeRect(0, 0, 620, 350),
             style,
             NSBackingStoreBuffered,
             False,
         )
-        self.window.setTitle_("AI-cowork")
+        self.window.setTitle_("AI-cowork Web Controller")
         self.window.center()
         self.window.setDelegate_(self)
-
         content = self.window.contentView()
 
-        title = self._label("ChatGPT Work Supervisor", 24, 270, 472, 30, 20)
-        subtitle = self._label(
-            "Keep ChatGPT working without watching the window continuously.",
-            24, 240, 472, 22, 13,
+        content.addSubview_(self._label("AI-cowork Web Controller", 24, 298, 570, 30, 21))
+        content.addSubview_(
+            self._label(
+                "Dedicated ChatGPT + Cursor web sessions. Passwords and cookies stay in the browser profile.",
+                24, 270, 570, 20, 12,
+            )
         )
-        content.addSubview_(title)
-        content.addSubview_(subtitle)
 
-        self.status_label = self._label("Status: idle", 24, 202, 472, 24, 13)
+        content.addSubview_(self._label("ChatGPT work URL", 24, 224, 170, 20, 13))
+        self.chatgpt_field = self._text_field(
+            self.settings.chatgpt_url,
+            24, 192, 570, 28,
+        )
+        content.addSubview_(self.chatgpt_field)
+
+        content.addSubview_(self._label("Cursor Agent URL", 24, 155, 170, 20, 13))
+        self.cursor_field = self._text_field(
+            self.settings.cursor_url,
+            24, 123, 570, 28,
+        )
+        content.addSubview_(self.cursor_field)
+
+        save_button = self._button("Save URLs", 24, 72, 145, 36, "saveURLs:")
+        content.addSubview_(save_button)
+
+        self.start_button = self._button(
+            "Start Web Supervisor",
+            183, 72, 200, 36,
+            "toggleSupervisor:",
+        )
+        content.addSubview_(self.start_button)
+
+        browser_button = self._button(
+            "Open/Login Session",
+            397, 72, 197, 36,
+            "openSession:",
+        )
+        content.addSubview_(browser_button)
+
+        self.status_label = self._label("Status: idle", 24, 30, 570, 26, 12)
         content.addSubview_(self.status_label)
-
-        self.supervisor_button = self._button(
-            "Start ChatGPT Supervisor", 24, 142, 472, 44, "toggleSupervisor:"
-        )
-        content.addSubview_(self.supervisor_button)
-
-        future_one = self._button(
-            "Multi-agent collaboration — Under development",
-            24, 86, 472, 40, "futureFeature:"
-        )
-        content.addSubview_(future_one)
-
-        future_two = self._button(
-            "Repository automation — Under development",
-            24, 34, 472, 40, "futureFeature:"
-        )
-        content.addSubview_(future_two)
 
         self.window.makeKeyAndOrderFront_(None)
 
@@ -92,6 +113,12 @@ class SupervisorWindowController(NSObject):
         return label
 
     @objc.python_method
+    def _text_field(self, text: str, x: float, y: float, w: float, h: float):
+        field = NSTextField.alloc().initWithFrame_(NSMakeRect(x, y, w, h))
+        field.setStringValue_(text or "")
+        return field
+
+    @objc.python_method
     def _button(self, title: str, x: float, y: float, w: float, h: float, action: str):
         button = NSButton.alloc().initWithFrame_(NSMakeRect(x, y, w, h))
         button.setTitle_(title)
@@ -99,21 +126,74 @@ class SupervisorWindowController(NSObject):
         button.setAction_(action)
         return button
 
+    @objc.python_method
+    def _collect_settings(self) -> WebSettings:
+        chatgpt_url = self.chatgpt_field.stringValue().strip()
+        cursor_url = self.cursor_field.stringValue().strip()
+        current = self.store.load()
+        current.chatgpt_url = chatgpt_url
+        current.cursor_url = cursor_url
+        return current
+
+    @objc.python_method
+    def _validate(self, settings: WebSettings) -> str | None:
+        if not validate_chatgpt_url(settings.chatgpt_url):
+            return "Enter a valid ChatGPT URL beginning with https://chatgpt.com/."
+        if settings.cursor_url and not validate_cursor_url(settings.cursor_url):
+            return "Enter a valid Cursor URL beginning with https://cursor.com/."
+        return None
+
+    @objc.python_method
+    def _save(self) -> WebSettings | None:
+        settings = self._collect_settings()
+        error = self._validate(settings)
+        if error:
+            self.updateStatus_(error)
+            return None
+        self.store.save(settings)
+        self.settings = settings
+        self.updateStatus_("URLs saved.")
+        return settings
+
+    @objc.IBAction
+    def saveURLs_(self, sender):
+        self._save()
+
+    @objc.IBAction
+    def openSession_(self, sender):
+        settings = self._save()
+        if settings is None:
+            return
+        if self.runtime and self.runtime.running:
+            self.updateStatus_("Dedicated browser session is already running.")
+            return
+        settings.headless = False
+        self.runtime = WebAutomationRuntime(settings, on_status=self.status_from_worker)
+        try:
+            self.runtime.start()
+            self.start_button.setTitle_("Stop Web Supervisor")
+            self.updateStatus_("Opening dedicated browser. Log in there if needed.")
+        except Exception as exc:
+            self.updateStatus_(f"Start error: {exc}")
+
     @objc.IBAction
     def toggleSupervisor_(self, sender):
-        if self.supervisor.running:
-            self.supervisor.stop()
-            self.supervisor_button.setTitle_("Start ChatGPT Supervisor")
+        if self.runtime and self.runtime.running:
+            self.runtime.stop()
+            self.start_button.setTitle_("Start Web Supervisor")
             return
 
-        if self.supervisor.start():
-            self.supervisor_button.setTitle_("Stop ChatGPT Supervisor")
-            self.updateStatus_("Supervisor started.")
+        settings = self._save()
+        if settings is None:
+            return
 
-    @objc.IBAction
-    def futureFeature_(self, sender):
-        self.updateStatus_("Under development — preserved on the future branch.")
-        notify_user("AI-cowork", "This feature is under development.")
+        self.runtime = WebAutomationRuntime(settings, on_status=self.status_from_worker)
+        try:
+            self.runtime.start()
+            self.start_button.setTitle_("Stop Web Supervisor")
+            self.updateStatus_("Web Supervisor starting…")
+        except Exception as exc:
+            self.updateStatus_(f"Start error: {exc}")
 
     @objc.python_method
     def status_from_worker(self, message: str) -> None:
@@ -124,26 +204,26 @@ class SupervisorWindowController(NSObject):
     def updateStatus_(self, message):
         if self.status_label is not None:
             self.status_label.setStringValue_(f"Status: {message}")
-        if self.supervisor_button is not None and not self.supervisor.running:
-            self.supervisor_button.setTitle_("Start ChatGPT Supervisor")
+        if self.start_button is not None and not (
+            self.runtime and self.runtime.running
+        ):
+            self.start_button.setTitle_("Start Web Supervisor")
 
     def windowWillClose_(self, notification):
-        self.supervisor.stop()
+        if self.runtime and self.runtime.running:
+            self.runtime.stop()
         NSApplication.sharedApplication().terminate_(None)
 
 
 _controller_ref = None
 
 
-def run_gui(supervisor: ChatGPTSupervisor) -> None:
+def run_gui() -> None:
     global _controller_ref
     app = NSApplication.sharedApplication()
     app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
-
-    controller = SupervisorWindowController.alloc().initWithSupervisor_(supervisor)
+    controller = WebControlWindowController.alloc().init()
     controller.build()
-
-    # Keep a strong Python reference for the lifetime of the Cocoa event loop.
     _controller_ref = controller
     app.activateIgnoringOtherApps_(True)
     app.run()
