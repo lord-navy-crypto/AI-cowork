@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active branch: `swarm-combat-v0.1`
+Active interface branch: `ollama-interface-v0.2` (based on the frozen `v0.1.0-alpha.1` test build)
 
 The first playable milestone is now under implementation:
 
@@ -54,7 +54,8 @@ The first playable milestone is now under implementation:
 - separation and cohesion modify the formation destination;
 - communication range, latency, deterministic packet loss, and an experiment seed are exposed as server config parameters;
 - `SwarmApproachGoal` owns movement outside melee range and yields back to vanilla combat nearby;
-- external AI remains reserved and disabled.
+- external AI remains disabled by default;
+- v0.2 adds a local-only Ollama strategy-provider interface without applying AI decisions to gameplay.
 
 Development commands:
 
@@ -64,6 +65,10 @@ Development commands:
 /swarmmobs group
 /swarmmobs debug spawn <count>
 /swarmmobs debug particles on|off|toggle
+/swarmmobs ai status
+/swarmmobs ai models
+/swarmmobs ai model <name>
+/swarmmobs ai test
 ```
 
 The development branch also includes a zero-dependency particle debugger. When enabled, vanilla particles show planned destinations, a small subset of local neighbor links, and the current target marker directly in the world.
@@ -72,6 +77,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Combat alpha v0.1 in active development.**
+**Swarm Combat v0.1 is frozen as the first testable build. Ollama interface v0.2-alpha.1 is now under test.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.
