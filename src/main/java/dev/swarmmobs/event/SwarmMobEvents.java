@@ -226,24 +226,27 @@ public final class SwarmMobEvents {
             SwarmAgentState state,
             long gameTick
     ) {
+        int memoryTicks = SwarmConfig.TARGET_MEMORY_TICKS.get();
+        List<TargetRecord> records = new ArrayList<>();
+
+        // Always drain messages that have reached their delivery tick. Direct local
+        // perception still takes precedence below, but a continuously observing agent
+        // must not accumulate an artificial backlog of already-deliverable messages.
+        for (var message : state.drainDeliverableTargetMessages(gameTick)) {
+            records.add(new TargetRecord(
+                    message.targetId(),
+                    message.observationTick()
+            ));
+        }
+
         Player direct = findDirectObservation(level, self);
         if (direct != null) {
             state.rememberTarget(direct.getUUID(), gameTick, true);
             return direct;
         }
 
-        int memoryTicks = SwarmConfig.TARGET_MEMORY_TICKS.get();
-        List<TargetRecord> records = new ArrayList<>();
-
         if (state.targetId() != null) {
             records.add(new TargetRecord(state.targetId(), state.lastTargetObservationTick()));
-        }
-
-        for (var message : state.drainDeliverableTargetMessages(gameTick)) {
-            records.add(new TargetRecord(
-                    message.targetId(),
-                    message.observationTick()
-            ));
         }
 
         var selected = TargetRelayPolicy.selectFreshest(gameTick, memoryTicks, records);
