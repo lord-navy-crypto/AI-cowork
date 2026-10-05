@@ -117,13 +117,10 @@ public final class SwarmRuntimeGameTests {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
         zombie.setNoGravity(true);
 
-        var player = helper.makeMockPlayer(GameType.SURVIVAL);
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
         Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
-        if (!helper.getLevel().addFreshEntity(player)) {
-            helper.fail("Mock player could not be inserted into the GameTest ServerLevel");
-            return;
-        }
 
         helper.runAfterDelay(12, () -> {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
@@ -148,6 +145,7 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
+            playerHandle.close();
             helper.succeed();
         });
     }
@@ -169,6 +167,12 @@ public final class SwarmRuntimeGameTests {
 
         Connection connection = new Connection(PacketFlow.SERVERBOUND) {
             @Override
+            public void tick() {
+                super.tick();
+                player.resetLastActionTime();
+            }
+
+            @Override
             public boolean isMemoryConnection() {
                 return true;
             }
@@ -181,6 +185,7 @@ public final class SwarmRuntimeGameTests {
         player.gameMode.changeGameModeForPlayer(gameType);
         player.connection.chunkSender.sendNextChunks(player);
         player.connection.chunkSender.onChunkBatchReceivedByClient(64.0F);
+        player.connection.markClientLoaded();
 
         return new TestPlayerHandle(player, connection);
     }
@@ -206,14 +211,11 @@ public final class SwarmRuntimeGameTests {
         helper.setBlock(new BlockPos(2, 1, 2), Blocks.STONE);
         helper.setBlock(new BlockPos(2, 2, 2), Blocks.STONE);
 
-        var player = helper.makeMockPlayer(GameType.SURVIVAL);
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
         Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
-        if (!helper.getLevel().addFreshEntity(player)) {
-            helper.fail("Relay test player could not be inserted into the GameTest ServerLevel");
-            return;
-        }
 
         helper.runAfterDelay(20, () -> {
             SwarmAgentState observerState = observer.getData(SwarmAttachments.AGENT_STATE.get());
@@ -254,6 +256,7 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
+            playerHandle.close();
             helper.succeed();
         });
     }
