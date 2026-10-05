@@ -134,6 +134,8 @@ public final class SwarmCommands {
                                 + ", navObstacleAvoidanceEnabled=" + SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()
                                 + ", navObstacleLookahead=" + SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.get()
                                 + ", navObstacleLateralDistance=" + SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.get()
+                                + ", navObstacleHoldTicks=" + SwarmConfig.NAV_OBSTACLE_HOLD_TICKS.get()
+                                + ", navObstacleArrivalTolerance=" + SwarmConfig.NAV_OBSTACLE_ARRIVAL_TOLERANCE.get()
                                 + ", communicationEnabled=" + SwarmConfig.COMMUNICATION_ENABLED.get()
                                 + ", communicationRadius=" + SwarmConfig.COMMUNICATION_RADIUS.get()
                                 + ", latencyTicks=" + SwarmConfig.COMMUNICATION_LATENCY_TICKS.get()
