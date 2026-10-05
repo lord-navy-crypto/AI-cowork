@@ -407,4 +407,46 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_spider_flanker", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void spiderJoinsSharedSwarmAsFlanker(GameTestHelper helper) {
+        var spider = helper.spawn(EntityType.SPIDER, new BlockPos(2, 1, 2));
+        spider.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(5.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(24, () -> {
+            SwarmAgentState state = spider.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId())) {
+                helper.fail("Spider flanker did not acquire the shared player target");
+                return;
+            }
+
+            if (state.role() != SwarmRole.FLANK_LEFT && state.role() != SwarmRole.FLANK_RIGHT) {
+                helper.fail("Spider was assigned a non-flanker tactical role");
+                return;
+            }
+
+            if (!state.hasDestination()) {
+                helper.fail("Spider flanker did not receive a planned flank destination");
+                return;
+            }
+
+            boolean hasApproachGoal = spider.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(wrapped -> wrapped.getGoal() instanceof SwarmApproachGoal);
+            if (!hasApproachGoal) {
+                helper.fail("Spider did not receive the heterogeneous SwarmApproachGoal");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
 }
