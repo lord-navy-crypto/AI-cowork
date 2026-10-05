@@ -10,6 +10,7 @@ import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
+import dev.swarmmobs.algorithm.TargetPredictionPolicy;
 import dev.swarmmobs.debug.SwarmDebugState;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -122,6 +123,8 @@ public final class SwarmCommands {
                                 + ", searchMinRadius=" + SwarmConfig.SEARCH_MIN_RADIUS.get()
                                 + ", searchMaxRadius=" + SwarmConfig.SEARCH_MAX_RADIUS.get()
                                 + ", searchPhaseTicks=" + SwarmConfig.SEARCH_PHASE_TICKS.get()
+                                + ", searchPredictionMaxTicks=" + SwarmConfig.SEARCH_PREDICTION_MAX_TICKS.get()
+                                + ", searchPredictionMaxDistance=" + SwarmConfig.SEARCH_PREDICTION_MAX_DISTANCE.get()
                                 + ", communicationEnabled=" + SwarmConfig.COMMUNICATION_ENABLED.get()
                                 + ", communicationRadius=" + SwarmConfig.COMMUNICATION_RADIUS.get()
                                 + ", latencyTicks=" + SwarmConfig.COMMUNICATION_LATENCY_TICKS.get()
@@ -181,6 +184,35 @@ public final class SwarmCommands {
                         observation.z()
                 );
 
+        TargetPredictionPolicy.Prediction prediction =
+                observation == null || !observation.hasFinitePosition()
+                        ? null
+                        : TargetPredictionPolicy.predict(
+                                observation,
+                                level.getGameTime(),
+                                confidence,
+                                SwarmConfig.SEARCH_PREDICTION_MAX_TICKS.get(),
+                                SwarmConfig.SEARCH_PREDICTION_MAX_DISTANCE.get()
+                        );
+
+        String observedVelocity = observation == null || !observation.hasFiniteVelocity()
+                ? "unknown"
+                : String.format(
+                        java.util.Locale.ROOT,
+                        "(%.3f, %.3f)",
+                        observation.velocityX(),
+                        observation.velocityZ()
+                );
+
+        String predictedAnchor = prediction == null
+                ? "none"
+                : String.format(
+                        java.util.Locale.ROOT,
+                        "(%.2f, %.2f)",
+                        prediction.anchor().x(),
+                        prediction.anchor().z()
+                );
+
         source.sendSuccess(
                 () -> Component.literal(
                         "Agent #" + nearest.getId()
@@ -197,6 +229,13 @@ public final class SwarmCommands {
                                 + " directObservation=" + state.directObservation()
                                 + " targetConfidence=" + String.format(java.util.Locale.ROOT, "%.3f", confidence)
                                 + " targetEstimate=" + targetEstimate
+                                + " observedVelocity=" + observedVelocity
+                                + " predictedSearchAnchor=" + predictedAnchor
+                                + " predictionOffset=" + String.format(
+                                        java.util.Locale.ROOT,
+                                        "%.2f",
+                                        prediction == null ? 0.0 : prediction.offsetMagnitude()
+                                )
                                 + " destination=" + (state.hasDestination()
                                         ? String.format(java.util.Locale.ROOT, "(%.2f, %.2f)", state.destinationX(), state.destinationZ())
                                         : "none")
