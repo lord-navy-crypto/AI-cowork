@@ -41,6 +41,8 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_LATERAL_DISTANCE;
     public static final ModConfigSpec.IntValue NAV_OBSTACLE_HOLD_TICKS;
     public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_ARRIVAL_TOLERANCE;
+    public static final ModConfigSpec.BooleanValue NAV_WALKABILITY_ENABLED;
+    public static final ModConfigSpec.IntValue NAV_MAX_PROBE_DROP_BLOCKS;
 
     public static final ModConfigSpec.BooleanValue COMMUNICATION_ENABLED;
     public static final ModConfigSpec.DoubleValue COMMUNICATION_RADIUS;
@@ -198,6 +200,14 @@ public final class SwarmConfig {
         NAV_OBSTACLE_ARRIVAL_TOLERANCE = BUILDER
                 .comment("Distance from a temporary obstacle-detour waypoint that releases the detour early.")
                 .defineInRange("navObstacleArrivalTolerance", 0.6, 0.1, 2.0);
+
+        NAV_WALKABILITY_ENABLED = BUILDER
+                .comment("Treat unsupported local probe points as blocked so detours avoid pits and ledges.")
+                .define("navWalkabilityEnabled", true);
+
+        NAV_MAX_PROBE_DROP_BLOCKS = BUILDER
+                .comment("Maximum vertical drop, in blocks, accepted when checking local probe ground support.")
+                .defineInRange("navMaxProbeDropBlocks", 1, 0, 4);
 
         BUILDER.pop();
 
