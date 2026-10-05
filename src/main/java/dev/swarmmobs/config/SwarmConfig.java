@@ -32,6 +32,10 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue TARGET_PREDICTION_MAX_DISTANCE;
     public static final ModConfigSpec.DoubleValue MOVE_SPEED;
     public static final ModConfigSpec.DoubleValue RELEASE_TO_VANILLA_DISTANCE;
+    public static final ModConfigSpec.IntValue NAV_STUCK_WINDOW_TICKS;
+    public static final ModConfigSpec.DoubleValue NAV_STUCK_MIN_PROGRESS;
+    public static final ModConfigSpec.DoubleValue NAV_RECOVERY_LATERAL_DISTANCE;
+    public static final ModConfigSpec.IntValue NAV_RECOVERY_DURATION_TICKS;
 
     public static final ModConfigSpec.BooleanValue COMMUNICATION_ENABLED;
     public static final ModConfigSpec.DoubleValue COMMUNICATION_RADIUS;
@@ -153,6 +157,22 @@ public final class SwarmConfig {
         RELEASE_TO_VANILLA_DISTANCE = BUILDER
                 .comment("Inside this distance, vanilla targeting/attack movement is allowed to dominate.")
                 .defineInRange("releaseToVanillaDistance", 3.25, 1.0, 10.0);
+
+        NAV_STUCK_WINDOW_TICKS = BUILDER
+                .comment("Ticks with insufficient movement before local navigation recovery activates.")
+                .defineInRange("navStuckWindowTicks", 24, 6, 200);
+
+        NAV_STUCK_MIN_PROGRESS = BUILDER
+                .comment("Minimum horizontal movement, in blocks, expected during the stuck-detection window.")
+                .defineInRange("navStuckMinProgress", 0.75, 0.05, 4.0);
+
+        NAV_RECOVERY_LATERAL_DISTANCE = BUILDER
+                .comment("Side-step distance, in blocks, used for deterministic local recovery waypoints.")
+                .defineInRange("navRecoveryLateralDistance", 2.0, 0.25, 6.0);
+
+        NAV_RECOVERY_DURATION_TICKS = BUILDER
+                .comment("How long an agent follows a temporary recovery waypoint before returning to the swarm plan.")
+                .defineInRange("navRecoveryDurationTicks", 18, 3, 100);
 
         BUILDER.pop();
 
