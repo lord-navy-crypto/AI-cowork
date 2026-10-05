@@ -3,6 +3,7 @@ package dev.swarmmobs.event;
 import dev.swarmmobs.agent.SwarmAgentProfile;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.agent.SwarmLocalComposition;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
@@ -129,9 +130,17 @@ public final class SwarmMobEvents {
                 gameTick,
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()
         );
+        SwarmLocalComposition composition = SwarmLocalComposition.fromArchetypes(
+                profile.archetype(),
+                movementNeighbors.stream()
+                        .map(peer -> SwarmAgentProfiles.profile(peer).archetype())
+                        .toList()
+        );
+
         SwarmRole tacticalRole = SwarmAgentProfiles.tacticalRole(
                 profile.archetype(),
-                assignedSlot
+                assignedSlot,
+                composition
         );
 
         SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
