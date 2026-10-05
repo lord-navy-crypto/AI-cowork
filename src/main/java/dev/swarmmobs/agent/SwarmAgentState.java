@@ -24,6 +24,8 @@ public final class SwarmAgentState {
     private long pendingFormationSlotSinceTick = Long.MIN_VALUE;
     private long formationSlotSwitchCount;
     private SwarmRole role = SwarmRole.CHASER;
+    private SwarmBehaviorMode behaviorMode = SwarmBehaviorMode.ENGAGE;
+    private double searchRadius;
     private boolean hasDestination;
     private double destinationX;
     private double destinationZ;
@@ -89,6 +91,14 @@ public final class SwarmAgentState {
 
     public SwarmRole role() {
         return role;
+    }
+
+    public SwarmBehaviorMode behaviorMode() {
+        return behaviorMode;
+    }
+
+    public double searchRadius() {
+        return searchRadius;
     }
 
     public boolean hasDestination() {
@@ -285,6 +295,8 @@ public final class SwarmAgentState {
     public void clearLocalPlan(int neighborCount) {
         this.neighborCount = neighborCount;
         this.hasDestination = false;
+        this.behaviorMode = SwarmBehaviorMode.ENGAGE;
+        this.searchRadius = 0.0;
         this.separationMagnitude = 0.0;
         this.cohesionMagnitude = 0.0;
         this.alignmentMagnitude = 0.0;
@@ -326,9 +338,39 @@ public final class SwarmAgentState {
             double alignmentMagnitude,
             double steeringMagnitude
     ) {
+        updateLocalPlan(
+                neighborCount,
+                formationSlot,
+                role,
+                SwarmBehaviorMode.ENGAGE,
+                0.0,
+                destinationX,
+                destinationZ,
+                separationMagnitude,
+                cohesionMagnitude,
+                alignmentMagnitude,
+                steeringMagnitude
+        );
+    }
+
+    public void updateLocalPlan(
+            int neighborCount,
+            int formationSlot,
+            SwarmRole role,
+            SwarmBehaviorMode behaviorMode,
+            double searchRadius,
+            double destinationX,
+            double destinationZ,
+            double separationMagnitude,
+            double cohesionMagnitude,
+            double alignmentMagnitude,
+            double steeringMagnitude
+    ) {
         this.neighborCount = neighborCount;
         this.formationSlot = formationSlot;
         this.role = role;
+        this.behaviorMode = behaviorMode == null ? SwarmBehaviorMode.ENGAGE : behaviorMode;
+        this.searchRadius = Math.max(0.0, searchRadius);
         this.destinationX = destinationX;
         this.destinationZ = destinationZ;
         this.separationMagnitude = separationMagnitude;
