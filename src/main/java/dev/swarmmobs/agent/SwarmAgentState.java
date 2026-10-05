@@ -230,6 +230,8 @@ public final class SwarmAgentState {
     public void forgetTarget() {
         this.targetObservation = null;
         this.directObservation = false;
+        this.behaviorMode = SwarmBehaviorMode.ENGAGE;
+        this.searchRadius = 0.0;
         this.hasDestination = false;
     }
 
