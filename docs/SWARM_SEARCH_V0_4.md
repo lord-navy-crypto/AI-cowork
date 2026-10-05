@@ -98,3 +98,45 @@ A Minecraft Runtime GameTest:
    - receives a destination offset from the stale target center.
 
 The design stays deterministic and does not use Ollama or any external AI.
+
+
+## v0.4.1 — bounded target-motion prediction
+
+SEARCH can now shift its search anchor using the velocity captured in the last real
+target observation.
+
+The prediction is deliberately conservative:
+
+~~~text
+observed velocity at sighting
+        ↓
+bounded prediction horizon
+        ↓
+confidence-weighted displacement
+        ↓
+maximum prediction distance clamp
+        ↓
+predicted SEARCH anchor
+~~~
+
+Defaults:
+
+~~~text
+searchPredictionMaxTicks = 30
+searchPredictionMaxDistance = 6.0
+~~~
+
+Prediction trust falls with target confidence. As confidence approaches zero, the
+velocity-based offset also approaches zero while the decentralized search radius
+continues to expand.
+
+The system never reads a hidden player's current position or current velocity.
+
+Target velocity is part of the immutable TargetObservation and is preserved through
+neighbor-to-neighbor communication exactly like the original position and timestamp.
+
+/swarmmobs inspect exposes:
+
+- observedVelocity;
+- predictedSearchAnchor;
+- predictionOffset.
