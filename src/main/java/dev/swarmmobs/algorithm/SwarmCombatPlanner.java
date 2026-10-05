@@ -114,9 +114,45 @@ public final class SwarmCombatPlanner {
             double alignmentWeight,
             double maxSteeringCorrection
     ) {
+        return planForRoleWithMotion(
+                roleForSlot(assignedSlot),
+                assignedSlot,
+                self,
+                selfVelocity,
+                target,
+                targetForward,
+                neighborPositions,
+                neighborVelocities,
+                formationSlots,
+                formationRadius,
+                separationRadius,
+                separationWeight,
+                cohesionWeight,
+                alignmentWeight,
+                maxSteeringCorrection
+        );
+    }
+
+    public static Plan planForRoleWithMotion(
+            SwarmRole assignedRole,
+            int assignedSlot,
+            Vec2 self,
+            Vec2 selfVelocity,
+            Vec2 target,
+            Vec2 targetForward,
+            List<Vec2> neighborPositions,
+            List<Vec2> neighborVelocities,
+            int formationSlots,
+            double formationRadius,
+            double separationRadius,
+            double separationWeight,
+            double cohesionWeight,
+            double alignmentWeight,
+            double maxSteeringCorrection
+    ) {
         int slots = Math.max(4, formationSlots);
         int slot = Math.floorMod(assignedSlot, slots);
-        SwarmRole role = roleForSlot(slot);
+        SwarmRole role = assignedRole == null ? roleForSlot(slot) : assignedRole;
 
         Vec2 forward = targetForward.normalized();
         if (forward.length() < EPS) {
@@ -141,6 +177,13 @@ public final class SwarmCombatPlanner {
             case REAR_PRESSURE -> target
                     .add(forward.scale(-formationRadius))
                     .add(right.scale(laneOffset));
+            case RANGED_SUPPORT -> {
+                double supportSpacing = Math.min(1.5, Math.max(0.75, formationRadius * 0.18));
+                double supportOffset = (slot - (slots - 1) / 2.0) * supportSpacing;
+                yield target
+                        .add(forward.scale(-formationRadius))
+                        .add(right.scale(supportOffset));
+            }
         };
 
         Vec2 separation = separation(self, neighborPositions, separationRadius);
