@@ -13,23 +13,29 @@ public final class SwarmCommunicationPolicy {
 
     public record TargetMessage(
             UUID senderId,
-            UUID targetId,
-            long observationTick,
+            TargetObservation observation,
             long sentTick,
             long deliverTick
-    ) {}
+    ) {
+        public UUID targetId() {
+            return observation.targetId();
+        }
+
+        public long observationTick() {
+            return observation.observationTick();
+        }
+    }
 
     public static Optional<TargetMessage> maybeTransmit(
             UUID senderId,
             UUID receiverId,
-            UUID targetId,
-            long observationTick,
+            TargetObservation observation,
             long sentTick,
             int latencyTicks,
             double packetDropRate,
             int experimentSeed
     ) {
-        if (senderId == null || receiverId == null || targetId == null) {
+        if (senderId == null || receiverId == null || observation == null) {
             return Optional.empty();
         }
 
@@ -42,8 +48,8 @@ public final class SwarmCommunicationPolicy {
             double sample = deterministicUnitInterval(
                     senderId,
                     receiverId,
-                    targetId,
-                    observationTick,
+                    observation.targetId(),
+                    observation.observationTick(),
                     sentTick,
                     experimentSeed
             );
@@ -55,8 +61,7 @@ public final class SwarmCommunicationPolicy {
         long deliverTick = sentTick + Math.max(0, latencyTicks);
         return Optional.of(new TargetMessage(
                 senderId,
-                targetId,
-                observationTick,
+                observation,
                 sentTick,
                 deliverTick
         ));
