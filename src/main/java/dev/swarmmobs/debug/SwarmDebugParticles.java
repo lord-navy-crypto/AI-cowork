@@ -5,7 +5,7 @@ import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.PathfinderMob;
 
 import java.util.List;
 
@@ -14,31 +14,31 @@ public final class SwarmDebugParticles {
 
     public static void render(
             ServerLevel level,
-            Zombie zombie,
-            List<Zombie> neighbors
+            PathfinderMob mob,
+            List<PathfinderMob> neighbors
     ) {
         if (!SwarmDebugState.particlesEnabled()) {
             return;
         }
 
-        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
 
-        double ax = zombie.getX();
-        double ay = zombie.getY() + 1.1;
-        double az = zombie.getZ();
+        double ax = mob.getX();
+        double ay = mob.getY() + 1.1;
+        double az = mob.getZ();
 
         if (state.hasDestination()) {
             drawLine(
                     level,
                     ax, ay, az,
-                    state.destinationX(), zombie.getY() + 0.15, state.destinationZ(),
+                    state.destinationX(), mob.getY() + 0.15, state.destinationZ(),
                     ParticleTypes.END_ROD
             );
 
             level.sendParticles(
                     ParticleTypes.HAPPY_VILLAGER,
                     state.destinationX(),
-                    zombie.getY() + 0.3,
+                    mob.getY() + 0.3,
                     state.destinationZ(),
                     2,
                     0.08, 0.08, 0.08,
@@ -47,7 +47,7 @@ public final class SwarmDebugParticles {
         }
 
         int rendered = 0;
-        for (Zombie neighbor : neighbors) {
+        for (PathfinderMob neighbor : neighbors) {
             if (rendered >= 3) {
                 break;
             }
