@@ -57,7 +57,8 @@ public final class SwarmRuntimeGameTests {
         zombie.setNoGravity(true);
 
         var player = helper.makeMockPlayer(GameType.SURVIVAL);
-        player.snapTo(helper.absoluteVec(new Vec3(8.0, 1.0, 2.0)));
+        Vec3 farPosition = helper.absoluteVec(new Vec3(8.0, 1.0, 2.0));
+        player.setPos(farPosition.x, farPosition.y, farPosition.z);
 
         helper.runAfterDelay(4, () -> {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
@@ -90,7 +91,7 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
-            player.snapTo(zombie.getX() + 1.0, zombie.getY(), zombie.getZ());
+            player.setPos(zombie.getX() + 1.0, zombie.getY(), zombie.getZ());
 
             if (approachGoal.canUse()) {
                 helper.fail("SwarmApproachGoal should yield movement inside release distance");
