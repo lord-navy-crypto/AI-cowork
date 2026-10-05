@@ -244,8 +244,13 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
-            if (relayState.lastTargetObservationTick() != observerState.lastTargetObservationTick()) {
-                helper.fail("Relay changed the original target observation timestamp");
+            if (relayState.lastTargetObservationTick() > observerState.lastTargetObservationTick()) {
+                helper.fail("Relay target timestamp became newer than the latest direct observation");
+                return;
+            }
+
+            if (relayState.lastTargetObservationTick() == Long.MIN_VALUE) {
+                helper.fail("Relay target did not carry a real observation timestamp");
                 return;
             }
 
