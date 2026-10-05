@@ -4,11 +4,14 @@ import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class SwarmAgentState {
     private static final int MAX_PENDING_TARGET_MESSAGES = 32;
+    private static final int MAX_DELIVERED_MESSAGE_KEYS = 128;
     private UUID targetId;
     private long lastTargetObservationTick = Long.MIN_VALUE;
     private long nextPlanTick;
@@ -24,6 +27,8 @@ public final class SwarmAgentState {
     private double cohesionMagnitude;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
+    private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
+            new LinkedHashMap<>(16, 0.75F, true);
     private long communicationAcceptedMessages;
     private long communicationDeliveredMessages;
     private long communicationDroppedMessages;
@@ -101,6 +106,12 @@ public final class SwarmAgentState {
             return false;
         }
 
+        MessageSourceTargetKey key = new MessageSourceTargetKey(message.senderId(), message.targetId());
+        Long latestDelivered = latestDeliveredObservationBySource.get(key);
+        if (latestDelivered != null && message.observationTick() <= latestDelivered) {
+            return false;
+        }
+
         for (TargetMessage pending : pendingTargetMessages) {
             if (pending.senderId().equals(message.senderId())
                     && pending.targetId().equals(message.targetId())
@@ -127,12 +138,31 @@ public final class SwarmAgentState {
             TargetMessage message = iterator.next();
             if (message.deliverTick() <= currentTick) {
                 delivered.add(message);
+                rememberDeliveredMessageVersion(message);
                 iterator.remove();
             }
         }
 
         communicationDeliveredMessages += delivered.size();
         return delivered;
+    }
+
+    private void rememberDeliveredMessageVersion(TargetMessage message) {
+        MessageSourceTargetKey key = new MessageSourceTargetKey(message.senderId(), message.targetId());
+        latestDeliveredObservationBySource.merge(
+                key,
+                message.observationTick(),
+                Math::max
+        );
+
+        while (latestDeliveredObservationBySource.size() > MAX_DELIVERED_MESSAGE_KEYS) {
+            Iterator<Map.Entry<MessageSourceTargetKey, Long>> iterator =
+                    latestDeliveredObservationBySource.entrySet().iterator();
+            if (iterator.hasNext()) {
+                iterator.next();
+                iterator.remove();
+            }
+        }
     }
 
     public void recordCommunicationDrop() {
@@ -176,6 +206,8 @@ public final class SwarmAgentState {
         this.separationMagnitude = 0.0;
         this.cohesionMagnitude = 0.0;
     }
+
+    private record MessageSourceTargetKey(UUID senderId, UUID targetId) {}
 
     public void updateLocalPlan(
             int neighborCount,
