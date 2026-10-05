@@ -30,6 +30,8 @@ public final class SwarmCommands {
                                 .executes(context -> status(context.getSource())))
                         .then(Commands.literal("inspect")
                                 .executes(context -> inspectNearest(context.getSource())))
+                        .then(Commands.literal("group")
+                                .executes(context -> inspectGroup(context.getSource())))
                         .then(Commands.literal("debug")
                                 .requires(source -> source.hasPermission(2))
                                 .then(Commands.literal("spawn")
@@ -105,6 +107,71 @@ public final class SwarmCommands {
         );
 
         return 1;
+    }
+
+    private static int inspectGroup(CommandSourceStack source) {
+        ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Run this command as a player."));
+            return 0;
+        }
+
+        ServerLevel level = source.getLevel();
+        double radius = Math.max(24.0, SwarmConfig.NEIGHBOR_RADIUS.get());
+        List<Zombie> zombies = level.getEntitiesOfClass(
+                Zombie.class,
+                player.getBoundingBox().inflate(radius),
+                Zombie::isAlive
+        );
+
+        if (zombies.isEmpty()) {
+            source.sendFailure(Component.literal("No living zombie swarm candidates found nearby."));
+            return 0;
+        }
+
+        java.util.EnumMap<dev.swarmmobs.agent.SwarmRole, Integer> roles =
+                new java.util.EnumMap<>(dev.swarmmobs.agent.SwarmRole.class);
+        int withTarget = 0;
+        int direct = 0;
+        double neighborSum = 0.0;
+        double separationSum = 0.0;
+        double cohesionSum = 0.0;
+
+        for (Zombie zombie : zombies) {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            roles.merge(state.role(), 1, Integer::sum);
+            if (state.targetId() != null) {
+                withTarget++;
+            }
+            if (state.directObservation()) {
+                direct++;
+            }
+            neighborSum += state.neighborCount();
+            separationSum += state.separationMagnitude();
+            cohesionSum += state.cohesionMagnitude();
+        }
+
+        int total = zombies.size();
+        String roleSummary = java.util.Arrays.stream(dev.swarmmobs.agent.SwarmRole.values())
+                .map(role -> role + "=" + roles.getOrDefault(role, 0))
+                .collect(java.util.stream.Collectors.joining(", "));
+
+        String summary = String.format(
+                java.util.Locale.ROOT,
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, roles={%s}",
+                total,
+                withTarget,
+                direct,
+                neighborSum / total,
+                separationSum / total,
+                cohesionSum / total,
+                roleSummary
+        );
+
+        source.sendSuccess(() -> Component.literal(summary), false);
+        return total;
     }
 
     private static int spawnTestSwarm(CommandSourceStack source, int count) {
