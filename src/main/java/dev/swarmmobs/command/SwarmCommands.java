@@ -95,6 +95,11 @@ public final class SwarmCommands {
                                 + " target=" + (state.targetId() == null ? "none" : state.targetId())
                                 + " targetAgeTicks=" + age
                                 + " directObservation=" + state.directObservation()
+                                + " destination=" + (state.hasDestination()
+                                        ? String.format(java.util.Locale.ROOT, "(%.2f, %.2f)", state.destinationX(), state.destinationZ())
+                                        : "none")
+                                + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
+                                + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
                 ),
                 false
         );
