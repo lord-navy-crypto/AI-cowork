@@ -449,4 +449,51 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_composition_roles", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void dedicatedSpidersReleaseZombieFromFlankDuty(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        var spiderA = helper.spawn(EntityType.SPIDER, new BlockPos(1, 1, 2));
+        var spiderB = helper.spawn(EntityType.SPIDER, new BlockPos(3, 1, 2));
+        zombie.setNoGravity(true);
+        spiderA.setNoGravity(true);
+        spiderB.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(5.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(36, () -> {
+            SwarmAgentState zombieState = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            SwarmAgentState spiderAState = spiderA.getData(SwarmAttachments.AGENT_STATE.get());
+            SwarmAgentState spiderBState = spiderB.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(zombieState.targetId())
+                    || !player.getUUID().equals(spiderAState.targetId())
+                    || !player.getUUID().equals(spiderBState.targetId())) {
+                helper.fail("Mixed local team did not converge on the same player target");
+                return;
+            }
+
+            if (zombieState.role() == SwarmRole.FLANK_LEFT
+                    || zombieState.role() == SwarmRole.FLANK_RIGHT) {
+                helper.fail("Zombie kept a flank role despite two dedicated Spider flankers");
+                return;
+            }
+
+            if ((spiderAState.role() != SwarmRole.FLANK_LEFT
+                    && spiderAState.role() != SwarmRole.FLANK_RIGHT)
+                    || (spiderBState.role() != SwarmRole.FLANK_LEFT
+                    && spiderBState.role() != SwarmRole.FLANK_RIGHT)) {
+                helper.fail("Dedicated Spider agents did not remain in flank roles");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
 }
