@@ -102,4 +102,41 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
+    public static void visiblePlayerIsAcquiredThroughPerceptionLayer(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        zombie.setNoGravity(true);
+
+        var player = helper.makeMockPlayer(GameType.SURVIVAL);
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+
+        helper.runAfterDelay(12, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (state.targetId() == null) {
+                helper.fail("Visible player was not acquired by swarm perception");
+                return;
+            }
+
+            if (!state.targetId().equals(player.getUUID())) {
+                helper.fail("Swarm perception acquired an unexpected target");
+                return;
+            }
+
+            if (!state.directObservation()) {
+                helper.fail("Visible player should be marked as a direct observation");
+                return;
+            }
+
+            if (zombie.getTarget() != player) {
+                helper.fail("Zombie vanilla target did not synchronize with swarm target");
+                return;
+            }
+
+            helper.succeed();
+        });
+    }
+
 }
