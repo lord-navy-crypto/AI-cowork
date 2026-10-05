@@ -3,23 +3,19 @@ package dev.swarmmobs.algorithm;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Pure target-memory selection logic.
  *
- * A relay carries the original observation tick. Selecting or forwarding a record
- * never rewrites that tick, which prevents stale information from becoming fresh
- * just because it traveled through another swarm member.
+ * A relay carries the entire original observation snapshot. Selecting or forwarding
+ * a record never rewrites its timestamp or spatial estimate.
  */
 public final class TargetRelayPolicy {
 
-    public record TargetRecord(UUID targetId, long observationTick) {}
-
-    public static Optional<TargetRecord> selectFreshest(
+    public static Optional<TargetObservation> selectFreshest(
             long currentTick,
             int memoryTicks,
-            List<TargetRecord> records
+            List<TargetObservation> records
     ) {
         long maxAge = Math.max(0, memoryTicks);
 
@@ -29,7 +25,7 @@ public final class TargetRelayPolicy {
                     long age = currentTick - record.observationTick();
                     return age >= 0 && age <= maxAge;
                 })
-                .max(Comparator.comparingLong(TargetRecord::observationTick));
+                .max(Comparator.comparingLong(TargetObservation::observationTick));
     }
 
     private TargetRelayPolicy() {}
