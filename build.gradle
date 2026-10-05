@@ -59,6 +59,23 @@ tasks.named('test', Test).configure {
     useJUnitPlatform()
 }
 
+
+def generateGameTestResources = tasks.register("generateGameTestResources") {
+    def encodedTemplate = layout.projectDirectory.file("src/gametest/empty5x4x5.nbt.b64")
+    def generatedRoot = layout.buildDirectory.dir("generated/gametestResources")
+
+    inputs.file(encodedTemplate)
+    outputs.dir(generatedRoot)
+
+    doLast {
+        def outputFile = generatedRoot.get()
+                .file("data/${mod_id}/structure/empty5x4x5.nbt")
+                .asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.bytes = java.util.Base64.mimeDecoder.decode(encodedTemplate.asFile.text)
+    }
+}
+
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
             minecraft_version       : minecraft_version,
@@ -76,7 +93,13 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
     into "build/generated/sources/modMetadata"
 }
 sourceSets.main.resources.srcDir generateModMetadata
+sourceSets.main.resources.srcDir generateGameTestResources
 neoForge.ideSyncTask generateModMetadata
+neoForge.ideSyncTask generateGameTestResources
+
+tasks.named("processResources").configure {
+    dependsOn generateGameTestResources
+}
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
