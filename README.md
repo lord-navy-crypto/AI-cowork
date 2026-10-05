@@ -63,6 +63,8 @@ Development commands:
 /swarmmobs debug spawn <count>
 ```
 
+The development branch also includes a zero-dependency particle debugger. When enabled, vanilla particles show planned destinations, a small subset of local neighbor links, and the current target marker directly in the world.
+
 The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.249 / Java 21 and runs deterministic planner tests.
 
 ## Status
