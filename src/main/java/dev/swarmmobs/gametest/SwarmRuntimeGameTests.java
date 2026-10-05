@@ -31,7 +31,7 @@ public final class SwarmRuntimeGameTests {
     private SwarmRuntimeGameTests() {}
 
     @PrefixGameTestTemplate(false)
-    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
+    @GameTest(batch = "swarm_runtime_integration", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
     public static void zombieReceivesSwarmRuntimeIntegration(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
         zombie.setNoGravity(true);
@@ -62,7 +62,7 @@ public final class SwarmRuntimeGameTests {
         });
     }
     @PrefixGameTestTemplate(false)
-    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
+    @GameTest(batch = "swarm_runtime_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
     public static void swarmApproachGoalYieldsNearMeleeRange(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
         zombie.setNoGravity(true);
@@ -114,7 +114,7 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
+    @GameTest(batch = "swarm_runtime_perception", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void visiblePlayerIsAcquiredThroughPerceptionLayer(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
         zombie.setNoGravity(true);
@@ -200,7 +200,7 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    @GameTest(batch = "swarm_runtime_relay", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void occludedZombieReceivesRelayedPlayerTarget(GameTestHelper helper) {
         Zombie relay = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
         Zombie observer = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
@@ -262,7 +262,7 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 220)
+    @GameTest(batch = "swarm_runtime_memory_expiry", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 220)
     public static void targetMemoryExpiresAfterLineOfSightIsLost(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
         zombie.setNoGravity(true);
