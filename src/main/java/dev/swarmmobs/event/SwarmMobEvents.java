@@ -153,14 +153,10 @@ public final class SwarmMobEvents {
             TargetRecord record = selected.get();
             Player shared = resolvePlayer(level, record.targetId());
             if (shared != null) {
-                boolean newerThanLocal = state.targetId() == null
-                        || !state.targetId().equals(record.targetId())
-                        || record.observationTick() > state.lastTargetObservationTick();
-
-                if (newerThanLocal) {
-                    state.rememberTarget(record.targetId(), record.observationTick(), false);
-                }
-
+                // Any non-LOS path is memory/relay, even when the freshest record is
+                // this agent's own previous observation. Preserve the source timestamp
+                // but update the telemetry source to indirect.
+                state.rememberTarget(record.targetId(), record.observationTick(), false);
                 return shared;
             }
         }
