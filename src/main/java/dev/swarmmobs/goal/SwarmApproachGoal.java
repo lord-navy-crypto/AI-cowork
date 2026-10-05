@@ -5,6 +5,7 @@ import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
+import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -128,11 +129,15 @@ public final class SwarmApproachGoal extends Goal {
         }
 
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
-        double minFactor = SwarmConfig.STALE_TARGET_MIN_SPEED_FACTOR.get();
-        double confidenceFactor = minFactor + (1.0 - minFactor) * confidence;
+        double behaviorSpeedFactor = SwarmMovementPolicy.speedFactor(
+                state.behaviorMode(),
+                confidence,
+                SwarmConfig.STALE_TARGET_MIN_SPEED_FACTOR.get(),
+                SwarmConfig.SEARCH_SPEED_FACTOR.get()
+        );
         double speed = SwarmConfig.MOVE_SPEED.get()
                 * profile.moveSpeedMultiplier()
-                * confidenceFactor;
+                * behaviorSpeedFactor;
 
         mob.getNavigation().moveTo(
                 state.destinationX(),
