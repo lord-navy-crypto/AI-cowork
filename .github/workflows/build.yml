@@ -2,7 +2,7 @@ name: Swarm Mobs Build
 
 on:
   push:
-    branches: [main, swarm-combat-v0.1]
+    branches: [main, swarm-combat-v0.1, swarm-core-v0.2]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
       - name: Unit tests
         run: gradle test --stacktrace
       - name: Runtime GameTests
-        if: github.ref == 'refs/heads/swarm-combat-v0.1'
+        if: github.ref == 'refs/heads/swarm-combat-v0.1' || github.ref == 'refs/heads/swarm-core-v0.2'
         run: timeout 8m gradle runGameTestServer --no-daemon --stacktrace --warning-mode all
       - name: Build
         run: gradle build --stacktrace --warning-mode all
