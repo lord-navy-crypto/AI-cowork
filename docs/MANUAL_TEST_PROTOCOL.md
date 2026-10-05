@@ -19,6 +19,7 @@ Useful commands:
 /swarmmobs inspect
 /swarmmobs group
 /swarmmobs debug spawn <2..32>
+/swarmmobs debug particles on
 ~~~
 
 ## Test A — Open-field swarm acquisition
@@ -143,3 +144,27 @@ The runtime milestone is considered healthy when:
 8. the server remains responsive at the small test sizes above.
 
 This protocol provides runtime evidence and complements future automated GameTests.
+
+
+## Visual debugger
+
+Enable:
+
+~~~
+/swarmmobs debug particles on
+~~~
+
+Current visual meanings:
+
+- END_ROD line: agent to its current planned destination;
+- HAPPY_VILLAGER marker: the current destination point;
+- ELECTRIC_SPARK line: a sampled local neighbor relationship;
+- CRIT marker: current player target.
+
+The visualizer is intentionally server-side and uses only vanilla particles. It is a development aid, not the final client HUD.
+
+Disable with:
+
+~~~
+/swarmmobs debug particles off
+~~~
