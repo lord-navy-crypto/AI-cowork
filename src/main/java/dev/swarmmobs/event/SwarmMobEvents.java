@@ -5,11 +5,12 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
+import dev.swarmmobs.goal.SwarmApproachGoal;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 import java.util.ArrayList;
@@ -18,6 +19,16 @@ import java.util.List;
 import java.util.UUID;
 
 public final class SwarmMobEvents {
+
+    public static void onEntityJoin(EntityJoinLevelEvent event) {
+        if (!(event.getEntity() instanceof Zombie zombie) || event.getLevel().isClientSide()) {
+            return;
+        }
+
+        // Priority 1 outranks the vanilla melee movement goal while the swarm member
+        // is outside releaseToVanillaDistance. Inside that radius this goal yields.
+        zombie.goalSelector.addGoal(1, new SwarmApproachGoal(zombie));
+    }
 
     public static void onEntityTick(EntityTickEvent.Post event) {
         if (!SwarmConfig.ENABLED.get()) {
@@ -44,7 +55,7 @@ public final class SwarmMobEvents {
 
         if (target == null) {
             state.forgetTarget();
-            state.updateLocalPlan(neighbors.size(), 0, dev.swarmmobs.agent.SwarmRole.CHASER);
+            state.clearLocalPlan(neighbors.size());
             return;
         }
 
@@ -67,21 +78,18 @@ public final class SwarmMobEvents {
                 SwarmConfig.COHESION_WEIGHT.get()
         );
 
-        state.updateLocalPlan(neighbors.size(), plan.formationSlot(), plan.role());
+        state.updateLocalPlan(
+                neighbors.size(),
+                plan.formationSlot(),
+                plan.role(),
+                plan.destination().x(),
+                plan.destination().z()
+        );
 
         // Shared target selection is the cooperation layer. Vanilla melee behavior remains
         // responsible for the final attack once a mob is close enough.
         zombie.setTarget(target);
 
-        double releaseDistance = SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
-        if (zombie.distanceToSqr(target) > releaseDistance * releaseDistance) {
-            zombie.getNavigation().moveTo(
-                    plan.destination().x(),
-                    target.getY(),
-                    plan.destination().z(),
-                    SwarmConfig.MOVE_SPEED.get()
-            );
-        }
     }
 
     private static List<Zombie> findNeighbors(ServerLevel level, Zombie self) {
@@ -176,11 +184,11 @@ public final class SwarmMobEvents {
     }
 
     private static Player resolvePlayer(ServerLevel level, UUID id) {
-        ServerPlayer player = level.getServer().getPlayerList().getPlayer(id);
-        if (player == null || player.level() != level || !validTarget(player)) {
-            return null;
+        var entity = level.getEntity(id);
+        if (entity instanceof Player player && validTarget(player)) {
+            return player;
         }
-        return player;
+        return null;
     }
 
     private static boolean validTarget(Player player) {
