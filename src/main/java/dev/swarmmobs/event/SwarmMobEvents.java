@@ -4,7 +4,7 @@ import dev.swarmmobs.agent.SwarmAgentProfile;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmRole;
-import dev.swarmmobs.algorithm.FormationSlotAllocator;
+import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
@@ -108,9 +108,19 @@ public final class SwarmMobEvents {
         Vec3 selfVelocity3 = mob.getDeltaMovement();
         Vec2 selfVelocity = new Vec2(selfVelocity3.x, selfVelocity3.z);
 
-        int candidateSlot = FormationSlotAllocator.allocate(
+        SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
+
+        List<CapabilitySlotAllocator.Member> capabilityMembers = movementNeighbors.stream()
+                .map(peer -> new CapabilitySlotAllocator.Member(
+                        peer.getUUID(),
+                        SwarmAgentProfiles.profile(peer).archetype()
+                ))
+                .toList();
+
+        int candidateSlot = CapabilitySlotAllocator.allocate(
                 mob.getUUID(),
-                movementNeighbors.stream().map(PathfinderMob::getUUID).toList(),
+                profile.archetype(),
+                capabilityMembers,
                 slots
         );
 
@@ -119,8 +129,6 @@ public final class SwarmMobEvents {
                 gameTick,
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()
         );
-
-        SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
         SwarmRole tacticalRole = SwarmAgentProfiles.tacticalRole(
                 profile.archetype(),
                 assignedSlot
