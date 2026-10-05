@@ -102,10 +102,16 @@ public final class SwarmMobEvents {
         Vec3 selfVelocity3 = zombie.getDeltaMovement();
         Vec2 selfVelocity = new Vec2(selfVelocity3.x, selfVelocity3.z);
 
-        int assignedSlot = FormationSlotAllocator.allocate(
+        int candidateSlot = FormationSlotAllocator.allocate(
                 zombie.getUUID(),
                 movementNeighbors.stream().map(Zombie::getUUID).toList(),
                 slots
+        );
+
+        int assignedSlot = state.stabilizeFormationSlot(
+                candidateSlot,
+                gameTick,
+                SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()
         );
 
         SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForSlotWithMotion(
