@@ -7,6 +7,7 @@ import dev.swarmmobs.algorithm.TargetRelayPolicy.TargetRecord;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
+import dev.swarmmobs.debug.SwarmDebugParticles;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.monster.Zombie;
@@ -97,6 +98,11 @@ public final class SwarmMobEvents {
         // responsible for the final attack once a mob is close enough.
         zombie.setTarget(target);
 
+        // Lightweight server-side visualization for development. This intentionally
+        // uses vanilla particles so v0.1 needs no client renderer or extra dependency.
+        if (gameTick % 10L == 0L) {
+            SwarmDebugParticles.render(level, zombie, neighbors);
+        }
     }
 
     private static List<Zombie> findNeighbors(ServerLevel level, Zombie self) {
