@@ -49,9 +49,8 @@ class SwarmFormationSimulationTest {
         assertEquals(2, roleCounts.getOrDefault(SwarmRole.FLANK_RIGHT, 0));
         assertEquals(2, roleCounts.getOrDefault(SwarmRole.REAR_PRESSURE, 0));
 
-        // Two CHASER slots intentionally share the target position; the other six
-        // slots occupy different ring locations.
-        assertEquals(7, uniqueDestinations.size());
+        // Lane offsets keep two agents with the same role from collapsing onto one point.
+        assertEquals(8, uniqueDestinations.size());
     }
 
     @Test
