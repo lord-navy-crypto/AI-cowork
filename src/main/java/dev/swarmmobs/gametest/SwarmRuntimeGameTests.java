@@ -5,6 +5,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.UUID;
 import dev.swarmmobs.SwarmMobs;
 import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
@@ -488,6 +489,97 @@ public final class SwarmRuntimeGameTests {
                     || (spiderBState.role() != SwarmRole.FLANK_LEFT
                     && spiderBState.role() != SwarmRole.FLANK_RIGHT)) {
                 helper.fail("Dedicated Spider agents did not remain in flank roles");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_search_mode", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 180)
+    public static void staleOccludedSpiderTransitionsIntoSearchMode(GameTestHelper helper) {
+        var spider = helper.spawn(EntityType.SPIDER, new BlockPos(1, 1, 2));
+        spider.setNoGravity(true);
+
+        var movementSpeed = spider.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (movementSpeed != null) {
+            movementSpeed.setBaseValue(0.0D);
+        }
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        double lastVisibleX = playerPosition.x;
+
+        helper.runAfterDelay(15, () -> {
+            SwarmAgentState state = spider.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                helper.fail("Spider did not establish a direct observation before search-mode test");
+                return;
+            }
+
+            helper.setBlock(new BlockPos(2, 1, 2), Blocks.STONE);
+            helper.setBlock(new BlockPos(2, 2, 2), Blocks.STONE);
+            player.setPos(player.getX() + 2.0, player.getY(), player.getZ());
+        });
+
+        int searchCheckTick = 15
+                + (int) Math.ceil(
+                        (1.0 - SwarmConfig.SEARCH_CONFIDENCE_THRESHOLD.get())
+                                * SwarmConfig.TARGET_MEMORY_TICKS.get()
+                )
+                + 12;
+
+        helper.runAfterDelay(searchCheckTick, () -> {
+            SwarmAgentState state = spider.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (spider.hasLineOfSight(player)) {
+                helper.fail("Spider unexpectedly regained direct line of sight during search test");
+                return;
+            }
+
+            if (!player.getUUID().equals(state.targetId())) {
+                helper.fail("Spider lost target memory before entering SEARCH");
+                return;
+            }
+
+            if (state.directObservation()) {
+                helper.fail("Stale target was still marked as direct during SEARCH");
+                return;
+            }
+
+            if (state.behaviorMode() != SwarmBehaviorMode.SEARCH) {
+                helper.fail("Stale indirect target did not switch Spider into SEARCH mode");
+                return;
+            }
+
+            if (state.searchRadius() <= 0.0) {
+                helper.fail("SEARCH mode did not expose a positive search radius");
+                return;
+            }
+
+            if (!state.hasDestination()) {
+                helper.fail("SEARCH mode did not produce a search destination");
+                return;
+            }
+
+            if (state.targetObservation() == null
+                    || Math.abs(state.targetObservation().x() - lastVisibleX) > 0.25) {
+                helper.fail("SEARCH mode stopped using the last-known target snapshot");
+                return;
+            }
+
+            double destinationOffset = Math.hypot(
+                    state.destinationX() - state.targetObservation().x(),
+                    state.destinationZ() - state.targetObservation().z()
+            );
+            if (destinationOffset < 0.75) {
+                helper.fail("SEARCH destination collapsed onto the stale target center");
                 return;
             }
 
