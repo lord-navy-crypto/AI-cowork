@@ -1,6 +1,7 @@
 package dev.swarmmobs.agent;
 
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
+import dev.swarmmobs.algorithm.TargetObservation;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -12,8 +13,7 @@ import java.util.UUID;
 public final class SwarmAgentState {
     private static final int MAX_PENDING_TARGET_MESSAGES = 32;
     private static final int MAX_DELIVERED_MESSAGE_KEYS = 128;
-    private UUID targetId;
-    private long lastTargetObservationTick = Long.MIN_VALUE;
+    private TargetObservation targetObservation;
     private long nextPlanTick;
     private boolean planningScheduleInitialized;
     private boolean directObservation;
@@ -34,11 +34,23 @@ public final class SwarmAgentState {
     private long communicationDroppedMessages;
 
     public UUID targetId() {
-        return targetId;
+        return targetObservation == null ? null : targetObservation.targetId();
     }
 
     public long lastTargetObservationTick() {
-        return lastTargetObservationTick;
+        return targetObservation == null ? Long.MIN_VALUE : targetObservation.observationTick();
+    }
+
+    public TargetObservation targetObservation() {
+        return targetObservation;
+    }
+
+    public boolean hasTargetObservation() {
+        return targetObservation != null && targetObservation.hasFinitePosition();
+    }
+
+    public double targetConfidence(long currentTick, int memoryTicks) {
+        return targetObservation == null ? 0.0 : targetObservation.confidence(currentTick, memoryTicks);
     }
 
     public long nextPlanTick() {
@@ -173,14 +185,18 @@ public final class SwarmAgentState {
         pendingTargetMessages.clear();
     }
 
+    public void rememberTarget(TargetObservation observation, boolean directObservation) {
+        this.targetObservation = observation;
+        this.directObservation = directObservation;
+    }
+
     public void rememberTarget(UUID targetId, long gameTick, boolean directObservation) {
-        this.targetId = targetId;
-        this.lastTargetObservationTick = gameTick;
+        this.targetObservation = TargetObservation.unknownPosition(targetId, gameTick);
         this.directObservation = directObservation;
     }
 
     public void forgetTarget() {
-        this.targetId = null;
+        this.targetObservation = null;
         this.directObservation = false;
         this.hasDestination = false;
     }
