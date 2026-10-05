@@ -27,7 +27,7 @@ public final class SwarmMobs {
         NeoForge.EVENT_BUS.addListener(SwarmMobEvents::onEntityTick);
         NeoForge.EVENT_BUS.addListener(SwarmCommands::onRegisterCommands);
 
-        LOGGER.info("Swarm Mobs {} initialized: algorithmic swarm control active, external AI reserved/off by default.",
+        LOGGER.info("Swarm Mobs {} initialized: deterministic swarm active; local Ollama strategy interface available and OFF by default.",
                 modContainer.getModInfo().getVersion());
     }
 }
