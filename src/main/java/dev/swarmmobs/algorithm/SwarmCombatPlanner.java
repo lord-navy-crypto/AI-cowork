@@ -2,6 +2,7 @@ package dev.swarmmobs.algorithm;
 
 import dev.swarmmobs.agent.SwarmRole;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,7 +37,9 @@ public final class SwarmCombatPlanner {
             SwarmRole role,
             int formationSlot,
             double separationMagnitude,
-            double cohesionMagnitude
+            double cohesionMagnitude,
+            double alignmentMagnitude,
+            double steeringMagnitude
     ) {}
 
     public static Plan plan(
@@ -77,6 +80,40 @@ public final class SwarmCombatPlanner {
             double separationWeight,
             double cohesionWeight
     ) {
+        return planForSlotWithMotion(
+                assignedSlot,
+                self,
+                new Vec2(0.0, 0.0),
+                target,
+                targetForward,
+                neighbors,
+                List.of(),
+                formationSlots,
+                formationRadius,
+                separationRadius,
+                separationWeight,
+                cohesionWeight,
+                0.0,
+                Double.POSITIVE_INFINITY
+        );
+    }
+
+    public static Plan planForSlotWithMotion(
+            int assignedSlot,
+            Vec2 self,
+            Vec2 selfVelocity,
+            Vec2 target,
+            Vec2 targetForward,
+            List<Vec2> neighborPositions,
+            List<Vec2> neighborVelocities,
+            int formationSlots,
+            double formationRadius,
+            double separationRadius,
+            double separationWeight,
+            double cohesionWeight,
+            double alignmentWeight,
+            double maxSteeringCorrection
+    ) {
         int slots = Math.max(4, formationSlots);
         int slot = Math.floorMod(assignedSlot, slots);
         SwarmRole role = roleForSlot(slot);
@@ -85,7 +122,7 @@ public final class SwarmCombatPlanner {
         if (forward.length() < EPS) {
             forward = new Vec2(0.0, 1.0);
         }
-        // In the X/Z plane this vector points to the target's local right.
+
         Vec2 right = new Vec2(forward.z(), -forward.x());
 
         int lane = slot / 4;
@@ -106,19 +143,25 @@ public final class SwarmCombatPlanner {
                     .add(right.scale(laneOffset));
         };
 
-        Vec2 separation = separation(self, neighbors, separationRadius);
-        Vec2 cohesion = cohesion(self, neighbors);
+        Vec2 separation = separation(self, neighborPositions, separationRadius);
+        Vec2 cohesion = cohesion(self, neighborPositions);
+        Vec2 alignment = alignment(selfVelocity, neighborVelocities);
 
-        Vec2 destination = base
-                .add(separation.scale(separationWeight))
-                .add(cohesion.scale(cohesionWeight));
+        Vec2 rawSteering = separation.scale(separationWeight)
+                .add(cohesion.scale(cohesionWeight))
+                .add(alignment.scale(alignmentWeight));
+
+        Vec2 steering = clampLength(rawSteering, maxSteeringCorrection);
+        Vec2 destination = base.add(steering);
 
         return new Plan(
                 destination,
                 role,
                 slot,
                 separation.length(),
-                cohesion.length()
+                cohesion.length(),
+                alignment.length(),
+                steering.length()
         );
     }
 
@@ -170,6 +213,63 @@ public final class SwarmCombatPlanner {
 
         Vec2 centroid = new Vec2(x / neighbors.size(), z / neighbors.size());
         return centroid.subtract(self).normalized();
+    }
+
+    public static Vec2 alignment(Vec2 selfVelocity, List<Vec2> neighborVelocities) {
+        if (neighborVelocities.isEmpty()) {
+            return new Vec2(0.0, 0.0);
+        }
+
+        List<Vec2> moving = new ArrayList<>();
+        for (Vec2 velocity : neighborVelocities) {
+            if (velocity != null && velocity.length() >= EPS) {
+                moving.add(velocity);
+            }
+        }
+
+        if (moving.isEmpty()) {
+            return new Vec2(0.0, 0.0);
+        }
+
+        double x = 0.0;
+        double z = 0.0;
+        for (Vec2 velocity : moving) {
+            Vec2 direction = velocity.normalized();
+            x += direction.x();
+            z += direction.z();
+        }
+
+        Vec2 desiredDirection = new Vec2(x / moving.size(), z / moving.size()).normalized();
+        Vec2 currentDirection = selfVelocity == null
+                ? new Vec2(0.0, 0.0)
+                : selfVelocity.normalized();
+
+        if (currentDirection.length() < EPS) {
+            return desiredDirection;
+        }
+
+        return desiredDirection.subtract(currentDirection);
+    }
+
+    public static Vec2 clampLength(Vec2 vector, double maxLength) {
+        if (vector == null) {
+            return new Vec2(0.0, 0.0);
+        }
+
+        if (!Double.isFinite(maxLength)) {
+            return vector;
+        }
+
+        if (maxLength <= 0.0) {
+            return new Vec2(0.0, 0.0);
+        }
+
+        double length = vector.length();
+        if (length <= maxLength || length < EPS) {
+            return vector;
+        }
+
+        return vector.scale(maxLength / length);
     }
 
     private SwarmCombatPlanner() {}
