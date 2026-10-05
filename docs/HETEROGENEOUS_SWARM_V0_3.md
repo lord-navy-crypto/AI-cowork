@@ -59,3 +59,30 @@ A runtime GameTest verifies that a Zombie with direct line of sight can relay it
 ## Current scope
 
 v0.3 starts with Zombie + Skeleton only. Spider and other archetypes should be added only after this mixed-team baseline remains stable in runtime tests.
+
+
+## v0.3.1 — Spider flankers
+
+### Spider — FLANKER
+
+Spider agents join the same shared target-memory and communication network but are
+restricted to FLANK_LEFT / FLANK_RIGHT tactical roles.
+
+Their capability profile uses:
+
+- a slightly wider formation radius than assault agents;
+- a higher repositioning speed multiplier;
+- the same no-cheating last-known target observations.
+
+This produces the first three-capability mixed team:
+
+~~~text
+Zombie   -> ASSAULT / pressure
+Skeleton -> RANGED_SUPPORT
+Spider   -> FLANKER
+~~~
+
+The mixed debug spawn now cycles through all three species.
+
+A runtime GameTest verifies that a Spider acquires the player through the shared swarm
+runtime, receives SwarmApproachGoal, and is assigned only a flank role.
