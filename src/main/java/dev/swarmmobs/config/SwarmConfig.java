@@ -36,6 +36,9 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue NAV_STUCK_MIN_PROGRESS;
     public static final ModConfigSpec.DoubleValue NAV_RECOVERY_LATERAL_DISTANCE;
     public static final ModConfigSpec.IntValue NAV_RECOVERY_DURATION_TICKS;
+    public static final ModConfigSpec.BooleanValue NAV_OBSTACLE_AVOIDANCE_ENABLED;
+    public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_LOOKAHEAD;
+    public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_LATERAL_DISTANCE;
 
     public static final ModConfigSpec.BooleanValue COMMUNICATION_ENABLED;
     public static final ModConfigSpec.DoubleValue COMMUNICATION_RADIUS;
@@ -173,6 +176,18 @@ public final class SwarmConfig {
         NAV_RECOVERY_DURATION_TICKS = BUILDER
                 .comment("How long an agent follows a temporary recovery waypoint before returning to the swarm plan.")
                 .defineInRange("navRecoveryDurationTicks", 18, 3, 100);
+
+        NAV_OBSTACLE_AVOIDANCE_ENABLED = BUILDER
+                .comment("Enable short-range terrain probing before issuing swarm navigation destinations.")
+                .define("navObstacleAvoidanceEnabled", true);
+
+        NAV_OBSTACLE_LOOKAHEAD = BUILDER
+                .comment("Forward probe and temporary detour distance, in blocks, for local obstacle avoidance.")
+                .defineInRange("navObstacleLookahead", 1.5, 0.5, 4.0);
+
+        NAV_OBSTACLE_LATERAL_DISTANCE = BUILDER
+                .comment("Side probe and detour distance, in blocks, for local obstacle avoidance.")
+                .defineInRange("navObstacleLateralDistance", 1.5, 0.5, 4.0);
 
         BUILDER.pop();
 
