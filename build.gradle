@@ -69,7 +69,7 @@ def generateGameTestResources = tasks.register("generateGameTestResources") {
 
     doLast {
         def outputFile = generatedRoot.get()
-                .file("data/${mod_id}/structure/empty5x4x5.nbt")
+                .file("data/${project.mod_id}/structure/empty5x4x5.nbt")
                 .asFile
         outputFile.parentFile.mkdirs()
         outputFile.bytes = java.util.Base64.mimeDecoder.decode(encodedTemplate.asFile.text)
