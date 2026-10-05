@@ -3,7 +3,10 @@ package dev.swarmmobs.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.ai.SwarmStrategyRequest;
+import dev.swarmmobs.ai.SwarmStrategyService;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.debug.SwarmDebugState;
@@ -90,6 +93,27 @@ public final class SwarmCommands {
 
         debug.then(communication);
         root.then(debug);
+
+        var ai = Commands.literal("ai")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("status")
+                        .executes(context -> aiStatus(context.getSource())))
+                .then(Commands.literal("models")
+                        .executes(context -> aiModels(context.getSource())))
+                .then(Commands.literal("test")
+                        .executes(context -> aiTest(context.getSource())))
+                .then(Commands.literal("on")
+                        .executes(context -> setAiEnabled(context.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(context -> setAiEnabled(context.getSource(), false)))
+                .then(Commands.literal("model")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(context -> setAiModel(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))));
+
+        root.then(ai);
         dispatcher.register(root);
     }
 
@@ -107,6 +131,9 @@ public final class SwarmCommands {
                                 + ", experimentSeed=" + SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.get()
                                 + ", debugParticles=" + SwarmDebugState.particlesEnabled()
                                 + ", externalAI=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
+                                + ", ollamaModel=" + (SwarmConfig.OLLAMA_MODEL.get().isBlank()
+                                        ? "<not-selected>"
+                                        : SwarmConfig.OLLAMA_MODEL.get())
                 ),
                 false
         );
@@ -244,6 +271,150 @@ public final class SwarmCommands {
 
         source.sendSuccess(() -> Component.literal(summary), false);
         return total;
+    }
+
+    private static int aiStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Checking local Ollama at " + SwarmConfig.OLLAMA_BASE_URL.get() + " ..."
+                ),
+                false
+        );
+
+        SwarmStrategyService.ollama().status().whenComplete((status, error) ->
+                source.getServer().execute(() -> {
+                    if (error != null) {
+                        source.sendFailure(Component.literal(
+                                "Ollama status failed: " + conciseError(error)
+                        ));
+                        return;
+                    }
+
+                    source.sendSuccess(
+                            () -> Component.literal(
+                                    "Ollama available=" + status.available()
+                                            + ", endpoint=" + status.endpoint()
+                                            + ", model=" + (status.model() == null || status.model().isBlank()
+                                                    ? "<not-selected>"
+                                                    : status.model())
+                                            + ", message=" + status.message()
+                            ),
+                            false
+                    );
+                })
+        );
+        return 1;
+    }
+
+    private static int aiModels(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal("Querying local Ollama models asynchronously ..."),
+                false
+        );
+
+        SwarmStrategyService.ollama().listModels().whenComplete((models, error) ->
+                source.getServer().execute(() -> {
+                    if (error != null) {
+                        source.sendFailure(Component.literal(
+                                "Could not list Ollama models: " + conciseError(error)
+                        ));
+                        return;
+                    }
+
+                    String result = models.isEmpty()
+                            ? "<none>"
+                            : String.join(", ", models);
+                    source.sendSuccess(
+                            () -> Component.literal("Local Ollama models: " + result),
+                            false
+                    );
+                })
+        );
+        return 1;
+    }
+
+    private static int aiTest(CommandSourceStack source) {
+        String model = SwarmConfig.OLLAMA_MODEL.get();
+        if (model == null || model.isBlank()) {
+            source.sendFailure(Component.literal(
+                    "No Ollama model selected. Use /swarmmobs ai models, then /swarmmobs ai model <name>."
+            ));
+            return 0;
+        }
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Sending one non-blocking interface test to local Ollama model " + model + " ..."
+                ),
+                false
+        );
+
+        SwarmStrategyService.ollama().decide(SwarmStrategyRequest.demo())
+                .whenComplete((decision, error) ->
+                        source.getServer().execute(() -> {
+                            if (error != null) {
+                                source.sendFailure(Component.literal(
+                                        "Ollama strategy test failed: " + conciseError(error)
+                                ));
+                                return;
+                            }
+
+                            source.sendSuccess(
+                                    () -> Component.literal(
+                                            "Ollama test decision: mode=" + decision.mode()
+                                                    + ", formationRadiusMultiplier="
+                                                    + String.format(java.util.Locale.ROOT, "%.2f", decision.formationRadiusMultiplier())
+                                                    + ", separationMultiplier="
+                                                    + String.format(java.util.Locale.ROOT, "%.2f", decision.separationMultiplier())
+                                                    + ", cohesionMultiplier="
+                                                    + String.format(java.util.Locale.ROOT, "%.2f", decision.cohesionMultiplier())
+                                                    + ", rationale=" + decision.rationale()
+                                                    + " [NOT applied to gameplay]"
+                                    ),
+                                    false
+                            );
+                        })
+                );
+        return 1;
+    }
+
+    private static int setAiEnabled(CommandSourceStack source, boolean enabled) {
+        SwarmConfig.EXTERNAL_AI_ENABLED.set(enabled);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "High-level AI strategy provider switch: " + (enabled ? "ON" : "OFF")
+                                + ". v0.2 interface decisions are not yet applied to mob movement."
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setAiModel(CommandSourceStack source, String model) {
+        String normalized = model == null ? "" : model.trim();
+        if (normalized.isBlank()) {
+            source.sendFailure(Component.literal("Model name cannot be empty."));
+            return 0;
+        }
+
+        SwarmConfig.OLLAMA_MODEL.set(normalized);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Selected local Ollama model: " + normalized
+                                + ". Use /swarmmobs ai test to verify the interface."
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static String conciseError(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage();
+        return cause.getClass().getSimpleName() + (message == null ? "" : ": " + message);
     }
 
     private static int setCommunicationEnabled(CommandSourceStack source, boolean enabled) {
