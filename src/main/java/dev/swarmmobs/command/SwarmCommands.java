@@ -26,61 +26,71 @@ public final class SwarmCommands {
     }
 
     private static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(
-                Commands.literal("swarmmobs")
-                        .then(Commands.literal("status")
-                                .executes(context -> status(context.getSource())))
-                        .then(Commands.literal("inspect")
-                                .executes(context -> inspectNearest(context.getSource())))
-                        .then(Commands.literal("group")
-                                .executes(context -> inspectGroup(context.getSource())))
-                        .then(Commands.literal("debug")
-                                .requires(source -> source.hasPermission(2))
-                                .then(Commands.literal("spawn")
-                                        .then(Commands.argument("count", IntegerArgumentType.integer(2, 32))
-                                                .executes(context -> spawnTestSwarm(
-                                                        context.getSource(),
-                                                        IntegerArgumentType.getInteger(context, "count")
-                                                ))))
-                                .then(Commands.literal("particles")
-                                        .then(Commands.literal("toggle")
-                                                .executes(context -> toggleParticles(context.getSource())))
-                                        .then(Commands.literal("on")
-                                                .executes(context -> setParticles(context.getSource(), true)))
-                                        .then(Commands.literal("off")
-                                                .executes(context -> setParticles(context.getSource(), false))))
-                                .then(Commands.literal("comm")
-                                        .then(Commands.literal("on")
-                                                .executes(context -> setCommunicationEnabled(context.getSource(), true)))
-                                        .then(Commands.literal("off")
-                                                .executes(context -> setCommunicationEnabled(context.getSource(), false)))
-                                        .then(Commands.literal("baseline")
-                                                .executes(context -> setCommunicationBaseline(context.getSource())))
-                                        .then(Commands.literal("latency")
-                                                .then(Commands.argument("ticks", IntegerArgumentType.integer(0, 400))
-                                                        .executes(context -> setCommunicationLatency(
-                                                                context.getSource(),
-                                                                IntegerArgumentType.getInteger(context, "ticks")
-                                                        ))))
-                                        .then(Commands.literal("drop")
-                                                .then(Commands.argument("rate", DoubleArgumentType.doubleArg(0.0, 1.0))
-                                                        .executes(context -> setCommunicationDropRate(
-                                                                context.getSource(),
-                                                                DoubleArgumentType.getDouble(context, "rate")
-                                                        ))))
-                                        .then(Commands.literal("radius")
-                                                .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(1.0, 96.0))
-                                                        .executes(context -> setCommunicationRadius(
-                                                                context.getSource(),
-                                                                DoubleArgumentType.getDouble(context, "blocks")
-                                                        ))))
-                                        .then(Commands.literal("seed")
-                                                .then(Commands.argument("value", IntegerArgumentType.integer())
-                                                        .executes(context -> setCommunicationSeed(
-                                                                context.getSource(),
-                                                                IntegerArgumentType.getInteger(context, "value")
-                                                        )))))
+        var root = Commands.literal("swarmmobs")
+                .then(Commands.literal("status")
+                        .executes(context -> status(context.getSource())))
+                .then(Commands.literal("inspect")
+                        .executes(context -> inspectNearest(context.getSource())))
+                .then(Commands.literal("group")
+                        .executes(context -> inspectGroup(context.getSource())));
+
+        var debug = Commands.literal("debug")
+                .requires(source -> source.hasPermission(2));
+
+        debug.then(
+                Commands.literal("spawn")
+                        .then(Commands.argument("count", IntegerArgumentType.integer(2, 32))
+                                .executes(context -> spawnTestSwarm(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "count")
+                                )))
         );
+
+        var particles = Commands.literal("particles")
+                .then(Commands.literal("toggle")
+                        .executes(context -> toggleParticles(context.getSource())))
+                .then(Commands.literal("on")
+                        .executes(context -> setParticles(context.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(context -> setParticles(context.getSource(), false)));
+
+        debug.then(particles);
+
+        var communication = Commands.literal("comm")
+                .then(Commands.literal("on")
+                        .executes(context -> setCommunicationEnabled(context.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(context -> setCommunicationEnabled(context.getSource(), false)))
+                .then(Commands.literal("baseline")
+                        .executes(context -> setCommunicationBaseline(context.getSource())))
+                .then(Commands.literal("latency")
+                        .then(Commands.argument("ticks", IntegerArgumentType.integer(0, 400))
+                                .executes(context -> setCommunicationLatency(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "ticks")
+                                ))))
+                .then(Commands.literal("drop")
+                        .then(Commands.argument("rate", DoubleArgumentType.doubleArg(0.0, 1.0))
+                                .executes(context -> setCommunicationDropRate(
+                                        context.getSource(),
+                                        DoubleArgumentType.getDouble(context, "rate")
+                                ))))
+                .then(Commands.literal("radius")
+                        .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(1.0, 96.0))
+                                .executes(context -> setCommunicationRadius(
+                                        context.getSource(),
+                                        DoubleArgumentType.getDouble(context, "blocks")
+                                ))))
+                .then(Commands.literal("seed")
+                        .then(Commands.argument("value", IntegerArgumentType.integer())
+                                .executes(context -> setCommunicationSeed(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "value")
+                                ))));
+
+        debug.then(communication);
+        root.then(debug);
+        dispatcher.register(root);
     }
 
     private static int status(CommandSourceStack source) {
