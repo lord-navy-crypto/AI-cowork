@@ -20,6 +20,15 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue ALIGNMENT_WEIGHT;
     public static final ModConfigSpec.DoubleValue MAX_STEERING_CORRECTION;
     public static final ModConfigSpec.DoubleValue STALE_TARGET_MIN_SPEED_FACTOR;
+    public static final ModConfigSpec.DoubleValue SEARCH_CONFIDENCE_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue SEARCH_MIN_RADIUS;
+    public static final ModConfigSpec.DoubleValue SEARCH_MAX_RADIUS;
+    public static final ModConfigSpec.IntValue SEARCH_PHASE_TICKS;
+    public static final ModConfigSpec.DoubleValue SEARCH_ARRIVAL_TOLERANCE;
+    public static final ModConfigSpec.BooleanValue TARGET_PREDICTION_ENABLED;
+    public static final ModConfigSpec.IntValue TARGET_PREDICTION_LEAD_TICKS;
+    public static final ModConfigSpec.IntValue TARGET_PREDICTION_MAX_TICKS;
+    public static final ModConfigSpec.DoubleValue TARGET_PREDICTION_MAX_DISTANCE;
     public static final ModConfigSpec.DoubleValue MOVE_SPEED;
     public static final ModConfigSpec.DoubleValue RELEASE_TO_VANILLA_DISTANCE;
 
@@ -95,6 +104,42 @@ public final class SwarmConfig {
         STALE_TARGET_MIN_SPEED_FACTOR = BUILDER
                 .comment("Minimum fraction of moveSpeed used when target information is almost expired.")
                 .defineInRange("staleTargetMinSpeedFactor", 0.55, 0.1, 1.0);
+
+        SEARCH_CONFIDENCE_THRESHOLD = BUILDER
+                .comment("Indirect target confidence below this value switches the swarm from ENGAGE to SEARCH.")
+                .defineInRange("searchConfidenceThreshold", 0.45, 0.05, 0.95);
+
+        SEARCH_MIN_RADIUS = BUILDER
+                .comment("Minimum decentralized search radius around the last-known target position.")
+                .defineInRange("searchMinRadius", 2.0, 0.5, 16.0);
+
+        SEARCH_MAX_RADIUS = BUILDER
+                .comment("Maximum decentralized search radius as target confidence approaches zero.")
+                .defineInRange("searchMaxRadius", 10.0, 2.0, 32.0);
+
+        SEARCH_PHASE_TICKS = BUILDER
+                .comment("How often search sectors rotate around the last-known target. 20 ticks = 1 second.")
+                .defineInRange("searchPhaseTicks", 20, 5, 200);
+
+        SEARCH_ARRIVAL_TOLERANCE = BUILDER
+                .comment("Distance from a search destination at which the swarm movement goal yields.")
+                .defineInRange("searchArrivalTolerance", 1.25, 0.5, 4.0);
+
+        TARGET_PREDICTION_ENABLED = BUILDER
+                .comment("Enable conservative short-horizon prediction from observed target velocity.")
+                .define("targetPredictionEnabled", true);
+
+        TARGET_PREDICTION_LEAD_TICKS = BUILDER
+                .comment("Short lead horizon added to a fresh observation before confidence scaling.")
+                .defineInRange("targetPredictionLeadTicks", 6, 0, 20);
+
+        TARGET_PREDICTION_MAX_TICKS = BUILDER
+                .comment("Hard upper bound on total prediction horizon.")
+                .defineInRange("targetPredictionMaxTicks", 12, 0, 40);
+
+        TARGET_PREDICTION_MAX_DISTANCE = BUILDER
+                .comment("Hard upper bound, in blocks, on predicted position offset.")
+                .defineInRange("targetPredictionMaxDistance", 3.5, 0.0, 12.0);
 
         MOVE_SPEED = BUILDER
                 .comment("Navigation speed multiplier used for swarm repositioning.")

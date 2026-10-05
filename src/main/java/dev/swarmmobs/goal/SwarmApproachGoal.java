@@ -4,6 +4,7 @@ import dev.swarmmobs.agent.SwarmAgentProfile;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmAgentArchetype;
+import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -38,6 +39,15 @@ public final class SwarmApproachGoal extends Goal {
         SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
         if (!state.hasDestination() || state.targetId() == null) {
             return false;
+        }
+
+        if (state.behaviorMode() == SwarmBehaviorMode.SEARCH) {
+            double tolerance = SwarmConfig.SEARCH_ARRIVAL_TOLERANCE.get();
+            return mob.distanceToSqr(
+                    state.destinationX(),
+                    mob.getY(),
+                    state.destinationZ()
+            ) > tolerance * tolerance;
         }
 
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);

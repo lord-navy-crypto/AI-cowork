@@ -1,6 +1,7 @@
 package dev.swarmmobs.event;
 
 import dev.swarmmobs.agent.SwarmAgentProfile;
+import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmLocalComposition;
@@ -9,7 +10,9 @@ import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
+import dev.swarmmobs.algorithm.SwarmSearchPlanner;
 import dev.swarmmobs.algorithm.TargetObservation;
+import dev.swarmmobs.algorithm.TargetPredictionPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -143,35 +146,113 @@ public final class SwarmMobEvents {
                 composition
         );
 
-        SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
-                tacticalRole,
-                assignedSlot,
-                new Vec2(mob.getX(), mob.getZ()),
-                selfVelocity,
-                new Vec2(observation.x(), observation.z()),
-                new Vec2(observation.forwardX(), observation.forwardZ()),
-                neighborPositions,
-                neighborVelocities,
-                slots,
-                SwarmConfig.FORMATION_RADIUS.get() * profile.formationRadiusMultiplier(),
-                SwarmConfig.SEPARATION_RADIUS.get(),
-                SwarmConfig.SEPARATION_WEIGHT.get(),
-                SwarmConfig.COHESION_WEIGHT.get(),
-                SwarmConfig.ALIGNMENT_WEIGHT.get(),
-                SwarmConfig.MAX_STEERING_CORRECTION.get()
+        double confidence = state.targetConfidence(
+                gameTick,
+                SwarmConfig.TARGET_MEMORY_TICKS.get()
         );
 
-        state.updateLocalPlan(
-                movementNeighbors.size(),
-                plan.formationSlot(),
-                plan.role(),
-                plan.destination().x(),
-                plan.destination().z(),
-                plan.separationMagnitude(),
-                plan.cohesionMagnitude(),
-                plan.alignmentMagnitude(),
-                plan.steeringMagnitude()
-        );
+        boolean searchMode = !selection.direct()
+                && confidence < SwarmConfig.SEARCH_CONFIDENCE_THRESHOLD.get();
+
+        if (searchMode) {
+            state.clearPredictionTelemetry();
+
+            int sameCapabilityCount = 1 + (int) movementNeighbors.stream()
+                    .filter(peer -> SwarmAgentProfiles.profile(peer).archetype() == profile.archetype())
+                    .count();
+
+            SwarmSearchPlanner.SearchPlan searchPlan = SwarmSearchPlanner.planWithMotion(
+                    profile.archetype(),
+                    assignedSlot,
+                    new Vec2(mob.getX(), mob.getZ()),
+                    selfVelocity,
+                    new Vec2(observation.x(), observation.z()),
+                    confidence,
+                    Math.max(0L, gameTick - observation.observationTick()),
+                    neighborPositions,
+                    neighborVelocities,
+                    sameCapabilityCount,
+                    SwarmConfig.SEARCH_MIN_RADIUS.get(),
+                    SwarmConfig.SEARCH_MAX_RADIUS.get(),
+                    SwarmConfig.SEARCH_PHASE_TICKS.get(),
+                    SwarmConfig.SEPARATION_RADIUS.get(),
+                    SwarmConfig.SEPARATION_WEIGHT.get(),
+                    SwarmConfig.COHESION_WEIGHT.get(),
+                    SwarmConfig.ALIGNMENT_WEIGHT.get(),
+                    SwarmConfig.MAX_STEERING_CORRECTION.get()
+            );
+
+            state.updateLocalPlan(
+                    movementNeighbors.size(),
+                    assignedSlot,
+                    tacticalRole,
+                    SwarmBehaviorMode.SEARCH,
+                    searchPlan.searchRadius(),
+                    searchPlan.destination().x(),
+                    searchPlan.destination().z(),
+                    searchPlan.separationMagnitude(),
+                    searchPlan.cohesionMagnitude(),
+                    searchPlan.alignmentMagnitude(),
+                    searchPlan.steeringMagnitude()
+            );
+        } else {
+            TargetPredictionPolicy.Prediction prediction;
+            if (SwarmConfig.TARGET_PREDICTION_ENABLED.get()) {
+                prediction = TargetPredictionPolicy.predict(
+                        observation,
+                        gameTick,
+                        confidence,
+                        SwarmConfig.TARGET_PREDICTION_LEAD_TICKS.get(),
+                        SwarmConfig.TARGET_PREDICTION_MAX_TICKS.get(),
+                        SwarmConfig.TARGET_PREDICTION_MAX_DISTANCE.get()
+                );
+            } else {
+                prediction = new TargetPredictionPolicy.Prediction(
+                        observation.x(),
+                        observation.z(),
+                        0.0,
+                        0.0
+                );
+            }
+
+            state.updatePredictionTelemetry(
+                    prediction.x(),
+                    prediction.z(),
+                    prediction.offsetMagnitude()
+            );
+
+            SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
+                    tacticalRole,
+                    assignedSlot,
+                    new Vec2(mob.getX(), mob.getZ()),
+                    selfVelocity,
+                    new Vec2(prediction.x(), prediction.z()),
+                    new Vec2(observation.forwardX(), observation.forwardZ()),
+                    neighborPositions,
+                    neighborVelocities,
+                    slots,
+                    SwarmConfig.FORMATION_RADIUS.get() * profile.formationRadiusMultiplier(),
+                    SwarmConfig.SEPARATION_RADIUS.get(),
+                    SwarmConfig.SEPARATION_WEIGHT.get(),
+                    SwarmConfig.COHESION_WEIGHT.get(),
+                    SwarmConfig.ALIGNMENT_WEIGHT.get(),
+                    SwarmConfig.MAX_STEERING_CORRECTION.get()
+            );
+
+            state.updateLocalPlan(
+                    movementNeighbors.size(),
+                    plan.formationSlot(),
+                    plan.role(),
+                    SwarmBehaviorMode.ENGAGE,
+                    0.0,
+                    plan.destination().x(),
+                    plan.destination().z(),
+                    plan.separationMagnitude(),
+                    plan.cohesionMagnitude(),
+                    plan.alignmentMagnitude(),
+                    plan.steeringMagnitude()
+            );
+        }
 
         if (selection.direct()) {
             mob.setTarget(selection.player());
@@ -303,6 +384,7 @@ public final class SwarmMobEvents {
         Player direct = findDirectObservation(level, self);
         if (direct != null) {
             Vec3 look = direct.getLookAngle();
+            Vec3 velocity = direct.getDeltaMovement();
             TargetObservation observation = new TargetObservation(
                     direct.getUUID(),
                     gameTick,
@@ -310,7 +392,9 @@ public final class SwarmMobEvents {
                     direct.getY(),
                     direct.getZ(),
                     look.x,
-                    look.z
+                    look.z,
+                    velocity.x,
+                    velocity.z
             );
             state.rememberTarget(observation, true);
             return new TargetSelection(observation, direct, true);
