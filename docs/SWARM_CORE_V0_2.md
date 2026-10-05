@@ -76,3 +76,21 @@ properties before adding any higher-level AI provider.
 - test-build/v0.1.0-alpha.1 remains frozen.
 - ollama-interface-v0.2 remains a separate AI-interface experiment.
 - swarm-core-v0.2 is the non-AI algorithm-development branch.
+
+
+### 6. Formation-slot hysteresis
+
+The local allocator still computes a deterministic candidate slot from the visible
+group, but agents no longer switch immediately when that candidate changes.
+
+A new candidate must remain unchanged for formationSlotHysteresisTicks before it
+replaces the current slot.
+
+This reduces role/lane thrashing when neighbors briefly enter or leave sensing range.
+
+Telemetry exposes:
+
+- pendingFormationSlot;
+- formationSlotSwitchCount.
+
+Setting formationSlotHysteresisTicks to 0 restores immediate switching.
