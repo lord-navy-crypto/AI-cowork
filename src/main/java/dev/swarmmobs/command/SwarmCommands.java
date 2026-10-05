@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
+import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.debug.SwarmDebugState;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -100,6 +101,9 @@ public final class SwarmCommands {
                                 + ", neighborRadius=" + SwarmConfig.NEIGHBOR_RADIUS.get()
                                 + ", targetRadius=" + SwarmConfig.TARGET_RADIUS.get()
                                 + ", formationRadius=" + SwarmConfig.FORMATION_RADIUS.get()
+                                + ", alignmentWeight=" + SwarmConfig.ALIGNMENT_WEIGHT.get()
+                                + ", maxSteeringCorrection=" + SwarmConfig.MAX_STEERING_CORRECTION.get()
+                                + ", staleTargetMinSpeedFactor=" + SwarmConfig.STALE_TARGET_MIN_SPEED_FACTOR.get()
                                 + ", communicationEnabled=" + SwarmConfig.COMMUNICATION_ENABLED.get()
                                 + ", communicationRadius=" + SwarmConfig.COMMUNICATION_RADIUS.get()
                                 + ", latencyTicks=" + SwarmConfig.COMMUNICATION_LATENCY_TICKS.get()
@@ -143,6 +147,20 @@ public final class SwarmCommands {
         long age = state.targetId() == null
                 ? -1L
                 : Math.max(0L, level.getGameTime() - state.lastTargetObservationTick());
+        double confidence = state.targetConfidence(
+                level.getGameTime(),
+                SwarmConfig.TARGET_MEMORY_TICKS.get()
+        );
+        TargetObservation observation = state.targetObservation();
+        String targetEstimate = observation == null || !observation.hasFinitePosition()
+                ? "none"
+                : String.format(
+                        java.util.Locale.ROOT,
+                        "(%.2f, %.2f, %.2f)",
+                        observation.x(),
+                        observation.y(),
+                        observation.z()
+                );
 
         source.sendSuccess(
                 () -> Component.literal(
@@ -153,11 +171,15 @@ public final class SwarmCommands {
                                 + " target=" + (state.targetId() == null ? "none" : state.targetId())
                                 + " targetAgeTicks=" + age
                                 + " directObservation=" + state.directObservation()
+                                + " targetConfidence=" + String.format(java.util.Locale.ROOT, "%.3f", confidence)
+                                + " targetEstimate=" + targetEstimate
                                 + " destination=" + (state.hasDestination()
                                         ? String.format(java.util.Locale.ROOT, "(%.2f, %.2f)", state.destinationX(), state.destinationZ())
                                         : "none")
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
+                                + " alignment=" + String.format(java.util.Locale.ROOT, "%.3f", state.alignmentMagnitude())
+                                + " steering=" + String.format(java.util.Locale.ROOT, "%.3f", state.steeringMagnitude())
                                 + " inbox=" + state.pendingTargetMessageCount()
                                 + " commAccepted=" + state.communicationAcceptedMessages()
                                 + " commDelivered=" + state.communicationDeliveredMessages()
@@ -198,6 +220,9 @@ public final class SwarmCommands {
         double neighborSum = 0.0;
         double separationSum = 0.0;
         double cohesionSum = 0.0;
+        double alignmentSum = 0.0;
+        double steeringSum = 0.0;
+        double confidenceSum = 0.0;
         long pendingMessages = 0L;
         long acceptedMessages = 0L;
         long deliveredMessages = 0L;
@@ -215,6 +240,12 @@ public final class SwarmCommands {
             neighborSum += state.neighborCount();
             separationSum += state.separationMagnitude();
             cohesionSum += state.cohesionMagnitude();
+            alignmentSum += state.alignmentMagnitude();
+            steeringSum += state.steeringMagnitude();
+            confidenceSum += state.targetConfidence(
+                    level.getGameTime(),
+                    SwarmConfig.TARGET_MEMORY_TICKS.get()
+            );
             pendingMessages += state.pendingTargetMessageCount();
             acceptedMessages += state.communicationAcceptedMessages();
             deliveredMessages += state.communicationDeliveredMessages();
@@ -228,13 +259,16 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, roles={%s}",
                 total,
                 withTarget,
                 direct,
                 neighborSum / total,
                 separationSum / total,
                 cohesionSum / total,
+                alignmentSum / total,
+                steeringSum / total,
+                confidenceSum / total,
                 pendingMessages,
                 acceptedMessages,
                 deliveredMessages,
