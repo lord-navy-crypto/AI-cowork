@@ -23,4 +23,13 @@ public record SwarmAgentProfile(
                 1.75
         );
     }
+
+    public static SwarmAgentProfile flanker() {
+        return new SwarmAgentProfile(
+                SwarmAgentArchetype.FLANKER,
+                1.25,
+                1.15,
+                0.0
+        );
+    }
 }
