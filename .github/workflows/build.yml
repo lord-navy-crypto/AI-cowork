@@ -34,6 +34,9 @@ jobs:
         run: gradle compileJava --stacktrace --warning-mode all
       - name: Unit tests
         run: gradle test --stacktrace
+      - name: Runtime GameTests
+        if: github.ref == 'refs/heads/swarm-combat-v0.1'
+        run: timeout 8m gradle runGameTestServer --no-daemon --stacktrace --warning-mode all
       - name: Build
         run: gradle build --stacktrace --warning-mode all
       - name: Upload jar
