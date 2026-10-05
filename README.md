@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.5; current integration work: `swarm-search-speed-v0.5.1`
+Active stable line: `main` through v0.5.1; current integration work: `swarm-navigation-recovery-v0.5.2`
 
 The current playable system includes:
 
@@ -55,6 +55,7 @@ The current playable system includes:
 - decentralized ENGAGE → SEARCH transitions and rotating capability-banded search sectors as uncertainty grows;
 - bounded observed-motion prediction during ENGAGE, with prediction cleared during SEARCH;
 - behavior-aware movement: stale ENGAGE information can slow pursuit while SEARCH keeps an independent configurable coverage speed;
+- local stuck detection with deterministic left/right recovery waypoints for blocked navigation in complex terrain;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -74,6 +75,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.5 is merged on `main`; v0.5.1 search-coverage movement tuning is under integration.**
+**Swarm Mobs v0.5.1 is merged on `main`; v0.5.2 navigation recovery is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.

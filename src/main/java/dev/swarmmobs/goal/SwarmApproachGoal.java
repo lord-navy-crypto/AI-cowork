@@ -6,6 +6,8 @@ import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
+import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
+import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -25,6 +27,13 @@ import java.util.EnumSet;
  */
 public final class SwarmApproachGoal extends Goal {
     private final PathfinderMob mob;
+    private double progressSampleX;
+    private double progressSampleZ;
+    private long progressSampleTick = Long.MIN_VALUE;
+    private boolean recoveryActive;
+    private double recoveryX;
+    private double recoveryZ;
+    private long recoveryUntilTick = Long.MIN_VALUE;
 
     public SwarmApproachGoal(PathfinderMob mob) {
         this.mob = mob;
@@ -89,11 +98,14 @@ public final class SwarmApproachGoal extends Goal {
 
     @Override
     public void start() {
+        resetProgressSample();
         moveToLatestPlan();
     }
 
     @Override
     public void tick() {
+        updateRecoveryState();
+
         if (mob.tickCount % 3 == 0 || mob.getNavigation().isDone()) {
             moveToLatestPlan();
         }
@@ -102,6 +114,9 @@ public final class SwarmApproachGoal extends Goal {
     @Override
     public void stop() {
         mob.getNavigation().stop();
+        recoveryActive = false;
+        recoveryUntilTick = Long.MIN_VALUE;
+        progressSampleTick = Long.MIN_VALUE;
     }
 
     private void moveToLatestPlan() {
@@ -139,12 +154,86 @@ public final class SwarmApproachGoal extends Goal {
                 * profile.moveSpeedMultiplier()
                 * behaviorSpeedFactor;
 
+        double navigationX = recoveryActive ? recoveryX : state.destinationX();
+        double navigationZ = recoveryActive ? recoveryZ : state.destinationZ();
+
         mob.getNavigation().moveTo(
-                state.destinationX(),
+                navigationX,
                 targetY,
-                state.destinationZ(),
+                navigationZ,
                 speed
         );
+    }
+
+    private void updateRecoveryState() {
+        if (!(mob.level() instanceof ServerLevel level)) {
+            return;
+        }
+
+        long gameTick = level.getGameTime();
+        if (recoveryActive) {
+            if (gameTick >= recoveryUntilTick) {
+                recoveryActive = false;
+                resetProgressSample();
+            }
+            return;
+        }
+
+        if (progressSampleTick == Long.MIN_VALUE) {
+            resetProgressSample();
+            return;
+        }
+
+        long elapsed = gameTick - progressSampleTick;
+        if (elapsed < SwarmConfig.NAV_STUCK_WINDOW_TICKS.get()) {
+            return;
+        }
+
+        double moved = Math.hypot(
+                mob.getX() - progressSampleX,
+                mob.getZ() - progressSampleZ
+        );
+
+        SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
+        if (!state.hasDestination()) {
+            resetProgressSample();
+            return;
+        }
+
+        double remaining = Math.hypot(
+                state.destinationX() - mob.getX(),
+                state.destinationZ() - mob.getZ()
+        );
+
+        if (moved < SwarmConfig.NAV_STUCK_MIN_PROGRESS.get()
+                && remaining > Math.max(1.5, SwarmConfig.NAV_STUCK_MIN_PROGRESS.get() * 2.0)) {
+            var recovery = SwarmNavigationRecoveryPolicy.recoveryWaypoint(
+                    new Vec2(mob.getX(), mob.getZ()),
+                    new Vec2(state.destinationX(), state.destinationZ()),
+                    mob.getId(),
+                    SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()
+            );
+
+            if (recovery.active()) {
+                recoveryActive = true;
+                recoveryX = recovery.waypoint().x();
+                recoveryZ = recovery.waypoint().z();
+                recoveryUntilTick = gameTick + SwarmConfig.NAV_RECOVERY_DURATION_TICKS.get();
+                mob.getNavigation().stop();
+            }
+        }
+
+        resetProgressSample();
+    }
+
+    private void resetProgressSample() {
+        progressSampleX = mob.getX();
+        progressSampleZ = mob.getZ();
+        if (mob.level() instanceof ServerLevel level) {
+            progressSampleTick = level.getGameTime();
+        } else {
+            progressSampleTick = Long.MIN_VALUE;
+        }
     }
 
     private static boolean validTarget(Player player) {
