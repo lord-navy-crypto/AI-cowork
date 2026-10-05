@@ -10,6 +10,9 @@ public final class SwarmAgentState {
     private int neighborCount;
     private int formationSlot;
     private SwarmRole role = SwarmRole.CHASER;
+    private boolean hasDestination;
+    private double destinationX;
+    private double destinationZ;
 
     public UUID targetId() {
         return targetId;
@@ -39,6 +42,18 @@ public final class SwarmAgentState {
         return role;
     }
 
+    public boolean hasDestination() {
+        return hasDestination;
+    }
+
+    public double destinationX() {
+        return destinationX;
+    }
+
+    public double destinationZ() {
+        return destinationZ;
+    }
+
     public void rememberTarget(UUID targetId, long gameTick, boolean directObservation) {
         this.targetId = targetId;
         this.lastTargetObservationTick = gameTick;
@@ -48,6 +63,7 @@ public final class SwarmAgentState {
     public void forgetTarget() {
         this.targetId = null;
         this.directObservation = false;
+        this.hasDestination = false;
     }
 
     public void scheduleNextPlan(long gameTick, int intervalTicks, int entityId) {
@@ -56,9 +72,25 @@ public final class SwarmAgentState {
         this.nextPlanTick = gameTick + interval + stagger;
     }
 
-    public void updateLocalPlan(int neighborCount, int formationSlot, SwarmRole role) {
+    public void clearLocalPlan(int neighborCount) {
+        this.neighborCount = neighborCount;
+        this.formationSlot = 0;
+        this.role = SwarmRole.CHASER;
+        this.hasDestination = false;
+    }
+
+    public void updateLocalPlan(
+            int neighborCount,
+            int formationSlot,
+            SwarmRole role,
+            double destinationX,
+            double destinationZ
+    ) {
         this.neighborCount = neighborCount;
         this.formationSlot = formationSlot;
         this.role = role;
+        this.destinationX = destinationX;
+        this.destinationZ = destinationZ;
+        this.hasDestination = true;
     }
 }
