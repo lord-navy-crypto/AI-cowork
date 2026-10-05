@@ -109,3 +109,29 @@ while still allowing same-capability agents to occupy distinct lanes.
 
 The behavior is covered by deterministic unit tests and the full Minecraft runtime
 regression suite remains enabled on this branch.
+
+
+## v0.3.3 — composition-aware responsibility
+
+Mixed teams now react to the local capability composition instead of treating each
+archetype in isolation.
+
+When at least two dedicated FLANKER agents are present in the local neighborhood:
+
+~~~text
+Spider flank coverage present
+            ↓
+Zombie ASSAULT agents
+            ↓
+stop competing for FLANK_LEFT / FLANK_RIGHT
+            ↓
+focus on CHASER / REAR_PRESSURE
+~~~
+
+This reduces duplicated responsibilities and lets heterogeneous teams gain a real
+coordination benefit from specialization.
+
+The decision remains decentralized: each agent uses only its local neighbor set.
+
+A runtime GameTest verifies that one Zombie accompanied by two Spider flankers gives
+up flank duty while both Spiders retain flank roles.
