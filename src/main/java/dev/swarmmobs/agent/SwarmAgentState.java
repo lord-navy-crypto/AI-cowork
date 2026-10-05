@@ -6,6 +6,7 @@ public final class SwarmAgentState {
     private UUID targetId;
     private long lastTargetObservationTick = Long.MIN_VALUE;
     private long nextPlanTick;
+    private boolean planningScheduleInitialized;
     private boolean directObservation;
     private int neighborCount;
     private int formationSlot;
@@ -26,6 +27,10 @@ public final class SwarmAgentState {
 
     public long nextPlanTick() {
         return nextPlanTick;
+    }
+
+    public boolean planningScheduleInitialized() {
+        return planningScheduleInitialized;
     }
 
     public boolean directObservation() {
@@ -76,10 +81,17 @@ public final class SwarmAgentState {
         this.hasDestination = false;
     }
 
-    public void scheduleNextPlan(long gameTick, int intervalTicks, int entityId) {
+    public void initializePlanSchedule(long gameTick, int intervalTicks, int entityId) {
         int interval = Math.max(1, intervalTicks);
         int stagger = Math.floorMod(entityId, interval);
-        this.nextPlanTick = gameTick + interval + stagger;
+        this.nextPlanTick = gameTick + stagger;
+        this.planningScheduleInitialized = true;
+    }
+
+    public void scheduleNextPlan(long gameTick, int intervalTicks) {
+        int interval = Math.max(1, intervalTicks);
+        this.nextPlanTick = gameTick + interval;
+        this.planningScheduleInitialized = true;
     }
 
     public void clearLocalPlan(int neighborCount) {
