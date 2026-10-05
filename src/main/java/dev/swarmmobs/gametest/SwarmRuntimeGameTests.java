@@ -111,6 +111,10 @@ public final class SwarmRuntimeGameTests {
         var player = helper.makeMockPlayer(GameType.SURVIVAL);
         Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        if (!helper.getLevel().addFreshEntity(player)) {
+            helper.fail("Mock player could not be inserted into the GameTest ServerLevel");
+            return;
+        }
 
         helper.runAfterDelay(12, () -> {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
