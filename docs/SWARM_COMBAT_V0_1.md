@@ -23,12 +23,14 @@ formation destination
         ↓
 separation + cohesion correction
         ↓
+SwarmApproachGoal owns MOVE while outside release radius
+        ↓
 vanilla PathNavigation
         ↓
-vanilla close-range combat behavior
+inside release radius → vanilla close-range combat behavior
 ```
 
-The swarm layer does not replace Minecraft's final attack behavior. It modifies target sharing and approach geometry.
+The swarm layer does not replace Minecraft's final attack behavior. A dedicated `SwarmApproachGoal` temporarily owns the MOVE channel while an agent is outside `releaseToVanillaDistance`; once inside that radius, the goal yields and vanilla melee behavior takes over.
 
 ## Local information model
 
@@ -42,6 +44,7 @@ The state currently contains:
 - local neighbor count;
 - deterministic formation slot;
 - current role;
+- current planned destination;
 - next planning tick.
 
 The attachment is intentionally transient in v0.1. Restarting the world resets swarm memory.
@@ -159,9 +162,34 @@ The first milestone is considered successful when:
 
 - Only vanilla zombies are swarm-enabled.
 - Neighbor discovery currently queries nearby entities directly; a spatial hash will replace this for larger swarms.
-- Vanilla zombie goals can still influence navigation between swarm planning updates.
+- Swarm movement currently uses one high-priority MOVE goal; richer arbitration with flee/sun/terrain behaviors is still future work.
 - There is no packet-loss, latency, or communication graph yet.
 - There is no client debug overlay yet.
 - There is no learned policy, RL, MARL, or LLM controller.
 
 These are intentional limits for the first testable version.
+
+
+## Debug commands
+
+The development branch exposes three commands:
+
+```text
+/swarmmobs status
+/swarmmobs inspect
+/swarmmobs debug spawn <2..32>
+```
+
+For a real targeting test, run the spawn command while the player is in Survival or Adventure mode. The command creates a ring of vanilla zombies around the player. The event layer then assigns target memory, formation slots, roles, and planned destinations.
+
+`/swarmmobs inspect` reports the nearest zombie's role, slot, neighbor count, target UUID, target age, and whether the latest target source was a direct observation.
+
+## Automated verification
+
+The v0.1 branch now separates testing into three layers:
+
+1. **planner unit tests** — vector behavior, slot stability, role mapping;
+2. **target relay tests** — freshness, expiry, timestamp preservation;
+3. **multi-agent simulation tests** — eight deterministic agents populate all four roles and produce a distributed formation.
+
+A real GameTest-world suite remains planned after the deterministic baseline stabilizes.
