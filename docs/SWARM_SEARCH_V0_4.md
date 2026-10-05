@@ -98,3 +98,24 @@ A Minecraft Runtime GameTest:
    - receives a destination offset from the stale target center.
 
 The design stays deterministic and does not use Ollama or any external AI.
+
+
+## v0.5.1 — behavior-aware search coverage speed
+
+SEARCH radius expands as target confidence falls. Movement now uses a dedicated
+`searchSpeedFactor` instead of inheriting the stale-target slowdown used by ENGAGE.
+
+Default:
+
+~~~text
+searchSpeedFactor = 1.0
+~~~
+
+This keeps two policies separate:
+
+- ENGAGE: stale target information can reduce pursuit speed;
+- SEARCH: uncertainty expands the area to cover, so agents keep a stable configurable
+  coverage speed rather than slowing simply because the observation is old.
+
+The behavior is implemented through a deterministic `SwarmMovementPolicy` and covered
+by unit tests for ENGAGE decay, SEARCH independence, and input clamping.

@@ -44,17 +44,19 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active branch: `swarm-combat-v0.1`
+Active stable line: `main` through v0.5; current integration work: `swarm-search-speed-v0.5.1`
 
-The first playable milestone is now under implementation:
+The current playable system includes:
 
-- vanilla zombies become transient swarm agents through NeoForge Data Attachments;
-- nearby agents exchange explicit target messages through a configurable communication layer;
-- deterministic local slot allocation assigns CHASER / FLANK_LEFT / FLANK_RIGHT / REAR_PRESSURE roles without a central coordinator;
-- separation and cohesion modify the formation destination;
-- communication range, latency, deterministic packet loss, and an experiment seed are exposed as server config parameters;
-- `SwarmApproachGoal` owns movement outside melee range and yields back to vanilla combat nearby;
-- external AI remains reserved and disabled.
+- heterogeneous Zombie / Skeleton / Spider swarm agents with capability-aware tactical roles;
+- local separation, cohesion, alignment, steering caps, and formation-slot hysteresis;
+- explicit neighbor-to-neighbor target communication with configurable radius, latency, deterministic packet loss, and experiment seeds;
+- truthful last-known target snapshots with confidence decay instead of hidden live tracking;
+- decentralized ENGAGE → SEARCH transitions and rotating capability-banded search sectors as uncertainty grows;
+- bounded observed-motion prediction during ENGAGE, with prediction cleared during SEARCH;
+- behavior-aware movement: stale ENGAGE information can slow pursuit while SEARCH keeps an independent configurable coverage speed;
+- runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
+- external AI remains reserved and disabled while deterministic baselines are developed.
 
 Development commands:
 
@@ -72,6 +74,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Combat alpha v0.1 in active development.**
+**Swarm Mobs v0.5 is merged on `main`; v0.5.1 search-coverage movement tuning is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.
