@@ -16,12 +16,15 @@ public final class SwarmAgentProfiles {
     }
 
     public static boolean isSupportedType(EntityType<?> type) {
-        return type == EntityType.ZOMBIE || type == EntityType.SKELETON;
+        return type == EntityType.ZOMBIE || type == EntityType.SKELETON || type == EntityType.SPIDER;
     }
 
     public static SwarmAgentProfile profile(PathfinderMob mob) {
         if (mob.getType() == EntityType.SKELETON) {
             return SwarmAgentProfile.rangedSupport();
+        }
+        if (mob.getType() == EntityType.SPIDER) {
+            return SwarmAgentProfile.flanker();
         }
         return SwarmAgentProfile.assault();
     }
