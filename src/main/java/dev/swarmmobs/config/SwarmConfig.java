@@ -39,6 +39,8 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NAV_OBSTACLE_AVOIDANCE_ENABLED;
     public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_LOOKAHEAD;
     public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_LATERAL_DISTANCE;
+    public static final ModConfigSpec.IntValue NAV_OBSTACLE_HOLD_TICKS;
+    public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_ARRIVAL_TOLERANCE;
 
     public static final ModConfigSpec.BooleanValue COMMUNICATION_ENABLED;
     public static final ModConfigSpec.DoubleValue COMMUNICATION_RADIUS;
@@ -188,6 +190,14 @@ public final class SwarmConfig {
         NAV_OBSTACLE_LATERAL_DISTANCE = BUILDER
                 .comment("Side probe and detour distance, in blocks, for local obstacle avoidance.")
                 .defineInRange("navObstacleLateralDistance", 1.5, 0.5, 4.0);
+
+        NAV_OBSTACLE_HOLD_TICKS = BUILDER
+                .comment("Minimum time an obstacle detour is held to avoid left/right oscillation near obstacle edges.")
+                .defineInRange("navObstacleHoldTicks", 12, 0, 100);
+
+        NAV_OBSTACLE_ARRIVAL_TOLERANCE = BUILDER
+                .comment("Distance from a temporary obstacle-detour waypoint that releases the detour early.")
+                .defineInRange("navObstacleArrivalTolerance", 0.6, 0.1, 2.0);
 
         BUILDER.pop();
 

@@ -8,6 +8,7 @@ import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
+import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.config.SwarmConfig;
@@ -36,6 +37,10 @@ public final class SwarmApproachGoal extends Goal {
     private double recoveryX;
     private double recoveryZ;
     private long recoveryUntilTick = Long.MIN_VALUE;
+    private boolean obstacleDetourActive;
+    private double obstacleDetourX;
+    private double obstacleDetourZ;
+    private long obstacleDetourUntilTick = Long.MIN_VALUE;
 
     public SwarmApproachGoal(PathfinderMob mob) {
         this.mob = mob;
@@ -118,6 +123,8 @@ public final class SwarmApproachGoal extends Goal {
         mob.getNavigation().stop();
         recoveryActive = false;
         recoveryUntilTick = Long.MIN_VALUE;
+        obstacleDetourActive = false;
+        obstacleDetourUntilTick = Long.MIN_VALUE;
         progressSampleTick = Long.MIN_VALUE;
     }
 
@@ -159,17 +166,45 @@ public final class SwarmApproachGoal extends Goal {
         double navigationX = recoveryActive ? recoveryX : state.destinationX();
         double navigationZ = recoveryActive ? recoveryZ : state.destinationZ();
 
-        if (!recoveryActive
-                && SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()
-                && mob.level() instanceof ServerLevel level) {
-            var avoidance = localObstacleAvoidance(
-                    level,
-                    new Vec2(mob.getX(), mob.getZ()),
-                    new Vec2(navigationX, navigationZ)
-            );
-            if (avoidance.active()) {
-                navigationX = avoidance.waypoint().x();
-                navigationZ = avoidance.waypoint().z();
+        if (!recoveryActive && mob.level() instanceof ServerLevel level) {
+            long gameTick = level.getGameTime();
+
+            if (obstacleDetourActive) {
+                double detourDistance = Math.hypot(
+                        obstacleDetourX - mob.getX(),
+                        obstacleDetourZ - mob.getZ()
+                );
+
+                obstacleDetourActive = SwarmObstacleHoldPolicy.shouldKeepDetour(
+                        gameTick,
+                        obstacleDetourUntilTick,
+                        detourDistance,
+                        SwarmConfig.NAV_OBSTACLE_ARRIVAL_TOLERANCE.get()
+                );
+
+                if (obstacleDetourActive) {
+                    navigationX = obstacleDetourX;
+                    navigationZ = obstacleDetourZ;
+                }
+            }
+
+            if (!obstacleDetourActive && SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()) {
+                var avoidance = localObstacleAvoidance(
+                        level,
+                        new Vec2(mob.getX(), mob.getZ()),
+                        new Vec2(state.destinationX(), state.destinationZ())
+                );
+                if (avoidance.active()) {
+                    obstacleDetourActive = true;
+                    obstacleDetourX = avoidance.waypoint().x();
+                    obstacleDetourZ = avoidance.waypoint().z();
+                    obstacleDetourUntilTick = SwarmObstacleHoldPolicy.holdUntil(
+                            gameTick,
+                            SwarmConfig.NAV_OBSTACLE_HOLD_TICKS.get()
+                    );
+                    navigationX = obstacleDetourX;
+                    navigationZ = obstacleDetourZ;
+                }
             }
         }
 
@@ -281,6 +316,8 @@ public final class SwarmApproachGoal extends Goal {
             );
 
             if (recovery.active()) {
+                obstacleDetourActive = false;
+                obstacleDetourUntilTick = Long.MIN_VALUE;
                 recoveryActive = true;
                 recoveryX = recovery.waypoint().x();
                 recoveryZ = recovery.waypoint().z();
