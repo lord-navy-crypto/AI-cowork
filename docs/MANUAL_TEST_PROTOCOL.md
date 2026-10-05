@@ -168,3 +168,88 @@ Disable with:
 ~~~
 /swarmmobs debug particles off
 ~~~
+
+## Test G — Communication baseline
+
+Restore the deterministic no-fault communication baseline:
+
+~~~
+/swarmmobs debug comm baseline
+~~~
+
+Expected status: communicationEnabled=true, latencyTicks=0, packetDropRate=0.0.
+
+Spawn or observe a partially occluded swarm and use /swarmmobs group and /swarmmobs inspect.
+
+The group telemetry now reports pendingMessages, commAccepted, commDelivered, and commDropped.
+
+With the baseline restored, relayed target information should propagate without artificial communication loss.
+
+## Test H — Fixed communication latency
+
+Set a one-second one-way delay:
+
+~~~
+/swarmmobs debug comm latency 20
+/swarmmobs debug comm drop 0
+~~~
+
+Expected behavior:
+
+- direct observers still react immediately to what they can see;
+- occluded agents should not receive a newly observed target before its message delivery time;
+- pendingMessages should temporarily rise;
+- commDelivered should increase only after messages become deliverable;
+- target information should retain the original observation tick rather than the later delivery tick.
+
+Return to zero latency with /swarmmobs debug comm latency 0.
+
+## Test I — Packet-loss sweep
+
+Keep latency at zero and sweep deterministic packet loss:
+
+~~~
+/swarmmobs debug comm drop 0
+/swarmmobs debug comm drop 0.10
+/swarmmobs debug comm drop 0.30
+/swarmmobs debug comm drop 0.60
+/swarmmobs debug comm drop 1.0
+~~~
+
+Use a fixed seed while comparing conditions:
+
+~~~
+/swarmmobs debug comm seed 42
+~~~
+
+For the same sender, receiver, message timing, target identity, and experiment seed, the loss decision is deterministic.
+
+Watch targetKnown, pendingMessages, commAccepted, commDelivered, and commDropped.
+
+At packetDropRate=1.0, no newly transmitted target message should be accepted through the communication channel.
+
+## Test J — Communication range / network partition
+
+Set a smaller communication radius:
+
+~~~
+/swarmmobs debug comm radius 4
+~~~
+
+Place agents so that some pairs are farther apart than the configured communication radius.
+
+Expected behavior:
+
+- movement-neighbor sensing and communication range are separate concepts;
+- agents outside communication range cannot directly exchange target messages;
+- the swarm can split into local information clusters even while some members remain part of the larger movement scene.
+
+Restore the current default experiment radius with /swarmmobs debug comm radius 16.
+
+## Communication experiment notes
+
+The live debug commands modify the active runtime config values. Use /swarmmobs status before recording an experiment condition.
+
+For reproducible comparisons, record at minimum: agent count, planIntervalTicks, communicationRadius, latencyTicks, packetDropRate, experimentSeed, targetMemoryTicks, and formationSlots.
+
+Then compare target propagation, message telemetry, and group behavior under the same world setup.
