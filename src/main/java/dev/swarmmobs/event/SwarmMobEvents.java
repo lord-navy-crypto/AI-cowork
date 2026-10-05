@@ -85,7 +85,9 @@ public final class SwarmMobEvents {
                 plan.formationSlot(),
                 plan.role(),
                 plan.destination().x(),
-                plan.destination().z()
+                plan.destination().z(),
+                plan.separationMagnitude(),
+                plan.cohesionMagnitude()
         );
 
         // Shared target selection is the cooperation layer. Vanilla melee behavior remains
