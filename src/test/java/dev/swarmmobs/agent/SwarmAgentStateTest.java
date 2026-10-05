@@ -1,6 +1,7 @@
 package dev.swarmmobs.agent;
 
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
+import dev.swarmmobs.algorithm.TargetObservation;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -79,7 +80,7 @@ class SwarmAgentStateTest {
         UUID target = UUID.randomUUID();
 
         assertTrue(state.enqueueTargetMessage(
-                new TargetMessage(sender, target, 50L, 60L, 70L)
+                new TargetMessage(sender, observation(target, 50L), 60L, 70L)
         ));
 
         assertTrue(state.drainDeliverableTargetMessages(69L).isEmpty());
@@ -99,8 +100,8 @@ class SwarmAgentStateTest {
         UUID sender = UUID.randomUUID();
         UUID target = UUID.randomUUID();
 
-        TargetMessage first = new TargetMessage(sender, target, 10L, 20L, 25L);
-        TargetMessage duplicate = new TargetMessage(sender, target, 10L, 21L, 26L);
+        TargetMessage first = new TargetMessage(sender, observation(target, 10L), 20L, 25L);
+        TargetMessage duplicate = new TargetMessage(sender, observation(target, 10L), 21L, 26L);
 
         assertTrue(state.enqueueTargetMessage(first));
         assertFalse(state.enqueueTargetMessage(duplicate));
@@ -113,11 +114,11 @@ class SwarmAgentStateTest {
         UUID sender = UUID.randomUUID();
         UUID target = UUID.randomUUID();
 
-        TargetMessage first = new TargetMessage(sender, target, 40L, 50L, 55L);
+        TargetMessage first = new TargetMessage(sender, observation(target, 40L), 50L, 55L);
         assertTrue(state.enqueueTargetMessage(first));
         assertEquals(1, state.drainDeliverableTargetMessages(55L).size());
 
-        TargetMessage rebroadcast = new TargetMessage(sender, target, 40L, 60L, 65L);
+        TargetMessage rebroadcast = new TargetMessage(sender, observation(target, 40L), 60L, 65L);
         assertFalse(state.enqueueTargetMessage(rebroadcast));
         assertEquals(0, state.pendingTargetMessageCount());
         assertEquals(1L, state.communicationAcceptedMessages());
@@ -131,14 +132,28 @@ class SwarmAgentStateTest {
         UUID target = UUID.randomUUID();
 
         assertTrue(state.enqueueTargetMessage(
-                new TargetMessage(sender, target, 40L, 50L, 55L)
+                new TargetMessage(sender, observation(target, 40L), 50L, 55L)
         ));
         state.drainDeliverableTargetMessages(55L);
 
         assertTrue(state.enqueueTargetMessage(
-                new TargetMessage(sender, target, 46L, 60L, 65L)
+                new TargetMessage(sender, observation(target, 46L), 60L, 65L)
         ));
         assertEquals(1, state.pendingTargetMessageCount());
     }
 
+    @Test
+    void targetConfidenceDecaysWithObservationAge() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID target = UUID.randomUUID();
+        state.rememberTarget(observation(target, 100L), false);
+
+        assertEquals(1.0, state.targetConfidence(100L, 100), 1.0e-9);
+        assertEquals(0.5, state.targetConfidence(150L, 100), 1.0e-9);
+        assertEquals(0.0, state.targetConfidence(200L, 100), 1.0e-9);
+    }
+
+    private static TargetObservation observation(UUID target, long tick) {
+        return new TargetObservation(target, tick, 4.0, 64.0, 8.0, 0.0, 1.0);
+    }
 }
