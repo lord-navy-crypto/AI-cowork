@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.5.1; current integration work: `swarm-navigation-recovery-v0.5.2`
+Active stable line: `main` through v0.5.2; current integration work: `swarm-obstacle-probe-v0.5.3`
 
 The current playable system includes:
 
@@ -56,6 +56,7 @@ The current playable system includes:
 - bounded observed-motion prediction during ENGAGE, with prediction cleared during SEARCH;
 - behavior-aware movement: stale ENGAGE information can slow pursuit while SEARCH keeps an independent configurable coverage speed;
 - local stuck detection with deterministic left/right recovery waypoints for blocked navigation in complex terrain;
+- short-range terrain probes that preemptively steer around immediate obstacles before a full stall occurs;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -75,6 +76,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.5.1 is merged on `main`; v0.5.2 navigation recovery is under integration.**
+**Swarm Mobs v0.5.2 is merged on `main`; v0.5.3 obstacle-aware local steering is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.

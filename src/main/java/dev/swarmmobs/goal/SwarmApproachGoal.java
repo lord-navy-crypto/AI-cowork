@@ -7,10 +7,12 @@ import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
+import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -157,12 +159,76 @@ public final class SwarmApproachGoal extends Goal {
         double navigationX = recoveryActive ? recoveryX : state.destinationX();
         double navigationZ = recoveryActive ? recoveryZ : state.destinationZ();
 
+        if (!recoveryActive
+                && SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()
+                && mob.level() instanceof ServerLevel level) {
+            var avoidance = localObstacleAvoidance(
+                    level,
+                    new Vec2(mob.getX(), mob.getZ()),
+                    new Vec2(navigationX, navigationZ)
+            );
+            if (avoidance.active()) {
+                navigationX = avoidance.waypoint().x();
+                navigationZ = avoidance.waypoint().z();
+            }
+        }
+
         mob.getNavigation().moveTo(
                 navigationX,
                 targetY,
                 navigationZ,
                 speed
         );
+    }
+
+    private SwarmObstacleAvoidancePolicy.Avoidance localObstacleAvoidance(
+            ServerLevel level,
+            Vec2 self,
+            Vec2 destination
+    ) {
+        Vec2 toTarget = destination.subtract(self);
+        double distance = toTarget.length();
+        if (distance < 1.0e-9) {
+            return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
+        }
+
+        double lookahead = SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.get();
+        double lateralDistance = SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.get();
+        Vec2 forward = toTarget.scale(1.0 / distance);
+        Vec2 left = new Vec2(-forward.z(), forward.x());
+
+        Vec2 frontProbe = self.add(forward.scale(Math.min(distance, lookahead)));
+        Vec2 leftProbe = frontProbe.add(left.scale(lateralDistance));
+        Vec2 rightProbe = frontProbe.add(left.scale(-lateralDistance));
+
+        boolean frontBlocked = isTerrainBlocked(level, frontProbe.x(), frontProbe.z());
+        boolean leftBlocked = isTerrainBlocked(level, leftProbe.x(), leftProbe.z());
+        boolean rightBlocked = isTerrainBlocked(level, rightProbe.x(), rightProbe.z());
+
+        return SwarmObstacleAvoidancePolicy.chooseWaypoint(
+                self,
+                destination,
+                mob.getId(),
+                frontBlocked,
+                leftBlocked,
+                rightBlocked,
+                lookahead,
+                lateralDistance
+        );
+    }
+
+    private boolean isTerrainBlocked(ServerLevel level, double x, double z) {
+        int minY = (int) Math.floor(mob.getY());
+        int maxY = Math.max(minY, (int) Math.floor(mob.getY() + mob.getBbHeight() - 0.01));
+
+        for (int y = minY; y <= maxY; y++) {
+            BlockPos pos = BlockPos.containing(x, y, z);
+            if (!level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void updateRecoveryState() {
