@@ -38,4 +38,37 @@ class SwarmAgentStateTest {
         assertFalse(state.hasDestination());
         assertFalse(state.directObservation());
     }
+    @Test
+    void initialPlanningStaggerDoesNotChangeSteadyStatePeriod() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        state.initializePlanSchedule(100L, 6, 8); // floorMod(8, 6) = 2
+        assertTrue(state.planningScheduleInitialized());
+        assertEquals(102L, state.nextPlanTick());
+
+        state.scheduleNextPlan(102L, 6);
+        assertEquals(108L, state.nextPlanTick());
+
+        state.scheduleNextPlan(108L, 6);
+        assertEquals(114L, state.nextPlanTick());
+    }
+
+    @Test
+    void differentEntityIdsOnlyChangeInitialPhase() {
+        SwarmAgentState first = new SwarmAgentState();
+        SwarmAgentState second = new SwarmAgentState();
+
+        first.initializePlanSchedule(200L, 6, 1);
+        second.initializePlanSchedule(200L, 6, 4);
+
+        assertEquals(201L, first.nextPlanTick());
+        assertEquals(204L, second.nextPlanTick());
+
+        first.scheduleNextPlan(first.nextPlanTick(), 6);
+        second.scheduleNextPlan(second.nextPlanTick(), 6);
+
+        assertEquals(207L, first.nextPlanTick());
+        assertEquals(210L, second.nextPlanTick());
+        assertEquals(3L, second.nextPlanTick() - first.nextPlanTick());
+    }
 }
