@@ -47,12 +47,17 @@ public final class SwarmMobEvents {
 
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
         long gameTick = level.getGameTime();
+        int interval = SwarmConfig.PLAN_INTERVAL_TICKS.get();
+
+        if (!state.planningScheduleInitialized()) {
+            state.initializePlanSchedule(gameTick, interval, zombie.getId());
+        }
+
         if (gameTick < state.nextPlanTick()) {
             return;
         }
 
-        int interval = SwarmConfig.PLAN_INTERVAL_TICKS.get();
-        state.scheduleNextPlan(gameTick, interval, zombie.getId());
+        state.scheduleNextPlan(gameTick, interval);
 
         List<Zombie> neighbors = findNeighbors(level, zombie);
         Player target = findTarget(level, zombie, neighbors, state, gameTick);
