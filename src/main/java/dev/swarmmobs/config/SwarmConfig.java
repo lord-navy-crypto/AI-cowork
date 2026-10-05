@@ -25,6 +25,10 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue SEARCH_MAX_RADIUS;
     public static final ModConfigSpec.IntValue SEARCH_PHASE_TICKS;
     public static final ModConfigSpec.DoubleValue SEARCH_ARRIVAL_TOLERANCE;
+    public static final ModConfigSpec.BooleanValue TARGET_PREDICTION_ENABLED;
+    public static final ModConfigSpec.IntValue TARGET_PREDICTION_LEAD_TICKS;
+    public static final ModConfigSpec.IntValue TARGET_PREDICTION_MAX_TICKS;
+    public static final ModConfigSpec.DoubleValue TARGET_PREDICTION_MAX_DISTANCE;
     public static final ModConfigSpec.DoubleValue MOVE_SPEED;
     public static final ModConfigSpec.DoubleValue RELEASE_TO_VANILLA_DISTANCE;
 
@@ -120,6 +124,22 @@ public final class SwarmConfig {
         SEARCH_ARRIVAL_TOLERANCE = BUILDER
                 .comment("Distance from a search destination at which the swarm movement goal yields.")
                 .defineInRange("searchArrivalTolerance", 1.25, 0.5, 4.0);
+
+        TARGET_PREDICTION_ENABLED = BUILDER
+                .comment("Enable conservative short-horizon prediction from observed target velocity.")
+                .define("targetPredictionEnabled", true);
+
+        TARGET_PREDICTION_LEAD_TICKS = BUILDER
+                .comment("Short lead horizon added to a fresh observation before confidence scaling.")
+                .defineInRange("targetPredictionLeadTicks", 6, 0, 20);
+
+        TARGET_PREDICTION_MAX_TICKS = BUILDER
+                .comment("Hard upper bound on total prediction horizon.")
+                .defineInRange("targetPredictionMaxTicks", 12, 0, 40);
+
+        TARGET_PREDICTION_MAX_DISTANCE = BUILDER
+                .comment("Hard upper bound, in blocks, on predicted position offset.")
+                .defineInRange("targetPredictionMaxDistance", 3.5, 0.0, 12.0);
 
         MOVE_SPEED = BUILDER
                 .comment("Navigation speed multiplier used for swarm repositioning.")
