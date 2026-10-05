@@ -36,5 +36,13 @@ public final class SwarmAgentProfiles {
         return SwarmTacticalRolePolicy.roleFor(archetype, stableSlot);
     }
 
+    public static SwarmRole tacticalRole(
+            SwarmAgentArchetype archetype,
+            int stableSlot,
+            SwarmLocalComposition composition
+    ) {
+        return SwarmTacticalRolePolicy.roleFor(archetype, stableSlot, composition);
+    }
+
     private SwarmAgentProfiles() {}
 }
