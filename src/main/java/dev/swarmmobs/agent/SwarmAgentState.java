@@ -26,6 +26,10 @@ public final class SwarmAgentState {
     private SwarmRole role = SwarmRole.CHASER;
     private SwarmBehaviorMode behaviorMode = SwarmBehaviorMode.ENGAGE;
     private double searchRadius;
+    private boolean hasPrediction;
+    private double predictedTargetX;
+    private double predictedTargetZ;
+    private double predictionOffset;
     private boolean hasDestination;
     private double destinationX;
     private double destinationZ;
@@ -99,6 +103,22 @@ public final class SwarmAgentState {
 
     public double searchRadius() {
         return searchRadius;
+    }
+
+    public boolean hasPrediction() {
+        return hasPrediction;
+    }
+
+    public double predictedTargetX() {
+        return predictedTargetX;
+    }
+
+    public double predictedTargetZ() {
+        return predictedTargetZ;
+    }
+
+    public double predictionOffset() {
+        return predictionOffset;
     }
 
     public boolean hasDestination() {
@@ -232,6 +252,7 @@ public final class SwarmAgentState {
         this.directObservation = false;
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
         this.searchRadius = 0.0;
+        clearPredictionTelemetry();
         this.hasDestination = false;
     }
 
@@ -299,10 +320,30 @@ public final class SwarmAgentState {
         this.hasDestination = false;
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
         this.searchRadius = 0.0;
+        clearPredictionTelemetry();
         this.separationMagnitude = 0.0;
         this.cohesionMagnitude = 0.0;
         this.alignmentMagnitude = 0.0;
         this.steeringMagnitude = 0.0;
+    }
+
+    public void updatePredictionTelemetry(
+            double predictedTargetX,
+            double predictedTargetZ,
+            double predictionOffset
+    ) {
+        this.predictedTargetX = predictedTargetX;
+        this.predictedTargetZ = predictedTargetZ;
+        this.predictionOffset = Math.max(0.0, predictionOffset);
+        this.hasPrediction = Double.isFinite(predictedTargetX)
+                && Double.isFinite(predictedTargetZ);
+    }
+
+    public void clearPredictionTelemetry() {
+        this.hasPrediction = false;
+        this.predictedTargetX = 0.0;
+        this.predictedTargetZ = 0.0;
+        this.predictionOffset = 0.0;
     }
 
     private record MessageSourceTargetKey(UUID senderId, UUID targetId) {}
