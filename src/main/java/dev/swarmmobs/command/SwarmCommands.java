@@ -123,7 +123,7 @@ public final class SwarmCommands {
                                 + ", packetDropRate=" + SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.get()
                                 + ", experimentSeed=" + SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.get()
                                 + ", debugParticles=" + SwarmDebugState.particlesEnabled()
-                                + ", heterogeneousAgents=ZOMBIE+SKELETON"
+                                + ", heterogeneousAgents=ZOMBIE+SKELETON+SPIDER"
                                 + ", externalAI=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
                 ),
                 false
@@ -413,10 +413,10 @@ public final class SwarmCommands {
             double z = player.getZ() + Math.sin(angle) * radius;
 
             PathfinderMob agent;
-            if (i % 2 == 0) {
-                agent = EntityType.ZOMBIE.create(level);
-            } else {
-                agent = EntityType.SKELETON.create(level);
+            switch (i % 3) {
+                case 0 -> agent = EntityType.ZOMBIE.create(level);
+                case 1 -> agent = EntityType.SKELETON.create(level);
+                default -> agent = EntityType.SPIDER.create(level);
             }
 
             if (agent == null) {
@@ -432,7 +432,7 @@ public final class SwarmCommands {
         source.sendSuccess(
                 () -> Component.literal(
                         "Spawned " + finalSpawned
-                                + " mixed swarm agents (Zombie assault + Skeleton ranged support)."
+                                + " mixed swarm agents (Zombie assault + Skeleton ranged support + Spider flankers)."
                                 + " Use /swarmmobs group to inspect cooperation."
                 ),
                 true
