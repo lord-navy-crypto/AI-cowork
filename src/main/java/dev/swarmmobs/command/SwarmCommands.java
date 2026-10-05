@@ -122,6 +122,7 @@ public final class SwarmCommands {
                                 + ", searchMinRadius=" + SwarmConfig.SEARCH_MIN_RADIUS.get()
                                 + ", searchMaxRadius=" + SwarmConfig.SEARCH_MAX_RADIUS.get()
                                 + ", searchPhaseTicks=" + SwarmConfig.SEARCH_PHASE_TICKS.get()
+                                + ", searchSpeedFactor=" + SwarmConfig.SEARCH_SPEED_FACTOR.get()
                                 + ", targetPredictionEnabled=" + SwarmConfig.TARGET_PREDICTION_ENABLED.get()
                                 + ", targetPredictionLeadTicks=" + SwarmConfig.TARGET_PREDICTION_LEAD_TICKS.get()
                                 + ", targetPredictionMaxTicks=" + SwarmConfig.TARGET_PREDICTION_MAX_TICKS.get()
