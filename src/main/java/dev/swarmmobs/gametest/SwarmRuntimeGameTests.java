@@ -276,6 +276,7 @@ public final class SwarmRuntimeGameTests {
         Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
+        double initialObservedX = playerPosition.x;
 
         helper.runAfterDelay(15, () -> {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
@@ -290,6 +291,22 @@ public final class SwarmRuntimeGameTests {
 
             if (zombie.hasLineOfSight(player)) {
                 helper.fail("Occlusion wall did not break direct line of sight");
+                return;
+            }
+
+            player.setPos(player.getX() + 2.0, player.getY(), player.getZ());
+        });
+
+        helper.runAfterDelay(35, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (state.targetObservation() == null || !state.targetObservation().hasFinitePosition()) {
+                helper.fail("Occluded zombie lost its last-known target snapshot too early");
+                return;
+            }
+
+            if (Math.abs(state.targetObservation().x() - initialObservedX) > 0.25) {
+                helper.fail("Occluded target snapshot followed the player's live position");
             }
         });
 
