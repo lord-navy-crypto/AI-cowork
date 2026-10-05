@@ -59,17 +59,26 @@ public final class SwarmCombatPlanner {
         if (forward.length() < EPS) {
             forward = new Vec2(0.0, 1.0);
         }
-        Vec2 right = new Vec2(-forward.z(), forward.x());
+        // In the X/Z plane this vector points to the target's local right.
+        Vec2 right = new Vec2(forward.z(), -forward.x());
 
-        Vec2 base;
-        if (role == SwarmRole.CHASER) {
-            base = target;
-        } else {
-            double angle = (Math.PI * 2.0 * slot) / slots;
-            Vec2 ringOffset = right.scale(Math.cos(angle) * formationRadius)
-                    .add(forward.scale(Math.sin(angle) * formationRadius));
-            base = target.add(ringOffset);
-        }
+        int lane = slot / 4;
+        int laneCount = (slots + 3) / 4;
+        double laneSpacing = Math.min(2.0, Math.max(0.75, formationRadius * 0.35));
+        double laneOffset = (lane - (laneCount - 1) / 2.0) * laneSpacing;
+
+        Vec2 base = switch (role) {
+            case CHASER -> target.add(right.scale(laneOffset));
+            case FLANK_LEFT -> target
+                    .add(right.scale(-formationRadius))
+                    .add(forward.scale(laneOffset));
+            case FLANK_RIGHT -> target
+                    .add(right.scale(formationRadius))
+                    .add(forward.scale(laneOffset));
+            case REAR_PRESSURE -> target
+                    .add(forward.scale(-formationRadius))
+                    .add(right.scale(laneOffset));
+        };
 
         Vec2 separation = separation(self, neighbors, separationRadius);
         Vec2 cohesion = cohesion(self, neighbors);
