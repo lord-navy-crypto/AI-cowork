@@ -25,6 +25,8 @@ public final class SwarmAgentState {
     private double destinationZ;
     private double separationMagnitude;
     private double cohesionMagnitude;
+    private double alignmentMagnitude;
+    private double steeringMagnitude;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -95,6 +97,14 @@ public final class SwarmAgentState {
 
     public double cohesionMagnitude() {
         return cohesionMagnitude;
+    }
+
+    public double alignmentMagnitude() {
+        return alignmentMagnitude;
+    }
+
+    public double steeringMagnitude() {
+        return steeringMagnitude;
     }
 
     public int pendingTargetMessageCount() {
@@ -221,6 +231,8 @@ public final class SwarmAgentState {
         this.hasDestination = false;
         this.separationMagnitude = 0.0;
         this.cohesionMagnitude = 0.0;
+        this.alignmentMagnitude = 0.0;
+        this.steeringMagnitude = 0.0;
     }
 
     private record MessageSourceTargetKey(UUID senderId, UUID targetId) {}
@@ -234,6 +246,30 @@ public final class SwarmAgentState {
             double separationMagnitude,
             double cohesionMagnitude
     ) {
+        updateLocalPlan(
+                neighborCount,
+                formationSlot,
+                role,
+                destinationX,
+                destinationZ,
+                separationMagnitude,
+                cohesionMagnitude,
+                0.0,
+                Math.hypot(separationMagnitude, cohesionMagnitude)
+        );
+    }
+
+    public void updateLocalPlan(
+            int neighborCount,
+            int formationSlot,
+            SwarmRole role,
+            double destinationX,
+            double destinationZ,
+            double separationMagnitude,
+            double cohesionMagnitude,
+            double alignmentMagnitude,
+            double steeringMagnitude
+    ) {
         this.neighborCount = neighborCount;
         this.formationSlot = formationSlot;
         this.role = role;
@@ -241,6 +277,8 @@ public final class SwarmAgentState {
         this.destinationZ = destinationZ;
         this.separationMagnitude = separationMagnitude;
         this.cohesionMagnitude = cohesionMagnitude;
+        this.alignmentMagnitude = alignmentMagnitude;
+        this.steeringMagnitude = steeringMagnitude;
         this.hasDestination = true;
     }
 }
