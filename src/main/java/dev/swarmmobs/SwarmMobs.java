@@ -21,6 +21,7 @@ public final class SwarmMobs {
         SwarmAttachments.ATTACHMENT_TYPES.register(modBus);
         modContainer.registerConfig(ModConfig.Type.SERVER, SwarmConfig.SPEC);
 
+        NeoForge.EVENT_BUS.addListener(SwarmMobEvents::onEntityJoin);
         NeoForge.EVENT_BUS.addListener(SwarmMobEvents::onEntityTick);
         NeoForge.EVENT_BUS.addListener(SwarmCommands::onRegisterCommands);
 
