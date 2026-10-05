@@ -3,6 +3,7 @@ package dev.swarmmobs.event;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.FormationSlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
+import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy.TargetRecord;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
@@ -59,12 +60,21 @@ public final class SwarmMobEvents {
 
         state.scheduleNextPlan(gameTick, interval);
 
-        List<Zombie> neighbors = findNeighbors(level, zombie);
-        Player target = findTarget(level, zombie, neighbors, state, gameTick);
+        List<Zombie> movementNeighbors = findMovementNeighbors(level, zombie);
+        List<Zombie> communicationNeighbors = findCommunicationNeighbors(level, zombie);
+
+        receiveNeighborMessages(
+                zombie,
+                communicationNeighbors,
+                state,
+                gameTick
+        );
+
+        Player target = findTarget(level, zombie, state, gameTick);
 
         if (target == null) {
             state.forgetTarget();
-            state.clearLocalPlan(neighbors.size());
+            state.clearLocalPlan(movementNeighbors.size());
             if (zombie.getTarget() instanceof Player) {
                 zombie.setTarget(null);
             }
@@ -73,13 +83,13 @@ public final class SwarmMobEvents {
 
         int slots = SwarmConfig.FORMATION_SLOTS.get();
         Vec3 look = target.getLookAngle();
-        List<Vec2> neighborPositions = neighbors.stream()
+        List<Vec2> neighborPositions = movementNeighbors.stream()
                 .map(entity -> new Vec2(entity.getX(), entity.getZ()))
                 .toList();
 
         int assignedSlot = FormationSlotAllocator.allocate(
                 zombie.getUUID(),
-                neighbors.stream().map(Zombie::getUUID).toList(),
+                movementNeighbors.stream().map(Zombie::getUUID).toList(),
                 slots
         );
 
@@ -97,7 +107,7 @@ public final class SwarmMobEvents {
         );
 
         state.updateLocalPlan(
-                neighbors.size(),
+                movementNeighbors.size(),
                 plan.formationSlot(),
                 plan.role(),
                 plan.destination().x(),
@@ -113,12 +123,38 @@ public final class SwarmMobEvents {
         // Lightweight server-side visualization for development. This intentionally
         // uses vanilla particles so v0.1 needs no client renderer or extra dependency.
         if (gameTick % 10L == 0L) {
-            SwarmDebugParticles.render(level, zombie, neighbors);
+            SwarmDebugParticles.render(level, zombie, communicationNeighbors);
         }
     }
 
-    private static List<Zombie> findNeighbors(ServerLevel level, Zombie self) {
-        double radius = SwarmConfig.NEIGHBOR_RADIUS.get();
+    private static List<Zombie> findMovementNeighbors(ServerLevel level, Zombie self) {
+        return findNearbyPeers(
+                level,
+                self,
+                SwarmConfig.NEIGHBOR_RADIUS.get(),
+                SwarmConfig.MAX_NEIGHBORS.get()
+        );
+    }
+
+    private static List<Zombie> findCommunicationNeighbors(ServerLevel level, Zombie self) {
+        if (!SwarmConfig.COMMUNICATION_ENABLED.get()) {
+            return List.of();
+        }
+
+        return findNearbyPeers(
+                level,
+                self,
+                SwarmConfig.COMMUNICATION_RADIUS.get(),
+                SwarmConfig.MAX_NEIGHBORS.get()
+        );
+    }
+
+    private static List<Zombie> findNearbyPeers(
+            ServerLevel level,
+            Zombie self,
+            double radius,
+            int maxNeighbors
+    ) {
         List<Zombie> nearby = level.getEntitiesOfClass(
                 Zombie.class,
                 self.getBoundingBox().inflate(radius),
@@ -126,14 +162,67 @@ public final class SwarmMobEvents {
         );
 
         nearby.sort(Comparator.comparingDouble(self::distanceToSqr));
-        int limit = Math.min(SwarmConfig.MAX_NEIGHBORS.get(), nearby.size());
+        int limit = Math.min(Math.max(0, maxNeighbors), nearby.size());
         return new ArrayList<>(nearby.subList(0, limit));
+    }
+
+    private static void receiveNeighborMessages(
+            Zombie receiver,
+            List<Zombie> communicationNeighbors,
+            SwarmAgentState receiverState,
+            long gameTick
+    ) {
+        if (!SwarmConfig.COMMUNICATION_ENABLED.get()) {
+            receiverState.clearPendingTargetMessages();
+            return;
+        }
+
+        int memoryTicks = SwarmConfig.TARGET_MEMORY_TICKS.get();
+        int latencyTicks = SwarmConfig.COMMUNICATION_LATENCY_TICKS.get();
+        double dropRate = SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.get();
+        int experimentSeed = SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.get();
+
+        for (Zombie sender : communicationNeighbors) {
+            if (!SwarmCommunicationPolicy.withinRange(
+                    receiver.distanceToSqr(sender),
+                    SwarmConfig.COMMUNICATION_RADIUS.get()
+            )) {
+                continue;
+            }
+
+            SwarmAgentState senderState = sender.getData(SwarmAttachments.AGENT_STATE.get());
+            UUID targetId = senderState.targetId();
+            if (targetId == null) {
+                continue;
+            }
+
+            long age = gameTick - senderState.lastTargetObservationTick();
+            if (age < 0 || age > memoryTicks) {
+                continue;
+            }
+
+            var message = SwarmCommunicationPolicy.maybeTransmit(
+                    sender.getUUID(),
+                    receiver.getUUID(),
+                    targetId,
+                    senderState.lastTargetObservationTick(),
+                    gameTick,
+                    latencyTicks,
+                    dropRate,
+                    experimentSeed
+            );
+
+            if (message.isPresent()) {
+                receiverState.enqueueTargetMessage(message.get());
+            } else if (dropRate > 0.0) {
+                receiverState.recordCommunicationDrop();
+            }
+        }
     }
 
     private static Player findTarget(
             ServerLevel level,
             Zombie self,
-            List<Zombie> neighbors,
             SwarmAgentState state,
             long gameTick
     ) {
@@ -150,14 +239,11 @@ public final class SwarmMobEvents {
             records.add(new TargetRecord(state.targetId(), state.lastTargetObservationTick()));
         }
 
-        for (Zombie neighbor : neighbors) {
-            SwarmAgentState neighborState = neighbor.getData(SwarmAttachments.AGENT_STATE.get());
-            if (neighborState.targetId() != null) {
-                records.add(new TargetRecord(
-                        neighborState.targetId(),
-                        neighborState.lastTargetObservationTick()
-                ));
-            }
+        for (var message : state.drainDeliverableTargetMessages(gameTick)) {
+            records.add(new TargetRecord(
+                    message.targetId(),
+                    message.observationTick()
+            ));
         }
 
         var selected = TargetRelayPolicy.selectFreshest(gameTick, memoryTicks, records);
@@ -165,9 +251,8 @@ public final class SwarmMobEvents {
             TargetRecord record = selected.get();
             Player shared = resolvePlayer(level, record.targetId());
             if (shared != null) {
-                // Any non-LOS path is memory/relay, even when the freshest record is
-                // this agent's own previous observation. Preserve the source timestamp
-                // but update the telemetry source to indirect.
+                // Any non-LOS path is memory/relay. Message delivery preserves the
+                // original observation tick even when latency is non-zero.
                 state.rememberTarget(record.targetId(), record.observationTick(), false);
                 return shared;
             }
