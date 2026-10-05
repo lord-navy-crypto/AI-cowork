@@ -1,5 +1,6 @@
 package dev.swarmmobs.agent;
 
+import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -71,4 +72,39 @@ class SwarmAgentStateTest {
         assertEquals(210L, second.nextPlanTick());
         assertEquals(3L, second.nextPlanTick() - first.nextPlanTick());
     }
+    @Test
+    void delayedTargetMessagesStayQueuedUntilDeliveryTick() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID sender = UUID.randomUUID();
+        UUID target = UUID.randomUUID();
+
+        assertTrue(state.enqueueTargetMessage(
+                new TargetMessage(sender, target, 50L, 60L, 70L)
+        ));
+
+        assertTrue(state.drainDeliverableTargetMessages(69L).isEmpty());
+        assertEquals(1, state.pendingTargetMessageCount());
+
+        var delivered = state.drainDeliverableTargetMessages(70L);
+        assertEquals(1, delivered.size());
+        assertEquals(target, delivered.getFirst().targetId());
+        assertEquals(0, state.pendingTargetMessageCount());
+        assertEquals(1L, state.communicationAcceptedMessages());
+        assertEquals(1L, state.communicationDeliveredMessages());
+    }
+
+    @Test
+    void identicalObservationFromSameSenderIsDeduplicated() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID sender = UUID.randomUUID();
+        UUID target = UUID.randomUUID();
+
+        TargetMessage first = new TargetMessage(sender, target, 10L, 20L, 25L);
+        TargetMessage duplicate = new TargetMessage(sender, target, 10L, 21L, 26L);
+
+        assertTrue(state.enqueueTargetMessage(first));
+        assertFalse(state.enqueueTargetMessage(duplicate));
+        assertEquals(1, state.pendingTargetMessageCount());
+    }
+
 }
