@@ -67,7 +67,17 @@ public final class SwarmSearchPlanner {
 
         double baseAngle = TWO_PI * slot / sectors;
         long phase = Math.max(0L, targetAgeTicks) / Math.max(1, phaseTicks);
-        double direction = (slot & 1) == 0 ? 1.0 : -1.0;
+
+        // All agents of the same capability rotate in the same direction so their
+        // sector spacing remains invariant. Different capability bands may rotate
+        // in opposite directions, improving coverage without collapsing same-band
+        // agents onto one destination.
+        double direction = switch (archetype) {
+            case ASSAULT -> 1.0;
+            case RANGED_SUPPORT -> 1.0;
+            case FLANKER -> -1.0;
+        };
+
         double angle = baseAngle + direction * phase * ANGLE_STEP;
 
         Vec2 baseDestination = lastKnownTarget.add(
