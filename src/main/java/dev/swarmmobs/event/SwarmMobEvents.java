@@ -2,6 +2,8 @@ package dev.swarmmobs.event;
 
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
+import dev.swarmmobs.algorithm.TargetRelayPolicy;
+import dev.swarmmobs.algorithm.TargetRelayPolicy.TargetRecord;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -123,49 +125,39 @@ public final class SwarmMobEvents {
             return vanillaTarget;
         }
 
-        UUID freshestTarget = null;
-        long freshestTick = Long.MIN_VALUE;
         int memoryTicks = SwarmConfig.TARGET_MEMORY_TICKS.get();
+        List<TargetRecord> records = new ArrayList<>();
+
+        if (state.targetId() != null) {
+            records.add(new TargetRecord(state.targetId(), state.lastTargetObservationTick()));
+        }
 
         for (Zombie neighbor : neighbors) {
             SwarmAgentState neighborState = neighbor.getData(SwarmAttachments.AGENT_STATE.get());
-            UUID candidate = neighborState.targetId();
-            if (candidate == null) {
-                continue;
-            }
-
-            long age = gameTick - neighborState.lastTargetObservationTick();
-            if (age < 0 || age > memoryTicks) {
-                continue;
-            }
-
-            if (neighborState.lastTargetObservationTick() > freshestTick) {
-                freshestTick = neighborState.lastTargetObservationTick();
-                freshestTarget = candidate;
+            if (neighborState.targetId() != null) {
+                records.add(new TargetRecord(
+                        neighborState.targetId(),
+                        neighborState.lastTargetObservationTick()
+                ));
             }
         }
 
-        if (freshestTarget != null) {
-            Player shared = resolvePlayer(level, freshestTarget);
+        var selected = TargetRelayPolicy.selectFreshest(gameTick, memoryTicks, records);
+        if (selected.isPresent()) {
+            TargetRecord record = selected.get();
+            Player shared = resolvePlayer(level, record.targetId());
             if (shared != null) {
-                // Keep the original observation time. Relaying information should not make
-                // old information look artificially fresh.
-                state.rememberTarget(freshestTarget, freshestTick, false);
+                boolean newerThanLocal = state.targetId() == null
+                        || !state.targetId().equals(record.targetId())
+                        || record.observationTick() > state.lastTargetObservationTick();
+
+                if (newerThanLocal) {
+                    state.rememberTarget(record.targetId(), record.observationTick(), false);
+                }
+
                 return shared;
             }
         }
-
-        UUID remembered = state.targetId();
-        if (remembered != null) {
-            long age = gameTick - state.lastTargetObservationTick();
-            if (age >= 0 && age <= memoryTicks) {
-                Player shared = resolvePlayer(level, remembered);
-                if (shared != null) {
-                    return shared;
-                }
-            }
-        }
-
         return null;
     }
 
