@@ -107,4 +107,38 @@ class SwarmAgentStateTest {
         assertEquals(1, state.pendingTargetMessageCount());
     }
 
+    @Test
+    void deliveredObservationIsNotAcceptedAgainFromSameSender() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID sender = UUID.randomUUID();
+        UUID target = UUID.randomUUID();
+
+        TargetMessage first = new TargetMessage(sender, target, 40L, 50L, 55L);
+        assertTrue(state.enqueueTargetMessage(first));
+        assertEquals(1, state.drainDeliverableTargetMessages(55L).size());
+
+        TargetMessage rebroadcast = new TargetMessage(sender, target, 40L, 60L, 65L);
+        assertFalse(state.enqueueTargetMessage(rebroadcast));
+        assertEquals(0, state.pendingTargetMessageCount());
+        assertEquals(1L, state.communicationAcceptedMessages());
+        assertEquals(1L, state.communicationDeliveredMessages());
+    }
+
+    @Test
+    void newerObservationFromSameSenderRemainsEligible() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID sender = UUID.randomUUID();
+        UUID target = UUID.randomUUID();
+
+        assertTrue(state.enqueueTargetMessage(
+                new TargetMessage(sender, target, 40L, 50L, 55L)
+        ));
+        state.drainDeliverableTargetMessages(55L);
+
+        assertTrue(state.enqueueTargetMessage(
+                new TargetMessage(sender, target, 46L, 60L, 65L)
+        ));
+        assertEquals(1, state.pendingTargetMessageCount());
+    }
+
 }
