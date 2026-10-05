@@ -39,4 +39,40 @@ class SwarmTacticalRolePolicyTest {
                 SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.FLANKER, 1)
         );
     }
+    @Test
+    void assaultStopsCompetingForFlanksWhenTwoDedicatedFlankersAreLocal() {
+        SwarmLocalComposition composition = new SwarmLocalComposition(3, 1, 2);
+
+        for (int slot = 0; slot < 12; slot++) {
+            SwarmRole role = SwarmTacticalRolePolicy.roleFor(
+                    SwarmAgentArchetype.ASSAULT,
+                    slot,
+                    composition
+            );
+            assertTrue(role == SwarmRole.CHASER || role == SwarmRole.REAR_PRESSURE);
+        }
+    }
+
+    @Test
+    void assaultKeepsFullRoleCycleWithoutDedicatedFlankCoverage() {
+        SwarmLocalComposition composition = new SwarmLocalComposition(4, 1, 1);
+
+        assertEquals(
+                SwarmRole.FLANK_LEFT,
+                SwarmTacticalRolePolicy.roleFor(
+                        SwarmAgentArchetype.ASSAULT,
+                        1,
+                        composition
+                )
+        );
+        assertEquals(
+                SwarmRole.FLANK_RIGHT,
+                SwarmTacticalRolePolicy.roleFor(
+                        SwarmAgentArchetype.ASSAULT,
+                        2,
+                        composition
+                )
+        );
+    }
+
 }
