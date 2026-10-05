@@ -38,6 +38,19 @@ class SwarmSearchPlannerTest {
     }
 
     @Test
+    void sameCapabilitySectorSpacingRemainsStableAcrossSearchPhases() {
+        for (long age : List.of(40L, 60L, 80L, 100L)) {
+            var first = planWithSectors(SwarmAgentArchetype.FLANKER, 0, 0.3, age, 2);
+            var second = planWithSectors(SwarmAgentArchetype.FLANKER, 1, 0.3, age, 2);
+
+            assertTrue(
+                    first.destination().subtract(second.destination()).length() > 2.0,
+                    "same-capability search sectors collapsed at age=" + age
+            );
+        }
+    }
+
+    @Test
     void twoSameCapabilitySlotsCoverDifferentSectors() {
         var left = planWithSectors(SwarmAgentArchetype.FLANKER, 0, 0.3, 60L, 2);
         var right = planWithSectors(SwarmAgentArchetype.FLANKER, 1, 0.3, 60L, 2);
