@@ -19,6 +19,10 @@ public final class SwarmAgentState {
     private boolean directObservation;
     private int neighborCount;
     private int formationSlot;
+    private boolean formationSlotInitialized;
+    private int pendingFormationSlot = -1;
+    private long pendingFormationSlotSinceTick = Long.MIN_VALUE;
+    private long formationSlotSwitchCount;
     private SwarmRole role = SwarmRole.CHASER;
     private boolean hasDestination;
     private double destinationX;
@@ -73,6 +77,14 @@ public final class SwarmAgentState {
 
     public int formationSlot() {
         return formationSlot;
+    }
+
+    public int pendingFormationSlot() {
+        return pendingFormationSlot;
+    }
+
+    public long formationSlotSwitchCount() {
+        return formationSlotSwitchCount;
     }
 
     public SwarmRole role() {
@@ -224,10 +236,54 @@ public final class SwarmAgentState {
         this.planningScheduleInitialized = true;
     }
 
+    public int stabilizeFormationSlot(
+            int candidateSlot,
+            long gameTick,
+            int hysteresisTicks
+    ) {
+        int candidate = Math.max(0, candidateSlot);
+        int hold = Math.max(0, hysteresisTicks);
+
+        if (!formationSlotInitialized) {
+            formationSlot = candidate;
+            formationSlotInitialized = true;
+            pendingFormationSlot = -1;
+            pendingFormationSlotSinceTick = Long.MIN_VALUE;
+            return formationSlot;
+        }
+
+        if (candidate == formationSlot) {
+            pendingFormationSlot = -1;
+            pendingFormationSlotSinceTick = Long.MIN_VALUE;
+            return formationSlot;
+        }
+
+        if (hold == 0) {
+            formationSlot = candidate;
+            formationSlotSwitchCount++;
+            pendingFormationSlot = -1;
+            pendingFormationSlotSinceTick = Long.MIN_VALUE;
+            return formationSlot;
+        }
+
+        if (pendingFormationSlot != candidate) {
+            pendingFormationSlot = candidate;
+            pendingFormationSlotSinceTick = gameTick;
+            return formationSlot;
+        }
+
+        if (gameTick - pendingFormationSlotSinceTick >= hold) {
+            formationSlot = candidate;
+            formationSlotSwitchCount++;
+            pendingFormationSlot = -1;
+            pendingFormationSlotSinceTick = Long.MIN_VALUE;
+        }
+
+        return formationSlot;
+    }
+
     public void clearLocalPlan(int neighborCount) {
         this.neighborCount = neighborCount;
-        this.formationSlot = 0;
-        this.role = SwarmRole.CHASER;
         this.hasDestination = false;
         this.separationMagnitude = 0.0;
         this.cohesionMagnitude = 0.0;
