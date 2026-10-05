@@ -92,17 +92,26 @@ Roles repeat every four slots:
 
 CHASER units move directly toward the target.
 
-Other roles use a point on a ring around the target:
+Roles now map to semantic target-relative geometry instead of a generic ring:
 
 ```text
-angle = 2π × slot / formationSlots
+CHASER
+    target + right × laneOffset
 
-offset =
-    right × cos(angle) × formationRadius
-  + forward × sin(angle) × formationRadius
+FLANK_LEFT
+    target - right × formationRadius
+           + forward × laneOffset
 
-baseDestination = targetPosition + offset
+FLANK_RIGHT
+    target + right × formationRadius
+           + forward × laneOffset
+
+REAR_PRESSURE
+    target - forward × formationRadius
+           + right × laneOffset
 ```
+
+`laneOffset` is derived from the stable formation slot, so two agents with the same role receive distinct nearby lanes rather than collapsing onto exactly the same destination.
 
 ## Separation
 
