@@ -6,6 +6,18 @@ public final class SwarmTacticalRolePolicy {
             SwarmAgentArchetype archetype,
             int stableSlot
     ) {
+        return roleFor(
+                archetype,
+                stableSlot,
+                new SwarmLocalComposition(0, 0, 0)
+        );
+    }
+
+    public static SwarmRole roleFor(
+            SwarmAgentArchetype archetype,
+            int stableSlot,
+            SwarmLocalComposition composition
+    ) {
         if (archetype == SwarmAgentArchetype.RANGED_SUPPORT) {
             return SwarmRole.RANGED_SUPPORT;
         }
@@ -14,6 +26,12 @@ public final class SwarmTacticalRolePolicy {
             return Math.floorMod(stableSlot, 2) == 0
                     ? SwarmRole.FLANK_LEFT
                     : SwarmRole.FLANK_RIGHT;
+        }
+
+        if (composition != null && composition.dedicatedFlankCoverage()) {
+            return Math.floorMod(stableSlot, 2) == 0
+                    ? SwarmRole.CHASER
+                    : SwarmRole.REAR_PRESSURE;
         }
 
         return switch (Math.floorMod(stableSlot, 4)) {
