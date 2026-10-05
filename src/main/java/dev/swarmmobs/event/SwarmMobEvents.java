@@ -3,10 +3,10 @@ package dev.swarmmobs.event;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.FormationSlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
-import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
-import dev.swarmmobs.algorithm.TargetRelayPolicy;
-import dev.swarmmobs.algorithm.TargetRelayPolicy.TargetRecord;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
+import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
+import dev.swarmmobs.algorithm.TargetObservation;
+import dev.swarmmobs.algorithm.TargetRelayPolicy;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.debug.SwarmDebugParticles;
@@ -25,13 +25,17 @@ import java.util.UUID;
 
 public final class SwarmMobEvents {
 
+    private record TargetSelection(
+            TargetObservation observation,
+            Player player,
+            boolean direct
+    ) {}
+
     public static void onEntityJoin(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof Zombie zombie) || event.getLevel().isClientSide()) {
             return;
         }
 
-        // Priority 1 outranks the vanilla melee movement goal while the swarm member
-        // is outside releaseToVanillaDistance. Inside that radius this goal yields.
         zombie.goalSelector.addGoal(1, new SwarmApproachGoal(zombie));
     }
 
@@ -70,9 +74,9 @@ public final class SwarmMobEvents {
                 gameTick
         );
 
-        Player target = findTarget(level, zombie, state, gameTick);
+        TargetSelection selection = findTarget(level, zombie, state, gameTick);
 
-        if (target == null) {
+        if (selection == null) {
             state.forgetTarget();
             state.clearLocalPlan(movementNeighbors.size());
             if (zombie.getTarget() instanceof Player) {
@@ -81,11 +85,22 @@ public final class SwarmMobEvents {
             return;
         }
 
+        TargetObservation observation = selection.observation();
         int slots = SwarmConfig.FORMATION_SLOTS.get();
-        Vec3 look = target.getLookAngle();
+
         List<Vec2> neighborPositions = movementNeighbors.stream()
                 .map(entity -> new Vec2(entity.getX(), entity.getZ()))
                 .toList();
+
+        List<Vec2> neighborVelocities = movementNeighbors.stream()
+                .map(entity -> {
+                    Vec3 velocity = entity.getDeltaMovement();
+                    return new Vec2(velocity.x, velocity.z);
+                })
+                .toList();
+
+        Vec3 selfVelocity3 = zombie.getDeltaMovement();
+        Vec2 selfVelocity = new Vec2(selfVelocity3.x, selfVelocity3.z);
 
         int assignedSlot = FormationSlotAllocator.allocate(
                 zombie.getUUID(),
@@ -93,17 +108,21 @@ public final class SwarmMobEvents {
                 slots
         );
 
-        SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForSlot(
+        SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForSlotWithMotion(
                 assignedSlot,
                 new Vec2(zombie.getX(), zombie.getZ()),
-                new Vec2(target.getX(), target.getZ()),
-                new Vec2(look.x, look.z),
+                selfVelocity,
+                new Vec2(observation.x(), observation.z()),
+                new Vec2(observation.forwardX(), observation.forwardZ()),
                 neighborPositions,
+                neighborVelocities,
                 slots,
                 SwarmConfig.FORMATION_RADIUS.get(),
                 SwarmConfig.SEPARATION_RADIUS.get(),
                 SwarmConfig.SEPARATION_WEIGHT.get(),
-                SwarmConfig.COHESION_WEIGHT.get()
+                SwarmConfig.COHESION_WEIGHT.get(),
+                SwarmConfig.ALIGNMENT_WEIGHT.get(),
+                SwarmConfig.MAX_STEERING_CORRECTION.get()
         );
 
         state.updateLocalPlan(
@@ -113,15 +132,19 @@ public final class SwarmMobEvents {
                 plan.destination().x(),
                 plan.destination().z(),
                 plan.separationMagnitude(),
-                plan.cohesionMagnitude()
+                plan.cohesionMagnitude(),
+                plan.alignmentMagnitude(),
+                plan.steeringMagnitude()
         );
 
-        // Shared target selection is the cooperation layer. Vanilla melee behavior remains
-        // responsible for the final attack once a mob is close enough.
-        zombie.setTarget(target);
+        if (selection.direct()) {
+            zombie.setTarget(selection.player());
+        } else if (zombie.getTarget() instanceof Player) {
+            // Do not allow vanilla AI to retain an exact live Player reference while
+            // the swarm controller is operating from an indirect/stale observation.
+            zombie.setTarget(null);
+        }
 
-        // Lightweight server-side visualization for development. This intentionally
-        // uses vanilla particles so v0.1 needs no client renderer or extra dependency.
         if (gameTick % 10L == 0L) {
             SwarmDebugParticles.render(level, zombie, communicationNeighbors);
         }
@@ -191,12 +214,12 @@ public final class SwarmMobEvents {
             }
 
             SwarmAgentState senderState = sender.getData(SwarmAttachments.AGENT_STATE.get());
-            UUID targetId = senderState.targetId();
-            if (targetId == null) {
+            TargetObservation observation = senderState.targetObservation();
+            if (observation == null || !observation.hasFinitePosition()) {
                 continue;
             }
 
-            long age = gameTick - senderState.lastTargetObservationTick();
+            long age = gameTick - observation.observationTick();
             if (age < 0 || age > memoryTicks) {
                 continue;
             }
@@ -204,8 +227,7 @@ public final class SwarmMobEvents {
             var message = SwarmCommunicationPolicy.maybeTransmit(
                     sender.getUUID(),
                     receiver.getUUID(),
-                    targetId,
-                    senderState.lastTargetObservationTick(),
+                    observation,
                     gameTick,
                     latencyTicks,
                     dropRate,
@@ -220,46 +242,49 @@ public final class SwarmMobEvents {
         }
     }
 
-    private static Player findTarget(
+    private static TargetSelection findTarget(
             ServerLevel level,
             Zombie self,
             SwarmAgentState state,
             long gameTick
     ) {
         int memoryTicks = SwarmConfig.TARGET_MEMORY_TICKS.get();
-        List<TargetRecord> records = new ArrayList<>();
+        List<TargetObservation> records = new ArrayList<>();
 
-        // Always drain messages that have reached their delivery tick. Direct local
-        // perception still takes precedence below, but a continuously observing agent
-        // must not accumulate an artificial backlog of already-deliverable messages.
         for (var message : state.drainDeliverableTargetMessages(gameTick)) {
-            records.add(new TargetRecord(
-                    message.targetId(),
-                    message.observationTick()
-            ));
+            records.add(message.observation());
         }
 
         Player direct = findDirectObservation(level, self);
         if (direct != null) {
-            state.rememberTarget(direct.getUUID(), gameTick, true);
-            return direct;
+            Vec3 look = direct.getLookAngle();
+            TargetObservation observation = new TargetObservation(
+                    direct.getUUID(),
+                    gameTick,
+                    direct.getX(),
+                    direct.getY(),
+                    direct.getZ(),
+                    look.x,
+                    look.z
+            );
+            state.rememberTarget(observation, true);
+            return new TargetSelection(observation, direct, true);
         }
 
-        if (state.targetId() != null) {
-            records.add(new TargetRecord(state.targetId(), state.lastTargetObservationTick()));
+        if (state.targetObservation() != null) {
+            records.add(state.targetObservation());
         }
 
         var selected = TargetRelayPolicy.selectFreshest(gameTick, memoryTicks, records);
         if (selected.isPresent()) {
-            TargetRecord record = selected.get();
-            Player shared = resolvePlayer(level, record.targetId());
-            if (shared != null) {
-                // Any non-LOS path is memory/relay. Message delivery preserves the
-                // original observation tick even when latency is non-zero.
-                state.rememberTarget(record.targetId(), record.observationTick(), false);
-                return shared;
+            TargetObservation observation = selected.get();
+            Player shared = resolvePlayer(level, observation.targetId());
+            if (shared != null && observation.hasFinitePosition()) {
+                state.rememberTarget(observation, false);
+                return new TargetSelection(observation, shared, false);
             }
         }
+
         return null;
     }
 
