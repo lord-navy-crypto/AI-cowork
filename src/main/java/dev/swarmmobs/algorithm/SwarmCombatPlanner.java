@@ -51,8 +51,34 @@ public final class SwarmCombatPlanner {
             double separationWeight,
             double cohesionWeight
     ) {
+        return planForSlot(
+                formationSlot(agentId, Math.max(4, formationSlots)),
+                self,
+                target,
+                targetForward,
+                neighbors,
+                formationSlots,
+                formationRadius,
+                separationRadius,
+                separationWeight,
+                cohesionWeight
+        );
+    }
+
+    public static Plan planForSlot(
+            int assignedSlot,
+            Vec2 self,
+            Vec2 target,
+            Vec2 targetForward,
+            List<Vec2> neighbors,
+            int formationSlots,
+            double formationRadius,
+            double separationRadius,
+            double separationWeight,
+            double cohesionWeight
+    ) {
         int slots = Math.max(4, formationSlots);
-        int slot = formationSlot(agentId, slots);
+        int slot = Math.floorMod(assignedSlot, slots);
         SwarmRole role = roleForSlot(slot);
 
         Vec2 forward = targetForward.normalized();
