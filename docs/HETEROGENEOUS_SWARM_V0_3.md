@@ -86,3 +86,26 @@ The mixed debug spawn now cycles through all three species.
 
 A runtime GameTest verifies that a Spider acquires the player through the shared swarm
 runtime, receives SwarmApproachGoal, and is assigned only a flank role.
+
+
+## v0.3.2 — capability-local tactical slots
+
+All supported species still share one local information and motion-coordination network,
+but tactical slot allocation is now separated by capability archetype.
+
+~~~text
+shared target / communication / steering
+                 ↓
+        capability partition
+        ├─ ASSAULT
+        ├─ RANGED_SUPPORT
+        └─ FLANKER
+                 ↓
+       local slots within group
+~~~
+
+This prevents a newly arrived Skeleton or Spider from reshuffling Zombie assault roles,
+while still allowing same-capability agents to occupy distinct lanes.
+
+The behavior is covered by deterministic unit tests and the full Minecraft runtime
+regression suite remains enabled on this branch.
