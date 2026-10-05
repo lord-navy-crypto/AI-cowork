@@ -4,6 +4,7 @@ import dev.swarmmobs.command.SwarmCommands;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.event.SwarmMobEvents;
+import dev.swarmmobs.gametest.SwarmGameTestRegistration;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -19,6 +20,7 @@ public final class SwarmMobs {
 
     public SwarmMobs(IEventBus modBus, ModContainer modContainer) {
         SwarmAttachments.ATTACHMENT_TYPES.register(modBus);
+        modBus.addListener(SwarmGameTestRegistration::register);
         modContainer.registerConfig(ModConfig.Type.SERVER, SwarmConfig.SPEC);
 
         NeoForge.EVENT_BUS.addListener(SwarmMobEvents::onEntityJoin);
