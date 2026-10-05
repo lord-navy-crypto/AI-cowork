@@ -1,6 +1,7 @@
 package dev.swarmmobs.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.config.SwarmConfig;
@@ -47,7 +48,38 @@ public final class SwarmCommands {
                                         .then(Commands.literal("on")
                                                 .executes(context -> setParticles(context.getSource(), true)))
                                         .then(Commands.literal("off")
-                                                .executes(context -> setParticles(context.getSource(), false)))))
+                                                .executes(context -> setParticles(context.getSource(), false))))
+                                .then(Commands.literal("comm")
+                                        .then(Commands.literal("on")
+                                                .executes(context -> setCommunicationEnabled(context.getSource(), true)))
+                                        .then(Commands.literal("off")
+                                                .executes(context -> setCommunicationEnabled(context.getSource(), false)))
+                                        .then(Commands.literal("baseline")
+                                                .executes(context -> setCommunicationBaseline(context.getSource())))
+                                        .then(Commands.literal("latency")
+                                                .then(Commands.argument("ticks", IntegerArgumentType.integer(0, 400))
+                                                        .executes(context -> setCommunicationLatency(
+                                                                context.getSource(),
+                                                                IntegerArgumentType.getInteger(context, "ticks")
+                                                        ))))
+                                        .then(Commands.literal("drop")
+                                                .then(Commands.argument("rate", DoubleArgumentType.doubleArg(0.0, 1.0))
+                                                        .executes(context -> setCommunicationDropRate(
+                                                                context.getSource(),
+                                                                DoubleArgumentType.getDouble(context, "rate")
+                                                        ))))
+                                        .then(Commands.literal("radius")
+                                                .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(1.0, 96.0))
+                                                        .executes(context -> setCommunicationRadius(
+                                                                context.getSource(),
+                                                                DoubleArgumentType.getDouble(context, "blocks")
+                                                        ))))
+                                        .then(Commands.literal("seed")
+                                                .then(Commands.argument("value", IntegerArgumentType.integer())
+                                                        .executes(context -> setCommunicationSeed(
+                                                                context.getSource(),
+                                                                IntegerArgumentType.getInteger(context, "value")
+                                                        )))))
         );
     }
 
@@ -202,6 +234,70 @@ public final class SwarmCommands {
 
         source.sendSuccess(() -> Component.literal(summary), false);
         return total;
+    }
+
+    private static int setCommunicationEnabled(CommandSourceStack source, boolean enabled) {
+        SwarmConfig.COMMUNICATION_ENABLED.set(enabled);
+        source.sendSuccess(
+                () -> Component.literal("Swarm communication runtime switch: " + (enabled ? "ON" : "OFF")),
+                true
+        );
+        return 1;
+    }
+
+    private static int setCommunicationBaseline(CommandSourceStack source) {
+        SwarmConfig.COMMUNICATION_ENABLED.set(true);
+        SwarmConfig.COMMUNICATION_LATENCY_TICKS.set(0);
+        SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.set(0.0D);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm communication baseline restored: enabled=true, latencyTicks=0, packetDropRate=0.0"
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setCommunicationLatency(CommandSourceStack source, int ticks) {
+        SwarmConfig.COMMUNICATION_LATENCY_TICKS.set(ticks);
+        source.sendSuccess(
+                () -> Component.literal("Swarm communication runtime latencyTicks=" + ticks),
+                true
+        );
+        return ticks;
+    }
+
+    private static int setCommunicationDropRate(CommandSourceStack source, double rate) {
+        SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.set(rate);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm communication runtime packetDropRate="
+                                + String.format(java.util.Locale.ROOT, "%.3f", rate)
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setCommunicationRadius(CommandSourceStack source, double radius) {
+        SwarmConfig.COMMUNICATION_RADIUS.set(radius);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm communication runtime radius="
+                                + String.format(java.util.Locale.ROOT, "%.2f", radius)
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setCommunicationSeed(CommandSourceStack source, int seed) {
+        SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.set(seed);
+        source.sendSuccess(
+                () -> Component.literal("Swarm communication runtime experimentSeed=" + seed),
+                true
+        );
+        return 1;
     }
 
     private static int toggleParticles(CommandSourceStack source) {
