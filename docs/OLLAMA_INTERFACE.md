@@ -159,3 +159,15 @@ SwarmStrategyProvider
 ~~~
 
 Future providers can implement the same interface without changing the swarm control code.
+
+
+## Official Ollama references
+
+- API introduction: https://docs.ollama.com/api
+- Chat endpoint: https://docs.ollama.com/api/chat
+- List local models: https://docs.ollama.com/api/tags
+- Structured outputs: https://docs.ollama.com/capabilities/structured-outputs
+
+The implementation follows the documented local base URL convention of
+`http://localhost:11434`, while the default Swarm Mobs config uses
+`http://127.0.0.1:11434` to make the loopback-only intent explicit.
