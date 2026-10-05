@@ -23,4 +23,20 @@ class SwarmTacticalRolePolicyTest {
         assertEquals(SwarmRole.FLANK_RIGHT, SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.ASSAULT, 2));
         assertEquals(SwarmRole.REAR_PRESSURE, SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.ASSAULT, 3));
     }
+    @Test
+    void flankerArchetypeAlternatesOnlyBetweenSideRoles() {
+        for (int slot = 0; slot < 12; slot++) {
+            SwarmRole role = SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.FLANKER, slot);
+            assertTrue(role == SwarmRole.FLANK_LEFT || role == SwarmRole.FLANK_RIGHT);
+        }
+
+        assertEquals(
+                SwarmRole.FLANK_LEFT,
+                SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.FLANKER, 0)
+        );
+        assertEquals(
+                SwarmRole.FLANK_RIGHT,
+                SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.FLANKER, 1)
+        );
+    }
 }
