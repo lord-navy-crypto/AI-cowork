@@ -143,6 +143,42 @@ class SwarmAgentStateTest {
     }
 
     @Test
+    void transientSlotCandidateDoesNotImmediatelyChangeRoleLane() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        assertEquals(2, state.stabilizeFormationSlot(2, 100L, 20));
+        assertEquals(2, state.stabilizeFormationSlot(5, 106L, 20));
+        assertEquals(5, state.pendingFormationSlot());
+        assertEquals(0L, state.formationSlotSwitchCount());
+
+        assertEquals(2, state.stabilizeFormationSlot(2, 112L, 20));
+        assertEquals(-1, state.pendingFormationSlot());
+        assertEquals(0L, state.formationSlotSwitchCount());
+    }
+
+    @Test
+    void persistentSlotCandidateSwitchesAfterHysteresisWindow() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        assertEquals(1, state.stabilizeFormationSlot(1, 100L, 20));
+        assertEquals(1, state.stabilizeFormationSlot(6, 110L, 20));
+        assertEquals(1, state.stabilizeFormationSlot(6, 129L, 20));
+        assertEquals(6, state.stabilizeFormationSlot(6, 130L, 20));
+        assertEquals(1L, state.formationSlotSwitchCount());
+        assertEquals(-1, state.pendingFormationSlot());
+    }
+
+    @Test
+    void zeroHysteresisAllowsImmediateSlotSwitch() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        assertEquals(0, state.stabilizeFormationSlot(0, 10L, 0));
+        assertEquals(3, state.stabilizeFormationSlot(3, 11L, 0));
+        assertEquals(1L, state.formationSlotSwitchCount());
+    }
+
+
+    @Test
     void targetConfidenceDecaysWithObservationAge() {
         SwarmAgentState state = new SwarmAgentState();
         UUID target = UUID.randomUUID();
