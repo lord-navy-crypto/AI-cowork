@@ -3,6 +3,8 @@ package dev.swarmmobs.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import dev.swarmmobs.agent.SwarmAgentArchetype;
+import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -14,6 +16,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Zombie;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
@@ -42,6 +45,15 @@ public final class SwarmCommands {
                 Commands.literal("spawn")
                         .then(Commands.argument("count", IntegerArgumentType.integer(2, 32))
                                 .executes(context -> spawnTestSwarm(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "count")
+                                )))
+        );
+
+        debug.then(
+                Commands.literal("spawnmixed")
+                        .then(Commands.argument("count", IntegerArgumentType.integer(2, 32))
+                                .executes(context -> spawnMixedSwarm(
                                         context.getSource(),
                                         IntegerArgumentType.getInteger(context, "count")
                                 )))
@@ -111,6 +123,7 @@ public final class SwarmCommands {
                                 + ", packetDropRate=" + SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.get()
                                 + ", experimentSeed=" + SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.get()
                                 + ", debugParticles=" + SwarmDebugState.particlesEnabled()
+                                + ", heterogeneousAgents=ZOMBIE+SKELETON"
                                 + ", externalAI=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
                 ),
                 false
@@ -129,18 +142,18 @@ public final class SwarmCommands {
 
         ServerLevel level = source.getLevel();
         double radius = Math.max(16.0, SwarmConfig.NEIGHBOR_RADIUS.get());
-        List<Zombie> zombies = level.getEntitiesOfClass(
-                Zombie.class,
+        List<PathfinderMob> agents = level.getEntitiesOfClass(
+                PathfinderMob.class,
                 player.getBoundingBox().inflate(radius),
-                Zombie::isAlive
+                candidate -> candidate.isAlive() && SwarmAgentProfiles.isSupported(candidate)
         );
 
-        Zombie nearest = zombies.stream()
+        PathfinderMob nearest = agents.stream()
                 .min(Comparator.comparingDouble(player::distanceToSqr))
                 .orElse(null);
 
         if (nearest == null) {
-            source.sendFailure(Component.literal("No living zombie swarm candidate found nearby."));
+            source.sendFailure(Component.literal("No living supported swarm agent found nearby."));
             return 0;
         }
 
@@ -165,7 +178,8 @@ public final class SwarmCommands {
 
         source.sendSuccess(
                 () -> Component.literal(
-                        "Zombie #" + nearest.getId()
+                        "Agent #" + nearest.getId()
+                                + " archetype=" + SwarmAgentProfiles.profile(nearest).archetype()
                                 + " role=" + state.role()
                                 + " slot=" + state.formationSlot()
                                 + " pendingSlot=" + state.pendingFormationSlot()
@@ -205,19 +219,21 @@ public final class SwarmCommands {
 
         ServerLevel level = source.getLevel();
         double radius = Math.max(24.0, SwarmConfig.NEIGHBOR_RADIUS.get());
-        List<Zombie> zombies = level.getEntitiesOfClass(
-                Zombie.class,
+        List<PathfinderMob> agents = level.getEntitiesOfClass(
+                PathfinderMob.class,
                 player.getBoundingBox().inflate(radius),
-                Zombie::isAlive
+                candidate -> candidate.isAlive() && SwarmAgentProfiles.isSupported(candidate)
         );
 
-        if (zombies.isEmpty()) {
-            source.sendFailure(Component.literal("No living zombie swarm candidates found nearby."));
+        if (agents.isEmpty()) {
+            source.sendFailure(Component.literal("No living supported swarm agents found nearby."));
             return 0;
         }
 
         java.util.EnumMap<dev.swarmmobs.agent.SwarmRole, Integer> roles =
                 new java.util.EnumMap<>(dev.swarmmobs.agent.SwarmRole.class);
+        java.util.EnumMap<SwarmAgentArchetype, Integer> archetypes =
+                new java.util.EnumMap<>(SwarmAgentArchetype.class);
         int withTarget = 0;
         int direct = 0;
         double neighborSum = 0.0;
@@ -231,9 +247,10 @@ public final class SwarmCommands {
         long deliveredMessages = 0L;
         long droppedMessages = 0L;
 
-        for (Zombie zombie : zombies) {
-            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        for (PathfinderMob agent : agents) {
+            SwarmAgentState state = agent.getData(SwarmAttachments.AGENT_STATE.get());
             roles.merge(state.role(), 1, Integer::sum);
+            archetypes.merge(SwarmAgentProfiles.profile(agent).archetype(), 1, Integer::sum);
             if (state.targetId() != null) {
                 withTarget++;
             }
@@ -255,14 +272,18 @@ public final class SwarmCommands {
             droppedMessages += state.communicationDroppedMessages();
         }
 
-        int total = zombies.size();
+        int total = agents.size();
         String roleSummary = java.util.Arrays.stream(dev.swarmmobs.agent.SwarmRole.values())
                 .map(role -> role + "=" + roles.getOrDefault(role, 0))
                 .collect(java.util.stream.Collectors.joining(", "));
 
+        String archetypeSummary = java.util.Arrays.stream(SwarmAgentArchetype.values())
+                .map(archetype -> archetype + "=" + archetypes.getOrDefault(archetype, 0))
+                .collect(java.util.stream.Collectors.joining(", "));
+
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -276,6 +297,7 @@ public final class SwarmCommands {
                 acceptedMessages,
                 deliveredMessages,
                 droppedMessages,
+                archetypeSummary,
                 roleSummary
         );
 
@@ -363,6 +385,59 @@ public final class SwarmCommands {
                 true
         );
         return 1;
+    }
+
+    private static int spawnMixedSwarm(CommandSourceStack source, int count) {
+        ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Run this command as a player."));
+            return 0;
+        }
+
+        if (player.isCreative() || player.isSpectator()) {
+            source.sendFailure(Component.literal(
+                    "For a real targeting test, switch to Survival or Adventure before spawning the mixed swarm."
+            ));
+            return 0;
+        }
+
+        ServerLevel level = source.getLevel();
+        double radius = 11.0;
+        int spawned = 0;
+
+        for (int i = 0; i < count; i++) {
+            double angle = (Math.PI * 2.0 * i) / count;
+            double x = player.getX() + Math.cos(angle) * radius;
+            double z = player.getZ() + Math.sin(angle) * radius;
+
+            PathfinderMob agent;
+            if (i % 2 == 0) {
+                agent = EntityType.ZOMBIE.create(level);
+            } else {
+                agent = EntityType.SKELETON.create(level);
+            }
+
+            if (agent == null) {
+                continue;
+            }
+
+            agent.moveTo(x, player.getY(), z, (float) Math.toDegrees(angle + Math.PI), 0.0F);
+            level.addFreshEntity(agent);
+            spawned++;
+        }
+
+        int finalSpawned = spawned;
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Spawned " + finalSpawned
+                                + " mixed swarm agents (Zombie assault + Skeleton ranged support)."
+                                + " Use /swarmmobs group to inspect cooperation."
+                ),
+                true
+        );
+        return spawned;
     }
 
     private static int spawnTestSwarm(CommandSourceStack source, int count) {
