@@ -64,6 +64,58 @@ class SwarmCombatPlannerTest {
     }
 
     @Test
+    void roleGeometryMatchesRoleNames() {
+        Vec2 target = new Vec2(10.0, 10.0);
+        Vec2 forward = new Vec2(0.0, 1.0);
+
+        SwarmCombatPlanner.Plan left = SwarmCombatPlanner.plan(
+                new UUID(0L, 1L),
+                new Vec2(0.0, 0.0),
+                target,
+                forward,
+                List.of(),
+                8,
+                4.0,
+                2.0,
+                0.0,
+                0.0
+        );
+        SwarmCombatPlanner.Plan right = SwarmCombatPlanner.plan(
+                new UUID(0L, 2L),
+                new Vec2(0.0, 0.0),
+                target,
+                forward,
+                List.of(),
+                8,
+                4.0,
+                2.0,
+                0.0,
+                0.0
+        );
+        SwarmCombatPlanner.Plan rear = SwarmCombatPlanner.plan(
+                new UUID(0L, 3L),
+                new Vec2(0.0, 0.0),
+                target,
+                forward,
+                List.of(),
+                8,
+                4.0,
+                2.0,
+                0.0,
+                0.0
+        );
+
+        assertEquals(SwarmRole.FLANK_LEFT, left.role());
+        assertTrue(left.destination().x() < target.x());
+
+        assertEquals(SwarmRole.FLANK_RIGHT, right.role());
+        assertTrue(right.destination().x() > target.x());
+
+        assertEquals(SwarmRole.REAR_PRESSURE, rear.role());
+        assertTrue(rear.destination().z() < target.z());
+    }
+
+    @Test
     void nonChaserReceivesOffsetApproachPoint() {
         UUID id = findUuidForRole(SwarmRole.FLANK_LEFT);
         Vec2 target = new Vec2(10.0, 10.0);
