@@ -58,6 +58,9 @@ public final class SwarmMobEvents {
         if (target == null) {
             state.forgetTarget();
             state.clearLocalPlan(neighbors.size());
+            if (zombie.getTarget() instanceof Player) {
+                zombie.setTarget(null);
+            }
             return;
         }
 
@@ -120,11 +123,6 @@ public final class SwarmMobEvents {
         if (direct != null) {
             state.rememberTarget(direct.getUUID(), gameTick, true);
             return direct;
-        }
-
-        if (self.getTarget() instanceof Player vanillaTarget && validTarget(vanillaTarget)) {
-            state.rememberTarget(vanillaTarget.getUUID(), gameTick, true);
-            return vanillaTarget;
         }
 
         int memoryTicks = SwarmConfig.TARGET_MEMORY_TICKS.get();
