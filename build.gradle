@@ -62,6 +62,8 @@ tasks.named('test', Test).configure {
 
 def gameTestNamespace = project.mod_id.toString()
 
+def gameTestModId = project.mod_id.toString()
+
 def generateGameTestResources = tasks.register("generateGameTestResources") {
     def encodedTemplate = layout.projectDirectory.file("src/gametest/empty5x4x5.nbt.b64")
     def generatedRoot = layout.buildDirectory.dir("generated/gametestResources")
