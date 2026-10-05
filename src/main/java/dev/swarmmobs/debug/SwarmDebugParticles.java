@@ -46,6 +46,25 @@ public final class SwarmDebugParticles {
             );
         }
 
+        if (state.hasNavigationWaypoint()
+                && state.navigationMode() != dev.swarmmobs.agent.SwarmNavigationMode.PLAN) {
+            drawLine(
+                    level,
+                    ax, ay, az,
+                    state.navigationWaypointX(), mob.getY() + 0.45, state.navigationWaypointZ(),
+                    ParticleTypes.ELECTRIC_SPARK
+            );
+            level.sendParticles(
+                    ParticleTypes.ELECTRIC_SPARK,
+                    state.navigationWaypointX(),
+                    mob.getY() + 0.45,
+                    state.navigationWaypointZ(),
+                    state.navigationMode() == dev.swarmmobs.agent.SwarmNavigationMode.RECOVERY ? 4 : 2,
+                    0.06, 0.06, 0.06,
+                    0.0
+            );
+        }
+
         int rendered = 0;
         for (PathfinderMob neighbor : neighbors) {
             if (rendered >= 3) {
