@@ -10,6 +10,12 @@ public final class SwarmTacticalRolePolicy {
             return SwarmRole.RANGED_SUPPORT;
         }
 
+        if (archetype == SwarmAgentArchetype.FLANKER) {
+            return Math.floorMod(stableSlot, 2) == 0
+                    ? SwarmRole.FLANK_LEFT
+                    : SwarmRole.FLANK_RIGHT;
+        }
+
         return switch (Math.floorMod(stableSlot, 4)) {
             case 0 -> SwarmRole.CHASER;
             case 1 -> SwarmRole.FLANK_LEFT;
