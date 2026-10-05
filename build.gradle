@@ -1,0 +1,111 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.146'
+    id 'idea'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+}
+
+
+def gameTestNamespace = project.mod_id.toString()
+
+def gameTestModId = project.mod_id.toString()
+
+def generateGameTestResources = tasks.register("generateGameTestResources") {
+    def encodedTemplate = layout.projectDirectory.file("src/gametest/empty5x4x5.nbt.b64")
+    def generatedRoot = layout.buildDirectory.dir("generated/gametestResources")
+
+    inputs.file(encodedTemplate)
+    outputs.dir(generatedRoot)
+
+    doLast {
+        def outputFile = generatedRoot.get()
+                .file("data/${gameTestNamespace}/structure/empty5x4x5.nbt")
+                .asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.bytes = java.util.Base64.mimeDecoder.decode(encodedTemplate.asFile.text)
+    }
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version       : minecraft_version,
+            minecraft_version_range : minecraft_version_range,
+            neo_version             : neo_version,
+            loader_version_range    : loader_version_range,
+            mod_id                  : mod_id,
+            mod_name                : mod_name,
+            mod_license             : mod_license,
+            mod_version             : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+sourceSets.main.resources.srcDir generateGameTestResources
+neoForge.ideSyncTask generateModMetadata
+neoForge.ideSyncTask generateGameTestResources
+
+tasks.named("processResources").configure {
+    dependsOn generateGameTestResources
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:deprecation']
+}

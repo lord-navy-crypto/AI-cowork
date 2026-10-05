@@ -42,8 +42,36 @@ feedback
 
 The system should make these stages observable and tunable so the repository can also function as a small multi-agent experimentation platform.
 
+## Current development status
+
+Active branch: `swarm-combat-v0.1`
+
+The first playable milestone is now under implementation:
+
+- vanilla zombies become transient swarm agents through NeoForge Data Attachments;
+- nearby agents exchange explicit target messages through a configurable communication layer;
+- deterministic local slot allocation assigns CHASER / FLANK_LEFT / FLANK_RIGHT / REAR_PRESSURE roles without a central coordinator;
+- separation and cohesion modify the formation destination;
+- communication range, latency, deterministic packet loss, and an experiment seed are exposed as server config parameters;
+- `SwarmApproachGoal` owns movement outside melee range and yields back to vanilla combat nearby;
+- external AI remains reserved and disabled.
+
+Development commands:
+
+```text
+/swarmmobs status
+/swarmmobs inspect
+/swarmmobs group
+/swarmmobs debug spawn <count>
+/swarmmobs debug particles on|off|toggle
+```
+
+The development branch also includes a zero-dependency particle debugger. When enabled, vanilla particles show planned destinations, a small subset of local neighbor links, and the current target marker directly in the world.
+
+The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.249 / Java 21, runs deterministic JUnit tests, and gates the swarm branch with real Minecraft GameTest-server runtime tests.
+
 ## Status
 
-**Bootstrap / architecture stage.**
+**Swarm Combat alpha v0.1 in active development.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.
