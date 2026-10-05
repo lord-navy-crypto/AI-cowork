@@ -7,6 +7,7 @@ import dev.swarmmobs.SwarmMobs;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.data.SwarmAttachments;
+import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -16,6 +17,7 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -251,6 +253,67 @@ public final class SwarmRuntimeGameTests {
 
             if (relayState.lastTargetObservationTick() == Long.MIN_VALUE) {
                 helper.fail("Relay target did not carry a real observation timestamp");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 220)
+    public static void targetMemoryExpiresAfterLineOfSightIsLost(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+        var movementSpeed = zombie.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (movementSpeed != null) {
+            movementSpeed.setBaseValue(0.0D);
+        }
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(15, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                helper.fail("Zombie did not establish direct target memory before occlusion");
+                return;
+            }
+
+            helper.setBlock(new BlockPos(2, 1, 2), Blocks.STONE);
+            helper.setBlock(new BlockPos(2, 2, 2), Blocks.STONE);
+
+            if (zombie.hasLineOfSight(player)) {
+                helper.fail("Occlusion wall did not break direct line of sight");
+            }
+        });
+
+        int expiryCheckTick = 15 + SwarmConfig.TARGET_MEMORY_TICKS.get() + 30;
+        helper.runAfterDelay(expiryCheckTick, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (zombie.hasLineOfSight(player)) {
+                helper.fail("Zombie unexpectedly regained line of sight during memory-expiry test");
+                return;
+            }
+
+            if (state.targetId() != null) {
+                helper.fail("Stale swarm target memory did not expire after configured memory window");
+                return;
+            }
+
+            if (state.hasDestination()) {
+                helper.fail("Expired target memory left a stale planned destination");
+                return;
+            }
+
+            if (zombie.getTarget() instanceof net.minecraft.world.entity.player.Player) {
+                helper.fail("Expired swarm memory left a stale vanilla player target");
                 return;
             }
 
