@@ -39,7 +39,8 @@ class SwarmCommunicationPolicyTest {
         TargetObservation source = new TargetObservation(
                 TARGET, 77L,
                 12.0, 70.0, -4.0,
-                0.0, 1.0
+                0.0, 1.0,
+                0.18, -0.04
         );
 
         TargetMessage message = SwarmCommunicationPolicy.maybeTransmit(
@@ -51,6 +52,8 @@ class SwarmCommunicationPolicyTest {
         assertSame(source, message.observation());
         assertEquals(77L, message.observationTick());
         assertEquals(12.0, message.observation().x(), 1.0e-9);
+        assertEquals(0.18, message.observation().velocityX(), 1.0e-9);
+        assertEquals(-0.04, message.observation().velocityZ(), 1.0e-9);
         assertEquals(100L, message.sentTick());
         assertEquals(112L, message.deliverTick());
     }
