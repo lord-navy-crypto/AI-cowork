@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.monster.Zombie;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -191,6 +192,65 @@ public final class SwarmRuntimeGameTests {
             }
             player.level().getServer().getConnection().getConnections().remove(connection);
         }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void occludedZombieReceivesRelayedPlayerTarget(GameTestHelper helper) {
+        Zombie relay = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        Zombie observer = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        relay.setNoGravity(true);
+        observer.setNoGravity(true);
+
+        // A two-block-high wall blocks the relay zombie's direct view toward +X.
+        helper.setBlock(new BlockPos(2, 1, 2), Blocks.STONE);
+        helper.setBlock(new BlockPos(2, 2, 2), Blocks.STONE);
+
+        var player = helper.makeMockPlayer(GameType.SURVIVAL);
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        if (!helper.getLevel().addFreshEntity(player)) {
+            helper.fail("Relay test player could not be inserted into the GameTest ServerLevel");
+            return;
+        }
+
+        helper.runAfterDelay(20, () -> {
+            SwarmAgentState observerState = observer.getData(SwarmAttachments.AGENT_STATE.get());
+            SwarmAgentState relayState = relay.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!observer.hasLineOfSight(player)) {
+                helper.fail("Observer zombie unexpectedly lost direct line of sight to player");
+                return;
+            }
+
+            if (relay.hasLineOfSight(player)) {
+                helper.fail("Relay zombie unexpectedly had direct line of sight through test wall");
+                return;
+            }
+
+            if (!player.getUUID().equals(observerState.targetId()) || !observerState.directObservation()) {
+                helper.fail("Observer zombie did not retain direct player observation");
+                return;
+            }
+
+            if (!player.getUUID().equals(relayState.targetId())) {
+                helper.fail("Occluded zombie did not receive player target from local swarm neighbor");
+                return;
+            }
+
+            if (relayState.directObservation()) {
+                helper.fail("Relayed target was incorrectly marked as direct observation");
+                return;
+            }
+
+            if (relayState.lastTargetObservationTick() != observerState.lastTargetObservationTick()) {
+                helper.fail("Relay changed the original target observation timestamp");
+                return;
+            }
+
+            helper.succeed();
+        });
     }
 
 }
