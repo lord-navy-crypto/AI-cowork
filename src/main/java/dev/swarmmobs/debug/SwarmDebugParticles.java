@@ -2,6 +2,7 @@ package dev.swarmmobs.debug;
 
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.data.SwarmAttachments;
+import dev.swarmmobs.algorithm.TargetObservation;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.monster.Zombie;
@@ -60,13 +61,14 @@ public final class SwarmDebugParticles {
             rendered++;
         }
 
-        if (zombie.getTarget() != null) {
+        TargetObservation observation = state.targetObservation();
+        if (observation != null && observation.hasFinitePosition()) {
             level.sendParticles(
                     ParticleTypes.CRIT,
-                    zombie.getTarget().getX(),
-                    zombie.getTarget().getY() + 1.6,
-                    zombie.getTarget().getZ(),
-                    1,
+                    observation.x(),
+                    observation.y() + 1.6,
+                    observation.z(),
+                    state.directObservation() ? 2 : 1,
                     0.05, 0.05, 0.05,
                     0.0
             );
