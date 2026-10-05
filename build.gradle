@@ -60,6 +60,8 @@ tasks.named('test', Test).configure {
 }
 
 
+def gameTestNamespace = project.mod_id.toString()
+
 def generateGameTestResources = tasks.register("generateGameTestResources") {
     def encodedTemplate = layout.projectDirectory.file("src/gametest/empty5x4x5.nbt.b64")
     def generatedRoot = layout.buildDirectory.dir("generated/gametestResources")
@@ -69,7 +71,7 @@ def generateGameTestResources = tasks.register("generateGameTestResources") {
 
     doLast {
         def outputFile = generatedRoot.get()
-                .file("data/${project.mod_id}/structure/empty5x4x5.nbt")
+                .file("data/${gameTestNamespace}/structure/empty5x4x5.nbt")
                 .asFile
         outputFile.parentFile.mkdirs()
         outputFile.bytes = java.util.Base64.mimeDecoder.decode(encodedTemplate.asFile.text)
