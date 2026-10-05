@@ -12,6 +12,7 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
 import dev.swarmmobs.algorithm.TargetObservation;
+import dev.swarmmobs.algorithm.TargetPredictionPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -158,12 +159,20 @@ public final class SwarmMobEvents {
                     .filter(peer -> SwarmAgentProfiles.profile(peer).archetype() == profile.archetype())
                     .count();
 
+            TargetPredictionPolicy.Prediction prediction = TargetPredictionPolicy.predict(
+                    observation,
+                    gameTick,
+                    confidence,
+                    SwarmConfig.SEARCH_PREDICTION_MAX_TICKS.get(),
+                    SwarmConfig.SEARCH_PREDICTION_MAX_DISTANCE.get()
+            );
+
             SwarmSearchPlanner.SearchPlan searchPlan = SwarmSearchPlanner.planWithMotion(
                     profile.archetype(),
                     assignedSlot,
                     new Vec2(mob.getX(), mob.getZ()),
                     selfVelocity,
-                    new Vec2(observation.x(), observation.z()),
+                    prediction.anchor(),
                     confidence,
                     Math.max(0L, gameTick - observation.observationTick()),
                     neighborPositions,
@@ -356,6 +365,7 @@ public final class SwarmMobEvents {
         Player direct = findDirectObservation(level, self);
         if (direct != null) {
             Vec3 look = direct.getLookAngle();
+            Vec3 velocity = direct.getDeltaMovement();
             TargetObservation observation = new TargetObservation(
                     direct.getUUID(),
                     gameTick,
@@ -363,7 +373,9 @@ public final class SwarmMobEvents {
                     direct.getY(),
                     direct.getZ(),
                     look.x,
-                    look.z
+                    look.z,
+                    velocity.x,
+                    velocity.z
             );
             state.rememberTarget(observation, true);
             return new TargetSelection(observation, direct, true);
