@@ -58,6 +58,11 @@ public final class SwarmCommands {
                                 + ", neighborRadius=" + SwarmConfig.NEIGHBOR_RADIUS.get()
                                 + ", targetRadius=" + SwarmConfig.TARGET_RADIUS.get()
                                 + ", formationRadius=" + SwarmConfig.FORMATION_RADIUS.get()
+                                + ", communicationEnabled=" + SwarmConfig.COMMUNICATION_ENABLED.get()
+                                + ", communicationRadius=" + SwarmConfig.COMMUNICATION_RADIUS.get()
+                                + ", latencyTicks=" + SwarmConfig.COMMUNICATION_LATENCY_TICKS.get()
+                                + ", packetDropRate=" + SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.get()
+                                + ", experimentSeed=" + SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.get()
                                 + ", debugParticles=" + SwarmDebugState.particlesEnabled()
                                 + ", externalAI=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
                 ),
@@ -111,6 +116,10 @@ public final class SwarmCommands {
                                         : "none")
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
+                                + " inbox=" + state.pendingTargetMessageCount()
+                                + " commAccepted=" + state.communicationAcceptedMessages()
+                                + " commDelivered=" + state.communicationDeliveredMessages()
+                                + " commDropped=" + state.communicationDroppedMessages()
                 ),
                 false
         );
@@ -147,6 +156,10 @@ public final class SwarmCommands {
         double neighborSum = 0.0;
         double separationSum = 0.0;
         double cohesionSum = 0.0;
+        long pendingMessages = 0L;
+        long acceptedMessages = 0L;
+        long deliveredMessages = 0L;
+        long droppedMessages = 0L;
 
         for (Zombie zombie : zombies) {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
@@ -160,6 +173,10 @@ public final class SwarmCommands {
             neighborSum += state.neighborCount();
             separationSum += state.separationMagnitude();
             cohesionSum += state.cohesionMagnitude();
+            pendingMessages += state.pendingTargetMessageCount();
+            acceptedMessages += state.communicationAcceptedMessages();
+            deliveredMessages += state.communicationDeliveredMessages();
+            droppedMessages += state.communicationDroppedMessages();
         }
 
         int total = zombies.size();
@@ -169,13 +186,17 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, roles={%s}",
                 total,
                 withTarget,
                 direct,
                 neighborSum / total,
                 separationSum / total,
                 cohesionSum / total,
+                pendingMessages,
+                acceptedMessages,
+                deliveredMessages,
+                droppedMessages,
                 roleSummary
         );
 
