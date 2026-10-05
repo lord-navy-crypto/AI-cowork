@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
+import dev.swarmmobs.debug.SwarmDebugState;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -39,7 +40,14 @@ public final class SwarmCommands {
                                                 .executes(context -> spawnTestSwarm(
                                                         context.getSource(),
                                                         IntegerArgumentType.getInteger(context, "count")
-                                                )))))
+                                                ))))
+                                .then(Commands.literal("particles")
+                                        .then(Commands.literal("toggle")
+                                                .executes(context -> toggleParticles(context.getSource())))
+                                        .then(Commands.literal("on")
+                                                .executes(context -> setParticles(context.getSource(), true)))
+                                        .then(Commands.literal("off")
+                                                .executes(context -> setParticles(context.getSource(), false)))))
         );
     }
 
@@ -50,6 +58,7 @@ public final class SwarmCommands {
                                 + ", neighborRadius=" + SwarmConfig.NEIGHBOR_RADIUS.get()
                                 + ", targetRadius=" + SwarmConfig.TARGET_RADIUS.get()
                                 + ", formationRadius=" + SwarmConfig.FORMATION_RADIUS.get()
+                                + ", debugParticles=" + SwarmDebugState.particlesEnabled()
                                 + ", externalAI=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
                 ),
                 false
@@ -172,6 +181,24 @@ public final class SwarmCommands {
 
         source.sendSuccess(() -> Component.literal(summary), false);
         return total;
+    }
+
+    private static int toggleParticles(CommandSourceStack source) {
+        boolean enabled = SwarmDebugState.toggleParticles();
+        source.sendSuccess(
+                () -> Component.literal("Swarm debug particles: " + (enabled ? "ON" : "OFF")),
+                true
+        );
+        return enabled ? 1 : 0;
+    }
+
+    private static int setParticles(CommandSourceStack source, boolean enabled) {
+        SwarmDebugState.setParticlesEnabled(enabled);
+        source.sendSuccess(
+                () -> Component.literal("Swarm debug particles: " + (enabled ? "ON" : "OFF")),
+                true
+        );
+        return 1;
     }
 
     private static int spawnTestSwarm(CommandSourceStack source, int count) {
