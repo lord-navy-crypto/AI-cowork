@@ -64,6 +64,70 @@ class SwarmCombatPlannerTest {
     }
 
     @Test
+    void alignmentSteersTowardAverageNeighborMotion() {
+        Vec2 alignment = SwarmCombatPlanner.alignment(
+                new Vec2(0.0, 0.0),
+                List.of(
+                        new Vec2(1.0, 0.0),
+                        new Vec2(2.0, 0.0)
+                )
+        );
+
+        assertTrue(alignment.x() > 0.99);
+        assertEquals(0.0, alignment.z(), 1.0e-9);
+    }
+
+    @Test
+    void steeringCorrectionIsHardCapped() {
+        Vec2 capped = SwarmCombatPlanner.clampLength(new Vec2(6.0, 8.0), 3.0);
+
+        assertEquals(3.0, capped.length(), 1.0e-9);
+        assertEquals(1.8, capped.x(), 1.0e-9);
+        assertEquals(2.4, capped.z(), 1.0e-9);
+    }
+
+    @Test
+    void alignmentContributesToMotionAwarePlan() {
+        SwarmCombatPlanner.Plan baseline = SwarmCombatPlanner.planForSlotWithMotion(
+                0,
+                new Vec2(0.0, 0.0),
+                new Vec2(0.0, 0.0),
+                new Vec2(10.0, 0.0),
+                new Vec2(1.0, 0.0),
+                List.of(),
+                List.of(),
+                8,
+                4.5,
+                2.4,
+                0.0,
+                0.0,
+                1.0,
+                3.0
+        );
+
+        SwarmCombatPlanner.Plan aligned = SwarmCombatPlanner.planForSlotWithMotion(
+                0,
+                new Vec2(0.0, 0.0),
+                new Vec2(0.0, 0.0),
+                new Vec2(10.0, 0.0),
+                new Vec2(1.0, 0.0),
+                List.of(),
+                List.of(new Vec2(0.0, 1.0)),
+                8,
+                4.5,
+                2.4,
+                0.0,
+                0.0,
+                1.0,
+                3.0
+        );
+
+        assertEquals(0.0, baseline.alignmentMagnitude(), 1.0e-9);
+        assertTrue(aligned.alignmentMagnitude() > 0.99);
+        assertNotEquals(baseline.destination(), aligned.destination());
+    }
+
+    @Test
     void roleGeometryMatchesRoleNames() {
         Vec2 target = new Vec2(10.0, 10.0);
         Vec2 forward = new Vec2(0.0, 1.0);
