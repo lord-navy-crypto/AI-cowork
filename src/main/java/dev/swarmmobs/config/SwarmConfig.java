@@ -12,6 +12,7 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue TARGET_RADIUS;
     public static final ModConfigSpec.IntValue TARGET_MEMORY_TICKS;
     public static final ModConfigSpec.IntValue FORMATION_SLOTS;
+    public static final ModConfigSpec.IntValue FORMATION_SLOT_HYSTERESIS_TICKS;
     public static final ModConfigSpec.DoubleValue FORMATION_RADIUS;
     public static final ModConfigSpec.DoubleValue SEPARATION_RADIUS;
     public static final ModConfigSpec.DoubleValue SEPARATION_WEIGHT;
@@ -62,6 +63,10 @@ public final class SwarmConfig {
         FORMATION_SLOTS = BUILDER
                 .comment("Number of deterministic approach slots around a target.")
                 .defineInRange("formationSlots", 8, 4, 32);
+
+        FORMATION_SLOT_HYSTERESIS_TICKS = BUILDER
+                .comment("How long a different local slot candidate must remain stable before the agent switches roles/lanes.")
+                .defineInRange("formationSlotHysteresisTicks", 20, 0, 200);
 
         FORMATION_RADIUS = BUILDER
                 .comment("Nominal ring radius around the shared target.")
