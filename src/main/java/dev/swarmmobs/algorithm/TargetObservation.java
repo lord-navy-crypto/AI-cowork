@@ -16,12 +16,39 @@ public record TargetObservation(
         double y,
         double z,
         double forwardX,
-        double forwardZ
+        double forwardZ,
+        double velocityX,
+        double velocityZ
 ) {
     public TargetObservation {
         if (targetId == null) {
             throw new IllegalArgumentException("targetId cannot be null");
         }
+    }
+
+    /**
+     * Compatibility constructor for snapshots without known target velocity.
+     */
+    public TargetObservation(
+            UUID targetId,
+            long observationTick,
+            double x,
+            double y,
+            double z,
+            double forwardX,
+            double forwardZ
+    ) {
+        this(
+                targetId,
+                observationTick,
+                x,
+                y,
+                z,
+                forwardX,
+                forwardZ,
+                Double.NaN,
+                Double.NaN
+        );
     }
 
     public static TargetObservation unknownPosition(UUID targetId, long observationTick) {
@@ -32,12 +59,18 @@ public record TargetObservation(
                 Double.NaN,
                 Double.NaN,
                 Double.NaN,
+                Double.NaN,
+                Double.NaN,
                 Double.NaN
         );
     }
 
     public boolean hasFinitePosition() {
         return Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z);
+    }
+
+    public boolean hasFiniteVelocity() {
+        return Double.isFinite(velocityX) && Double.isFinite(velocityZ);
     }
 
     public double confidence(long currentTick, int memoryTicks) {
