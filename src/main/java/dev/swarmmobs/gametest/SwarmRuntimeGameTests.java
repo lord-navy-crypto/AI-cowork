@@ -1,5 +1,8 @@
 package dev.swarmmobs.gametest;
 
+import com.mojang.authlib.GameProfile;
+import io.netty.channel.embedded.EmbeddedChannel;
+import java.util.UUID;
 import dev.swarmmobs.SwarmMobs;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmRole;
@@ -8,11 +11,16 @@ import dev.swarmmobs.goal.SwarmApproachGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.monster.Zombie;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
 public final class SwarmRuntimeGameTests {
     private static final String TEMPLATE = "empty5x4x5";
@@ -141,6 +149,48 @@ public final class SwarmRuntimeGameTests {
 
             helper.succeed();
         });
+    }
+
+    private static TestPlayerHandle createTickingTestPlayer(GameTestHelper helper, GameType gameType) {
+        var level = helper.getLevel();
+        var server = level.getServer();
+        CommonListenerCookie cookie = CommonListenerCookie.createInitial(
+                new GameProfile(UUID.randomUUID(), "swarm-test-player"),
+                false
+        );
+
+        ServerPlayer player = new ServerPlayer(
+                server,
+                level,
+                cookie.gameProfile(),
+                cookie.clientInformation()
+        );
+
+        Connection connection = new Connection(PacketFlow.SERVERBOUND) {
+            @Override
+            public boolean isMemoryConnection() {
+                return true;
+            }
+        };
+
+        new EmbeddedChannel(connection);
+        NetworkRegistry.configureMockConnection(connection);
+        server.getPlayerList().placeNewPlayer(connection, player, cookie);
+        server.getConnection().getConnections().add(connection);
+        player.gameMode.changeGameModeForPlayer(gameType);
+        player.connection.chunkSender.sendNextChunks(player);
+        player.connection.chunkSender.onChunkBatchReceivedByClient(64.0F);
+
+        return new TestPlayerHandle(player, connection);
+    }
+
+    private record TestPlayerHandle(ServerPlayer player, Connection connection) {
+        private void close() {
+            if (player.connection != null) {
+                player.connection.disconnect(net.minecraft.network.chat.Component.literal("Swarm GameTest complete"));
+            }
+            player.level().getServer().getConnection().getConnections().remove(connection);
+        }
     }
 
 }
