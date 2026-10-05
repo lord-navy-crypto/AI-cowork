@@ -25,6 +25,8 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue SEARCH_MAX_RADIUS;
     public static final ModConfigSpec.IntValue SEARCH_PHASE_TICKS;
     public static final ModConfigSpec.DoubleValue SEARCH_ARRIVAL_TOLERANCE;
+    public static final ModConfigSpec.IntValue SEARCH_PREDICTION_MAX_TICKS;
+    public static final ModConfigSpec.DoubleValue SEARCH_PREDICTION_MAX_DISTANCE;
     public static final ModConfigSpec.DoubleValue MOVE_SPEED;
     public static final ModConfigSpec.DoubleValue RELEASE_TO_VANILLA_DISTANCE;
 
@@ -120,6 +122,14 @@ public final class SwarmConfig {
         SEARCH_ARRIVAL_TOLERANCE = BUILDER
                 .comment("Distance from a search destination at which the swarm movement goal yields.")
                 .defineInRange("searchArrivalTolerance", 1.25, 0.5, 4.0);
+
+        SEARCH_PREDICTION_MAX_TICKS = BUILDER
+                .comment("Maximum dead-reckoning horizon from the last observed target velocity.")
+                .defineInRange("searchPredictionMaxTicks", 30, 0, 100);
+
+        SEARCH_PREDICTION_MAX_DISTANCE = BUILDER
+                .comment("Maximum distance, in blocks, that dead-reckoning may shift the search anchor.")
+                .defineInRange("searchPredictionMaxDistance", 6.0, 0.0, 24.0);
 
         MOVE_SPEED = BUILDER
                 .comment("Navigation speed multiplier used for swarm repositioning.")
