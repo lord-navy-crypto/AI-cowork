@@ -1,8 +1,14 @@
 package dev.swarmmobs.agent;
 
+import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 
 public final class SwarmAgentState {
+    private static final int MAX_PENDING_TARGET_MESSAGES = 32;
     private UUID targetId;
     private long lastTargetObservationTick = Long.MIN_VALUE;
     private long nextPlanTick;
@@ -16,6 +22,11 @@ public final class SwarmAgentState {
     private double destinationZ;
     private double separationMagnitude;
     private double cohesionMagnitude;
+
+    private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
+    private long communicationAcceptedMessages;
+    private long communicationDeliveredMessages;
+    private long communicationDroppedMessages;
 
     public UUID targetId() {
         return targetId;
@@ -67,6 +78,69 @@ public final class SwarmAgentState {
 
     public double cohesionMagnitude() {
         return cohesionMagnitude;
+    }
+
+    public int pendingTargetMessageCount() {
+        return pendingTargetMessages.size();
+    }
+
+    public long communicationAcceptedMessages() {
+        return communicationAcceptedMessages;
+    }
+
+    public long communicationDeliveredMessages() {
+        return communicationDeliveredMessages;
+    }
+
+    public long communicationDroppedMessages() {
+        return communicationDroppedMessages;
+    }
+
+    public boolean enqueueTargetMessage(TargetMessage message) {
+        if (message == null) {
+            return false;
+        }
+
+        for (TargetMessage pending : pendingTargetMessages) {
+            if (pending.senderId().equals(message.senderId())
+                    && pending.targetId().equals(message.targetId())
+                    && pending.observationTick() == message.observationTick()) {
+                return false;
+            }
+        }
+
+        if (pendingTargetMessages.size() >= MAX_PENDING_TARGET_MESSAGES) {
+            pendingTargetMessages.remove(0);
+            communicationDroppedMessages++;
+        }
+
+        pendingTargetMessages.add(message);
+        communicationAcceptedMessages++;
+        return true;
+    }
+
+    public List<TargetMessage> drainDeliverableTargetMessages(long currentTick) {
+        List<TargetMessage> delivered = new ArrayList<>();
+        Iterator<TargetMessage> iterator = pendingTargetMessages.iterator();
+
+        while (iterator.hasNext()) {
+            TargetMessage message = iterator.next();
+            if (message.deliverTick() <= currentTick) {
+                delivered.add(message);
+                iterator.remove();
+            }
+        }
+
+        communicationDeliveredMessages += delivered.size();
+        return delivered;
+    }
+
+    public void recordCommunicationDrop() {
+        communicationDroppedMessages++;
+    }
+
+    public void clearPendingTargetMessages() {
+        pendingTargetMessages.clear();
     }
 
     public void rememberTarget(UUID targetId, long gameTick, boolean directObservation) {
