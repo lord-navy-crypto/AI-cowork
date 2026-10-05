@@ -339,4 +339,72 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_heterogeneous_relay", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void zombieObservationRelaysToOccludedSkeletonSupport(GameTestHelper helper) {
+        var skeleton = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 2));
+        Zombie observer = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        skeleton.setNoGravity(true);
+        observer.setNoGravity(true);
+
+        helper.setBlock(new BlockPos(2, 1, 2), Blocks.STONE);
+        helper.setBlock(new BlockPos(2, 2, 2), Blocks.STONE);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(30, () -> {
+            SwarmAgentState observerState = observer.getData(SwarmAttachments.AGENT_STATE.get());
+            SwarmAgentState skeletonState = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!observer.hasLineOfSight(player)) {
+                helper.fail("Zombie observer unexpectedly lost direct line of sight");
+                return;
+            }
+
+            if (skeleton.hasLineOfSight(player)) {
+                helper.fail("Skeleton support unexpectedly had direct line of sight through test wall");
+                return;
+            }
+
+            if (!player.getUUID().equals(observerState.targetId()) || !observerState.directObservation()) {
+                helper.fail("Zombie observer did not establish direct target observation");
+                return;
+            }
+
+            if (!player.getUUID().equals(skeletonState.targetId())) {
+                helper.fail("Skeleton support did not receive target observation from Zombie teammate");
+                return;
+            }
+
+            if (skeletonState.directObservation()) {
+                helper.fail("Cross-species relay was incorrectly marked as direct observation");
+                return;
+            }
+
+            if (skeletonState.role() != SwarmRole.RANGED_SUPPORT) {
+                helper.fail("Skeleton did not enter RANGED_SUPPORT tactical role");
+                return;
+            }
+
+            if (!skeletonState.hasDestination()) {
+                helper.fail("Skeleton support did not receive a planned support destination");
+                return;
+            }
+
+            boolean hasApproachGoal = skeleton.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(wrapped -> wrapped.getGoal() instanceof SwarmApproachGoal);
+            if (!hasApproachGoal) {
+                helper.fail("Skeleton did not receive the heterogeneous SwarmApproachGoal");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
 }
