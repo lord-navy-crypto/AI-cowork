@@ -122,6 +122,10 @@ public final class SwarmCommands {
                                 + ", searchMinRadius=" + SwarmConfig.SEARCH_MIN_RADIUS.get()
                                 + ", searchMaxRadius=" + SwarmConfig.SEARCH_MAX_RADIUS.get()
                                 + ", searchPhaseTicks=" + SwarmConfig.SEARCH_PHASE_TICKS.get()
+                                + ", targetPredictionEnabled=" + SwarmConfig.TARGET_PREDICTION_ENABLED.get()
+                                + ", targetPredictionLeadTicks=" + SwarmConfig.TARGET_PREDICTION_LEAD_TICKS.get()
+                                + ", targetPredictionMaxTicks=" + SwarmConfig.TARGET_PREDICTION_MAX_TICKS.get()
+                                + ", targetPredictionMaxDistance=" + SwarmConfig.TARGET_PREDICTION_MAX_DISTANCE.get()
                                 + ", communicationEnabled=" + SwarmConfig.COMMUNICATION_ENABLED.get()
                                 + ", communicationRadius=" + SwarmConfig.COMMUNICATION_RADIUS.get()
                                 + ", latencyTicks=" + SwarmConfig.COMMUNICATION_LATENCY_TICKS.get()
@@ -197,6 +201,19 @@ public final class SwarmCommands {
                                 + " directObservation=" + state.directObservation()
                                 + " targetConfidence=" + String.format(java.util.Locale.ROOT, "%.3f", confidence)
                                 + " targetEstimate=" + targetEstimate
+                                + " predictedTarget=" + (state.hasPrediction()
+                                        ? String.format(
+                                                java.util.Locale.ROOT,
+                                                "(%.2f, %.2f)",
+                                                state.predictedTargetX(),
+                                                state.predictedTargetZ()
+                                        )
+                                        : "none")
+                                + " predictionOffset=" + String.format(
+                                        java.util.Locale.ROOT,
+                                        "%.3f",
+                                        state.predictionOffset()
+                                )
                                 + " destination=" + (state.hasDestination()
                                         ? String.format(java.util.Locale.ROOT, "(%.2f, %.2f)", state.destinationX(), state.destinationZ())
                                         : "none")
@@ -246,6 +263,8 @@ public final class SwarmCommands {
         int engageCount = 0;
         int searchCount = 0;
         double searchRadiusSum = 0.0;
+        double predictionOffsetSum = 0.0;
+        int predictionCount = 0;
         double neighborSum = 0.0;
         double separationSum = 0.0;
         double cohesionSum = 0.0;
@@ -273,6 +292,10 @@ public final class SwarmCommands {
             } else {
                 engageCount++;
             }
+            if (state.hasPrediction()) {
+                predictionCount++;
+                predictionOffsetSum += state.predictionOffset();
+            }
             neighborSum += state.neighborCount();
             separationSum += state.separationMagnitude();
             cohesionSum += state.cohesionMagnitude();
@@ -299,13 +322,15 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
                 engageCount,
                 searchCount,
                 searchCount == 0 ? 0.0 : searchRadiusSum / searchCount,
+                predictionCount,
+                predictionCount == 0 ? 0.0 : predictionOffsetSum / predictionCount,
                 neighborSum / total,
                 separationSum / total,
                 cohesionSum / total,
