@@ -1,6 +1,7 @@
 package dev.swarmmobs.event;
 
 import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.algorithm.FormationSlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy.TargetRecord;
@@ -71,8 +72,14 @@ public final class SwarmMobEvents {
                 .map(entity -> new Vec2(entity.getX(), entity.getZ()))
                 .toList();
 
-        SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.plan(
+        int assignedSlot = FormationSlotAllocator.allocate(
                 zombie.getUUID(),
+                neighbors.stream().map(Zombie::getUUID).toList(),
+                slots
+        );
+
+        SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForSlot(
+                assignedSlot,
                 new Vec2(zombie.getX(), zombie.getZ()),
                 new Vec2(target.getX(), target.getZ()),
                 new Vec2(look.x, look.z),
