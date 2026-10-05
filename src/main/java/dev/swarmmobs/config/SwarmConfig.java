@@ -18,6 +18,13 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue COHESION_WEIGHT;
     public static final ModConfigSpec.DoubleValue MOVE_SPEED;
     public static final ModConfigSpec.DoubleValue RELEASE_TO_VANILLA_DISTANCE;
+
+    public static final ModConfigSpec.BooleanValue COMMUNICATION_ENABLED;
+    public static final ModConfigSpec.DoubleValue COMMUNICATION_RADIUS;
+    public static final ModConfigSpec.IntValue COMMUNICATION_LATENCY_TICKS;
+    public static final ModConfigSpec.DoubleValue COMMUNICATION_PACKET_DROP_RATE;
+    public static final ModConfigSpec.IntValue COMMUNICATION_EXPERIMENT_SEED;
+
     public static final ModConfigSpec.BooleanValue EXTERNAL_AI_ENABLED;
 
     public static final ModConfigSpec SPEC;
@@ -76,6 +83,30 @@ public final class SwarmConfig {
         RELEASE_TO_VANILLA_DISTANCE = BUILDER
                 .comment("Inside this distance, vanilla targeting/attack movement is allowed to dominate.")
                 .defineInRange("releaseToVanillaDistance", 3.25, 1.0, 10.0);
+
+        BUILDER.pop();
+
+        BUILDER.push("communication");
+
+        COMMUNICATION_ENABLED = BUILDER
+                .comment("Enable explicit neighbor-to-neighbor target-message communication.")
+                .define("enabled", true);
+
+        COMMUNICATION_RADIUS = BUILDER
+                .comment("Maximum distance, in blocks, for one swarm agent to send target information to another.")
+                .defineInRange("radius", 16.0, 1.0, 96.0);
+
+        COMMUNICATION_LATENCY_TICKS = BUILDER
+                .comment("One-way delivery latency applied to swarm target messages.")
+                .defineInRange("latencyTicks", 0, 0, 400);
+
+        COMMUNICATION_PACKET_DROP_RATE = BUILDER
+                .comment("Deterministic packet-drop probability from 0.0 to 1.0.")
+                .defineInRange("packetDropRate", 0.0, 0.0, 1.0);
+
+        COMMUNICATION_EXPERIMENT_SEED = BUILDER
+                .comment("Seed mixed into deterministic packet-drop decisions for reproducible experiments.")
+                .defineInRange("experimentSeed", 0, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
         BUILDER.pop();
 
