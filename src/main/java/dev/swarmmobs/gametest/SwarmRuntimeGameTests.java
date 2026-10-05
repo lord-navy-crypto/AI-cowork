@@ -185,8 +185,6 @@ public final class SwarmRuntimeGameTests {
         player.gameMode.changeGameModeForPlayer(gameType);
         player.connection.chunkSender.sendNextChunks(player);
         player.connection.chunkSender.onChunkBatchReceivedByClient(64.0F);
-        player.connection.markClientLoaded();
-
         return new TestPlayerHandle(player, connection);
     }
 
