@@ -1,0 +1,41 @@
+name: Swarm Mobs Build
+
+on:
+  push:
+    branches: [main, swarm-combat-v0.1]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle 9.2.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.2.1'
+      - name: Compile
+        run: gradle compileJava --stacktrace --warning-mode all
+      - name: Unit tests
+        run: gradle test --stacktrace
+      - name: Build
+        run: gradle build --stacktrace --warning-mode all
+      - name: Upload jar
+        uses: actions/upload-artifact@v6
+        with:
+          name: swarm-mobs-${{ github.sha }}
+          path: build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 14
