@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.5.4; current integration work: `swarm-navigation-telemetry-v0.5.5`
+Active stable line: `main` through v0.5.5; current integration work: `swarm-walkability-v0.5.6`
 
 The current playable system includes:
 
@@ -59,6 +59,7 @@ The current playable system includes:
 - short-range terrain probes that preemptively steer around immediate obstacles before a full stall occurs;
 - obstacle-detour hysteresis that holds a chosen bypass briefly, reducing left/right steering jitter near wall edges;
 - navigation-layer telemetry exposing the actual PLAN / OBSTACLE_DETOUR / RECOVERY waypoint and cumulative recovery counters;
+- walkability-aware local probes that reject unsupported detours near pits and ledges while allowing a configurable small drop;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -78,6 +79,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.5.4 is merged on `main`; v0.5.5 navigation observability is under integration.**
+**Swarm Mobs v0.5.5 is merged on `main`; v0.5.6 walkability-aware terrain probing is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.

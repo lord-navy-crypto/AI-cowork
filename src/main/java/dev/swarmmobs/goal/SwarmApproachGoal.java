@@ -10,12 +10,14 @@ import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
+import dev.swarmmobs.algorithm.SwarmTerrainSupportPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
@@ -251,9 +253,9 @@ public final class SwarmApproachGoal extends Goal {
         Vec2 leftProbe = frontProbe.add(left.scale(lateralDistance));
         Vec2 rightProbe = frontProbe.add(left.scale(-lateralDistance));
 
-        boolean frontBlocked = isTerrainBlocked(level, frontProbe.x(), frontProbe.z());
-        boolean leftBlocked = isTerrainBlocked(level, leftProbe.x(), leftProbe.z());
-        boolean rightBlocked = isTerrainBlocked(level, rightProbe.x(), rightProbe.z());
+        boolean frontBlocked = isProbeBlocked(level, frontProbe.x(), frontProbe.z());
+        boolean leftBlocked = isProbeBlocked(level, leftProbe.x(), leftProbe.z());
+        boolean rightBlocked = isProbeBlocked(level, rightProbe.x(), rightProbe.z());
 
         return SwarmObstacleAvoidancePolicy.chooseWaypoint(
                 self,
@@ -267,7 +269,7 @@ public final class SwarmApproachGoal extends Goal {
         );
     }
 
-    private boolean isTerrainBlocked(ServerLevel level, double x, double z) {
+    private boolean isProbeBlocked(ServerLevel level, double x, double z) {
         int minY = (int) Math.floor(mob.getY());
         int maxY = Math.max(minY, (int) Math.floor(mob.getY() + mob.getBbHeight() - 0.01));
 
@@ -278,7 +280,28 @@ public final class SwarmApproachGoal extends Goal {
             }
         }
 
-        return false;
+        if (!SwarmConfig.NAV_WALKABILITY_ENABLED.get()) {
+            return false;
+        }
+
+        BlockPos footPos = BlockPos.containing(x, minY, z);
+        if (level.getFluidState(footPos).is(FluidTags.WATER)) {
+            return false;
+        }
+
+        int maxDrop = SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.get();
+        boolean[] supportByDropDepth = new boolean[maxDrop + 1];
+        for (int depth = 0; depth <= maxDrop; depth++) {
+            BlockPos supportPos = BlockPos.containing(x, minY - 1 - depth, z);
+            supportByDropDepth[depth] =
+                    !level.getBlockState(supportPos).getCollisionShape(level, supportPos).isEmpty()
+                            || level.getFluidState(supportPos).is(FluidTags.WATER);
+        }
+
+        return !SwarmTerrainSupportPolicy.hasSupport(
+                supportByDropDepth,
+                maxDrop
+        );
     }
 
     private void updateRecoveryState() {
