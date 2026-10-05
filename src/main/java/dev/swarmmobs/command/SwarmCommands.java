@@ -227,6 +227,17 @@ public final class SwarmCommands {
                                 + " destination=" + (state.hasDestination()
                                         ? String.format(java.util.Locale.ROOT, "(%.2f, %.2f)", state.destinationX(), state.destinationZ())
                                         : "none")
+                                + " navMode=" + state.navigationMode()
+                                + " navWaypoint=" + (state.hasNavigationWaypoint()
+                                        ? String.format(
+                                                java.util.Locale.ROOT,
+                                                "(%.2f, %.2f)",
+                                                state.navigationWaypointX(),
+                                                state.navigationWaypointZ()
+                                        )
+                                        : "none")
+                                + " obstacleDetours=" + state.obstacleDetourCount()
+                                + " recoveries=" + state.recoveryCount()
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
                                 + " alignment=" + String.format(java.util.Locale.ROOT, "%.3f", state.alignmentMagnitude())
@@ -285,6 +296,11 @@ public final class SwarmCommands {
         long acceptedMessages = 0L;
         long deliveredMessages = 0L;
         long droppedMessages = 0L;
+        int planNavigation = 0;
+        int obstacleNavigation = 0;
+        int recoveryNavigation = 0;
+        long obstacleDetours = 0L;
+        long recoveries = 0L;
 
         for (PathfinderMob agent : agents) {
             SwarmAgentState state = agent.getData(SwarmAttachments.AGENT_STATE.get());
@@ -319,6 +335,13 @@ public final class SwarmCommands {
             acceptedMessages += state.communicationAcceptedMessages();
             deliveredMessages += state.communicationDeliveredMessages();
             droppedMessages += state.communicationDroppedMessages();
+            switch (state.navigationMode()) {
+                case PLAN -> planNavigation++;
+                case OBSTACLE_DETOUR -> obstacleNavigation++;
+                case RECOVERY -> recoveryNavigation++;
+            }
+            obstacleDetours += state.obstacleDetourCount();
+            recoveries += state.recoveryCount();
         }
 
         int total = agents.size();
@@ -332,7 +355,7 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -351,6 +374,11 @@ public final class SwarmCommands {
                 acceptedMessages,
                 deliveredMessages,
                 droppedMessages,
+                planNavigation,
+                obstacleNavigation,
+                recoveryNavigation,
+                obstacleDetours,
+                recoveries,
                 archetypeSummary,
                 roleSummary
         );
