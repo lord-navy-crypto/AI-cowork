@@ -101,6 +101,7 @@ public final class SwarmCommands {
                                 + ", neighborRadius=" + SwarmConfig.NEIGHBOR_RADIUS.get()
                                 + ", targetRadius=" + SwarmConfig.TARGET_RADIUS.get()
                                 + ", formationRadius=" + SwarmConfig.FORMATION_RADIUS.get()
+                                + ", formationSlotHysteresisTicks=" + SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()
                                 + ", alignmentWeight=" + SwarmConfig.ALIGNMENT_WEIGHT.get()
                                 + ", maxSteeringCorrection=" + SwarmConfig.MAX_STEERING_CORRECTION.get()
                                 + ", staleTargetMinSpeedFactor=" + SwarmConfig.STALE_TARGET_MIN_SPEED_FACTOR.get()
@@ -167,6 +168,8 @@ public final class SwarmCommands {
                         "Zombie #" + nearest.getId()
                                 + " role=" + state.role()
                                 + " slot=" + state.formationSlot()
+                                + " pendingSlot=" + state.pendingFormationSlot()
+                                + " slotSwitches=" + state.formationSlotSwitchCount()
                                 + " neighbors=" + state.neighborCount()
                                 + " target=" + (state.targetId() == null ? "none" : state.targetId())
                                 + " targetAgeTicks=" + age
