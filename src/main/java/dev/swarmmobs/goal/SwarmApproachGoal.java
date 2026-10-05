@@ -5,6 +5,7 @@ import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
+import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
@@ -125,6 +126,7 @@ public final class SwarmApproachGoal extends Goal {
         recoveryUntilTick = Long.MIN_VALUE;
         obstacleDetourActive = false;
         obstacleDetourUntilTick = Long.MIN_VALUE;
+        mob.getData(SwarmAttachments.AGENT_STATE.get()).clearNavigationTelemetry();
         progressSampleTick = Long.MIN_VALUE;
     }
 
@@ -207,6 +209,19 @@ public final class SwarmApproachGoal extends Goal {
                 }
             }
         }
+
+        SwarmNavigationMode navigationMode = recoveryActive
+                ? SwarmNavigationMode.RECOVERY
+                : obstacleDetourActive
+                        ? SwarmNavigationMode.OBSTACLE_DETOUR
+                        : SwarmNavigationMode.PLAN;
+
+        state.updateNavigationTelemetry(
+                navigationMode,
+                navigationX,
+                navigationZ,
+                false
+        );
 
         mob.getNavigation().moveTo(
                 navigationX,
@@ -321,6 +336,12 @@ public final class SwarmApproachGoal extends Goal {
                 recoveryActive = true;
                 recoveryX = recovery.waypoint().x();
                 recoveryZ = recovery.waypoint().z();
+                state.updateNavigationTelemetry(
+                        SwarmNavigationMode.RECOVERY,
+                        recoveryX,
+                        recoveryZ,
+                        true
+                );
                 recoveryUntilTick = gameTick + SwarmConfig.NAV_RECOVERY_DURATION_TICKS.get();
                 mob.getNavigation().stop();
             }

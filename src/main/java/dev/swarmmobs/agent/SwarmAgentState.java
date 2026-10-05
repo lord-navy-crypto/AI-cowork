@@ -37,6 +37,12 @@ public final class SwarmAgentState {
     private double cohesionMagnitude;
     private double alignmentMagnitude;
     private double steeringMagnitude;
+    private SwarmNavigationMode navigationMode = SwarmNavigationMode.PLAN;
+    private boolean hasNavigationWaypoint;
+    private double navigationWaypointX;
+    private double navigationWaypointZ;
+    private long obstacleDetourCount;
+    private long recoveryCount;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -147,6 +153,30 @@ public final class SwarmAgentState {
 
     public double steeringMagnitude() {
         return steeringMagnitude;
+    }
+
+    public SwarmNavigationMode navigationMode() {
+        return navigationMode;
+    }
+
+    public boolean hasNavigationWaypoint() {
+        return hasNavigationWaypoint;
+    }
+
+    public double navigationWaypointX() {
+        return navigationWaypointX;
+    }
+
+    public double navigationWaypointZ() {
+        return navigationWaypointZ;
+    }
+
+    public long obstacleDetourCount() {
+        return obstacleDetourCount;
+    }
+
+    public long recoveryCount() {
+        return recoveryCount;
     }
 
     public int pendingTargetMessageCount() {
@@ -337,6 +367,34 @@ public final class SwarmAgentState {
         this.predictionOffset = Math.max(0.0, predictionOffset);
         this.hasPrediction = Double.isFinite(predictedTargetX)
                 && Double.isFinite(predictedTargetZ);
+    }
+
+    public void updateNavigationTelemetry(
+            SwarmNavigationMode mode,
+            double waypointX,
+            double waypointZ,
+            boolean countTransition
+    ) {
+        SwarmNavigationMode next = mode == null ? SwarmNavigationMode.PLAN : mode;
+        if (countTransition && next != this.navigationMode) {
+            if (next == SwarmNavigationMode.OBSTACLE_DETOUR) {
+                obstacleDetourCount++;
+            } else if (next == SwarmNavigationMode.RECOVERY) {
+                recoveryCount++;
+            }
+        }
+
+        this.navigationMode = next;
+        this.navigationWaypointX = waypointX;
+        this.navigationWaypointZ = waypointZ;
+        this.hasNavigationWaypoint = Double.isFinite(waypointX) && Double.isFinite(waypointZ);
+    }
+
+    public void clearNavigationTelemetry() {
+        this.navigationMode = SwarmNavigationMode.PLAN;
+        this.hasNavigationWaypoint = false;
+        this.navigationWaypointX = 0.0;
+        this.navigationWaypointZ = 0.0;
     }
 
     public void clearPredictionTelemetry() {
