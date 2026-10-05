@@ -13,6 +13,8 @@ public final class SwarmAgentState {
     private boolean hasDestination;
     private double destinationX;
     private double destinationZ;
+    private double separationMagnitude;
+    private double cohesionMagnitude;
 
     public UUID targetId() {
         return targetId;
@@ -54,6 +56,14 @@ public final class SwarmAgentState {
         return destinationZ;
     }
 
+    public double separationMagnitude() {
+        return separationMagnitude;
+    }
+
+    public double cohesionMagnitude() {
+        return cohesionMagnitude;
+    }
+
     public void rememberTarget(UUID targetId, long gameTick, boolean directObservation) {
         this.targetId = targetId;
         this.lastTargetObservationTick = gameTick;
@@ -77,6 +87,8 @@ public final class SwarmAgentState {
         this.formationSlot = 0;
         this.role = SwarmRole.CHASER;
         this.hasDestination = false;
+        this.separationMagnitude = 0.0;
+        this.cohesionMagnitude = 0.0;
     }
 
     public void updateLocalPlan(
@@ -84,13 +96,17 @@ public final class SwarmAgentState {
             int formationSlot,
             SwarmRole role,
             double destinationX,
-            double destinationZ
+            double destinationZ,
+            double separationMagnitude,
+            double cohesionMagnitude
     ) {
         this.neighborCount = neighborCount;
         this.formationSlot = formationSlot;
         this.role = role;
         this.destinationX = destinationX;
         this.destinationZ = destinationZ;
+        this.separationMagnitude = separationMagnitude;
+        this.cohesionMagnitude = cohesionMagnitude;
         this.hasDestination = true;
     }
 }
