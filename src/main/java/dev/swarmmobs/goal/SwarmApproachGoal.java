@@ -1,8 +1,10 @@
 package dev.swarmmobs.goal;
 
 import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
@@ -10,10 +12,11 @@ import net.minecraft.world.entity.player.Player;
 import java.util.EnumSet;
 
 /**
- * Holds the movement channel while a swarm member is outside melee range.
+ * Holds the movement channel while a swarm member is outside the vanilla melee
+ * release radius.
  *
- * Target sensing and planning remain outside the goal. This class only applies the
- * most recent local swarm destination through vanilla PathNavigation.
+ * Indirect target memory uses the last-known observation snapshot, not a live player
+ * position. As confidence decays, movement speed becomes more conservative.
  */
 public final class SwarmApproachGoal extends Goal {
     private final Zombie zombie;
@@ -29,17 +32,30 @@ public final class SwarmApproachGoal extends Goal {
             return false;
         }
 
-        if (!(zombie.getTarget() instanceof Player target) || !validTarget(target)) {
-            return false;
-        }
-
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
-        if (!state.hasDestination() || state.targetId() == null || !state.targetId().equals(target.getUUID())) {
+        if (!state.hasDestination() || state.targetId() == null) {
             return false;
         }
 
         double release = SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
-        return zombie.distanceToSqr(target) > release * release;
+
+        if (state.directObservation()
+                && zombie.getTarget() instanceof Player target
+                && validTarget(target)
+                && state.targetId().equals(target.getUUID())) {
+            return zombie.distanceToSqr(target) > release * release;
+        }
+
+        TargetObservation observation = state.targetObservation();
+        if (observation == null || !observation.hasFinitePosition()) {
+            return false;
+        }
+
+        return zombie.distanceToSqr(
+                observation.x(),
+                observation.y(),
+                observation.z()
+        ) > release * release;
     }
 
     @Override
@@ -65,20 +81,38 @@ public final class SwarmApproachGoal extends Goal {
     }
 
     private void moveToLatestPlan() {
-        if (!(zombie.getTarget() instanceof Player target)) {
-            return;
-        }
-
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
         if (!state.hasDestination()) {
             return;
         }
 
+        double targetY = zombie.getY();
+        if (state.directObservation() && zombie.getTarget() instanceof Player target) {
+            targetY = target.getY();
+        } else {
+            TargetObservation observation = state.targetObservation();
+            if (observation != null && observation.hasFinitePosition()) {
+                targetY = observation.y();
+            }
+        }
+
+        double confidence = 1.0;
+        if (zombie.level() instanceof ServerLevel level) {
+            confidence = state.targetConfidence(
+                    level.getGameTime(),
+                    SwarmConfig.TARGET_MEMORY_TICKS.get()
+            );
+        }
+
+        double minFactor = SwarmConfig.STALE_TARGET_MIN_SPEED_FACTOR.get();
+        double speedFactor = minFactor + (1.0 - minFactor) * confidence;
+        double speed = SwarmConfig.MOVE_SPEED.get() * speedFactor;
+
         zombie.getNavigation().moveTo(
                 state.destinationX(),
-                target.getY(),
+                targetY,
                 state.destinationZ(),
-                SwarmConfig.MOVE_SPEED.get()
+                speed
         );
     }
 
