@@ -16,6 +16,9 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue SEPARATION_RADIUS;
     public static final ModConfigSpec.DoubleValue SEPARATION_WEIGHT;
     public static final ModConfigSpec.DoubleValue COHESION_WEIGHT;
+    public static final ModConfigSpec.DoubleValue ALIGNMENT_WEIGHT;
+    public static final ModConfigSpec.DoubleValue MAX_STEERING_CORRECTION;
+    public static final ModConfigSpec.DoubleValue STALE_TARGET_MIN_SPEED_FACTOR;
     public static final ModConfigSpec.DoubleValue MOVE_SPEED;
     public static final ModConfigSpec.DoubleValue RELEASE_TO_VANILLA_DISTANCE;
 
@@ -75,6 +78,18 @@ public final class SwarmConfig {
         COHESION_WEIGHT = BUILDER
                 .comment("Strength, in blocks, pulling isolated mobs toward their local neighbor centroid.")
                 .defineInRange("cohesionWeight", 0.35, 0.0, 4.0);
+
+        ALIGNMENT_WEIGHT = BUILDER
+                .comment("Strength of steering toward the average movement direction of local peers.")
+                .defineInRange("alignmentWeight", 0.45, 0.0, 4.0);
+
+        MAX_STEERING_CORRECTION = BUILDER
+                .comment("Maximum combined separation/cohesion/alignment correction in blocks.")
+                .defineInRange("maxSteeringCorrection", 3.0, 0.25, 12.0);
+
+        STALE_TARGET_MIN_SPEED_FACTOR = BUILDER
+                .comment("Minimum fraction of moveSpeed used when target information is almost expired.")
+                .defineInRange("staleTargetMinSpeedFactor", 0.55, 0.1, 1.0);
 
         MOVE_SPEED = BUILDER
                 .comment("Navigation speed multiplier used for swarm repositioning.")
