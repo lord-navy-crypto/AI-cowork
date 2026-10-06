@@ -397,7 +397,7 @@ public final class SwarmConfig {
                 .defineInRange("activeMinHoldTicks", 60, 0, 1200);
 
         OLLAMA_BASE_URL = BUILDER
-                .comment("Local Ollama base URL. v0.10 accepts loopback hosts only.")
+                .comment("Local Ollama base URL. Only loopback hosts are accepted.")
                 .define("ollamaBaseUrl", "http://127.0.0.1:11434");
 
         OLLAMA_MODEL = BUILDER
