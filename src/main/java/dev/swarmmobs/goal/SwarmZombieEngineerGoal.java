@@ -275,6 +275,14 @@ public final class SwarmZombieEngineerGoal extends Goal {
                     distanceSqr
             );
 
+            boolean materialAvailable = type != SwarmEngineeringTask.Type.BRIDGE
+                    || candidateState.carriedEngineeringBlockCount() > 0
+                    || findMaterialDonor(
+                            candidate,
+                            localZombies,
+                            requesterState.targetId()
+                    ) != null;
+
             candidates.add(new SwarmEngineeringTaskPolicy.Candidate(
                     candidate.getUUID(),
                     distanceSqr,
@@ -282,11 +290,49 @@ public final class SwarmZombieEngineerGoal extends Goal {
                     candidateState.carriedEngineeringBlockCount(),
                     candidate == zombie,
                     meleeBusy(candidate),
-                    pathReachable
+                    pathReachable,
+                    materialAvailable
             ));
         }
 
-        return SwarmEngineeringTaskPolicy.chooseClaimant(type, candidates);
+        UUID claimant = SwarmEngineeringTaskPolicy.chooseClaimant(type, candidates);
+        if (claimant == null || type != SwarmEngineeringTask.Type.BRIDGE) {
+            return claimant;
+        }
+
+        Zombie claimantZombie = localZombies.stream()
+                .filter(candidate -> candidate.getUUID().equals(claimant))
+                .findFirst()
+                .orElse(null);
+        if (claimantZombie == null) {
+            return null;
+        }
+
+        SwarmAgentState claimantState =
+                claimantZombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+        if (claimantState.carriedEngineeringBlockCount() > 0) {
+            return claimant;
+        }
+
+        Zombie donor = findMaterialDonor(
+                claimantZombie,
+                localZombies,
+                requesterState.targetId()
+        );
+        if (donor == null) {
+            return null;
+        }
+
+        SwarmAgentState donorState =
+                donor.getData(SwarmAttachments.AGENT_STATE.get());
+
+        return donorState.transferOneEngineeringBlockTo(
+                claimantState,
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        )
+                ? claimant
+                : null;
     }
 
     private boolean engineeringPathReachable(
@@ -326,6 +372,45 @@ public final class SwarmZombieEngineerGoal extends Goal {
         double dy = candidate.getY() - (position.getY() + 0.5);
         double dz = candidate.getZ() - (position.getZ() + 0.5);
         return dx * dx + dy * dy + dz * dz;
+    }
+
+    private Zombie findMaterialDonor(
+            Zombie receiver,
+            List<Zombie> localZombies,
+            UUID targetId
+    ) {
+        if (receiver == null || localZombies == null || localZombies.isEmpty()) {
+            return null;
+        }
+
+        double radius = SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.get();
+        double radiusSqr = radius * radius;
+        SwarmAgentState receiverState =
+                receiver.getData(SwarmAttachments.AGENT_STATE.get());
+
+        return localZombies.stream()
+                .filter(donor -> donor != receiver && donor.isAlive())
+                .filter(donor -> {
+                    SwarmAgentState donorState =
+                            donor.getData(SwarmAttachments.AGENT_STATE.get());
+                    return targetId != null
+                            && targetId.equals(donorState.targetId())
+                            && donorState.carriedEngineeringBlockCount() > 0
+                            && donorState.carriedEngineeringBlock() != null
+                            && !meleeBusy(donor)
+                            && receiverState.canCarryEngineeringBlock(
+                                    donorState.carriedEngineeringBlock(),
+                                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+                            );
+                })
+                .filter(donor -> donor.distanceToSqr(receiver) <= radiusSqr)
+                .min(
+                        Comparator.comparingDouble(
+                                        (Zombie donor) -> donor.distanceToSqr(receiver)
+                                )
+                                .thenComparing(donor -> donor.getUUID().toString())
+                )
+                .orElse(null);
     }
 
     private boolean configureFromTask(
@@ -398,22 +483,28 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 zombie.getZ() + stepZ * 0.9
         );
 
-        if (state.carriedEngineeringBlockCount() > 0
-                && state.carriedEngineeringBlock() != null) {
-            BlockPos support = feetAhead.below();
-            BlockState currentSupport = zombie.level().getBlockState(support);
-            BlockState feetState = zombie.level().getBlockState(feetAhead);
-            BlockState carried = state.carriedEngineeringBlock().getBlock().defaultBlockState();
+        BlockPos support = feetAhead.below();
+        BlockState currentSupport = zombie.level().getBlockState(support);
+        BlockState feetState = zombie.level().getBlockState(feetAhead);
 
-            if (currentSupport.canBeReplaced()
-                    && feetState.getCollisionShape(zombie.level(), feetAhead).isEmpty()
-                    && !carried.getCollisionShape(zombie.level(), support).isEmpty()
-                    && carried.canSurvive(zombie.level(), support)) {
-                actionPos = support;
-                sourceState = carried;
-                requiredTicks = 6;
-                return Action.BRIDGE;
+        if (currentSupport.canBeReplaced()
+                && feetState.getCollisionShape(zombie.level(), feetAhead).isEmpty()) {
+            if (state.carriedEngineeringBlockCount() > 0
+                    && state.carriedEngineeringBlock() != null) {
+                BlockState carried = state.carriedEngineeringBlock()
+                        .getBlock()
+                        .defaultBlockState();
+                if (!carried.getCollisionShape(zombie.level(), support).isEmpty()
+                        && carried.canSurvive(zombie.level(), support)) {
+                    sourceState = carried;
+                }
+            } else {
+                sourceState = null;
             }
+
+            actionPos = support;
+            requiredTicks = 6;
+            return Action.BRIDGE;
         }
 
         BlockPos[] candidates = {
