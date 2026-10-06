@@ -124,4 +124,48 @@ class SwarmAgentNavigationTelemetryTest {
         assertEquals(SwarmPlannerContext.NONE, state.plannerContext());
         assertEquals(7L, state.plannerPathQueryCount());
     }
+    @Test
+    void searchEpisodeTracksSameTargetReacquisitionLatency() {
+        SwarmAgentState state = new SwarmAgentState();
+        java.util.UUID target = java.util.UUID.randomUUID();
+
+        state.beginSearchEpisode(100L, target);
+        state.beginSearchEpisode(110L, target);
+
+        assertTrue(state.searchEpisodeActive());
+        assertEquals(1L, state.searchEpisodesStarted());
+
+        state.recordDirectReacquisition(137L, target);
+
+        assertFalse(state.searchEpisodeActive());
+        assertEquals(1L, state.searchEpisodesSucceeded());
+        assertEquals(0L, state.searchEpisodesFailed());
+        assertEquals(37L, state.searchReacquisitionTicksTotal());
+        assertEquals(37L, state.lastSearchReacquisitionTicks());
+    }
+
+    @Test
+    void searchEpisodeFailureIsCountedOnce() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.beginSearchEpisode(50L, java.util.UUID.randomUUID());
+
+        state.recordSearchFailure();
+        state.recordSearchFailure();
+
+        assertFalse(state.searchEpisodeActive());
+        assertEquals(1L, state.searchEpisodesStarted());
+        assertEquals(0L, state.searchEpisodesSucceeded());
+        assertEquals(1L, state.searchEpisodesFailed());
+    }
+
+    @Test
+    void differentDirectTargetFailsPreviousSearchEpisode() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.beginSearchEpisode(20L, java.util.UUID.randomUUID());
+
+        state.recordDirectReacquisition(30L, java.util.UUID.randomUUID());
+
+        assertEquals(0L, state.searchEpisodesSucceeded());
+        assertEquals(1L, state.searchEpisodesFailed());
+    }
 }

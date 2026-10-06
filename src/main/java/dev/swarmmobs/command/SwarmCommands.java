@@ -214,7 +214,7 @@ public final class SwarmCommands {
         source.sendSuccess(
                 () -> Component.literal(String.format(
                         java.util.Locale.ROOT,
-                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d",
+                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d, searchStarted=%d, searchSucceeded=%d, searchFailed=%d, activeSearch=%d, searchSuccessRate=%.3f, avgReacquisitionTicks=%.2f",
                         metrics.active(),
                         metrics.elapsedTicks(),
                         metrics.agentCount(),
@@ -228,7 +228,13 @@ public final class SwarmCommands {
                         metrics.recoveryPlanningFailures(),
                         metrics.recoveryFailureRate(),
                         metrics.pathQueries(),
-                        metrics.roleReassignments()
+                        metrics.roleReassignments(),
+                        metrics.searchEpisodesStarted(),
+                        metrics.searchEpisodesSucceeded(),
+                        metrics.searchEpisodesFailed(),
+                        metrics.activeSearchEpisodes(),
+                        metrics.searchSuccessRate(),
+                        metrics.averageReacquisitionTicks()
                 )),
                 false
         );

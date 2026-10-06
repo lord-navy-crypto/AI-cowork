@@ -236,6 +236,32 @@ public final class SwarmControlScreen extends Screen {
                         }
                 ).bounds(rightX, y, 300, 20).build()
         );
+        y += 26;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Search: started=" + (int) number("metricSearchStarted")
+                                        + " success=" + (int) number("metricSearchSucceeded")
+                                        + " failed=" + (int) number("metricSearchFailed")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 26;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Reacquire: success=" + formatPercent(number("metricSearchSuccessRate"))
+                                        + " avg=" + format(number("metricAvgReacquisitionTicks")) + " ticks"
+                                        + " active=" + (int) number("metricActiveSearch")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
     }
 
     private void buildCoordination() {

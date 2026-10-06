@@ -20,11 +20,18 @@ class SwarmExperimentMetricsTest {
                 4L,
                 1L,
                 12L,
-                2L
+                2L,
+                5L,
+                3L,
+                1L,
+                90L,
+                1
         );
 
         assertEquals(0.20, snapshot.communicationDropRate(), 1.0e-9);
         assertEquals(0.25, snapshot.recoveryFailureRate(), 1.0e-9);
+        assertEquals(0.75, snapshot.searchSuccessRate(), 1.0e-9);
+        assertEquals(30.0, snapshot.averageReacquisitionTicks(), 1.0e-9);
     }
 
     @Test
@@ -41,10 +48,17 @@ class SwarmExperimentMetricsTest {
                 0L,
                 0L,
                 0L,
-                0L
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0
         );
 
         assertEquals(0.0, snapshot.communicationDropRate(), 1.0e-9);
         assertEquals(0.0, snapshot.recoveryFailureRate(), 1.0e-9);
+        assertEquals(0.0, snapshot.searchSuccessRate(), 1.0e-9);
+        assertEquals(0.0, snapshot.averageReacquisitionTicks(), 1.0e-9);
     }
 }

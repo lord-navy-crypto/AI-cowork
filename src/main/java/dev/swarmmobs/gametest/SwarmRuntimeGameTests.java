@@ -498,7 +498,7 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(batch = "swarm_runtime_search_mode", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 180)
+    @GameTest(batch = "swarm_runtime_search_mode", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 220)
     public static void staleOccludedSpiderTransitionsIntoSearchMode(GameTestHelper helper) {
         var spider = helper.spawn(EntityType.SPIDER, new BlockPos(1, 1, 2));
         spider.setNoGravity(true);
@@ -580,6 +580,49 @@ public final class SwarmRuntimeGameTests {
             );
             if (destinationOffset < 0.75) {
                 helper.fail("SEARCH destination collapsed onto the stale target center");
+                return;
+            }
+
+            if (!state.searchEpisodeActive() || state.searchEpisodesStarted() <= 0L) {
+                helper.fail("Entering SEARCH did not start a search episode metric");
+                return;
+            }
+
+            helper.setBlock(new BlockPos(2, 1, 2), Blocks.AIR);
+            helper.setBlock(new BlockPos(2, 2, 2), Blocks.AIR);
+            Vec3 reacquisitionPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+            player.setPos(
+                    reacquisitionPosition.x,
+                    reacquisitionPosition.y,
+                    reacquisitionPosition.z
+            );
+        });
+
+        helper.runAfterDelay(searchCheckTick + 18, () -> {
+            SwarmAgentState state = spider.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!spider.hasLineOfSight(player) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Spider did not directly reacquire player after SEARCH obstruction was removed");
+                return;
+            }
+
+            if (state.searchEpisodeActive()) {
+                playerHandle.close();
+                helper.fail("Search episode remained active after direct reacquisition");
+                return;
+            }
+
+            if (state.searchEpisodesSucceeded() <= 0L) {
+                playerHandle.close();
+                helper.fail("Direct reacquisition did not increment search success metric");
+                return;
+            }
+
+            if (state.lastSearchReacquisitionTicks() <= 0L
+                    || state.searchReacquisitionTicksTotal() < state.lastSearchReacquisitionTicks()) {
+                playerHandle.close();
+                helper.fail("Search reacquisition latency was not recorded");
                 return;
             }
 
