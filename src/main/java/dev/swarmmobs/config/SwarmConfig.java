@@ -69,6 +69,9 @@ public final class SwarmConfig {
     public static final ModConfigSpec.IntValue COMMUNICATION_EXPERIMENT_SEED;
 
     public static final ModConfigSpec.BooleanValue EXTERNAL_AI_ENABLED;
+    public static final ModConfigSpec.BooleanValue EXTERNAL_AI_ACTIVE_ENABLED;
+    public static final ModConfigSpec.IntValue EXTERNAL_AI_ACTIVE_TTL_TICKS;
+    public static final ModConfigSpec.IntValue EXTERNAL_AI_ACTIVE_MIN_HOLD_TICKS;
     public static final ModConfigSpec.ConfigValue<String> OLLAMA_BASE_URL;
     public static final ModConfigSpec.ConfigValue<String> OLLAMA_MODEL;
     public static final ModConfigSpec.IntValue OLLAMA_TIMEOUT_MS;
@@ -328,8 +331,20 @@ public final class SwarmConfig {
         BUILDER.push("externalAi");
 
         EXTERNAL_AI_ENABLED = BUILDER
-                .comment("Enable local Ollama shadow recommendations. Shadow mode never changes gameplay.")
+                .comment("Enable local Ollama strategy requests. Shadow requests never change gameplay by themselves.")
                 .define("enabled", false);
+
+        EXTERNAL_AI_ACTIVE_ENABLED = BUILDER
+                .comment("Allow explicitly requested, sanitized Ollama strategy decisions to influence bounded high-level swarm multipliers. OFF by default.")
+                .define("activeEnabled", false);
+
+        EXTERNAL_AI_ACTIVE_TTL_TICKS = BUILDER
+                .comment("How long one accepted active AI strategy remains valid before deterministic baseline resumes.")
+                .defineInRange("activeTtlTicks", 200, 20, 2400);
+
+        EXTERNAL_AI_ACTIVE_MIN_HOLD_TICKS = BUILDER
+                .comment("Minimum hold time before a different AI strategy mode may replace the current mode.")
+                .defineInRange("activeMinHoldTicks", 60, 0, 1200);
 
         OLLAMA_BASE_URL = BUILDER
                 .comment("Local Ollama base URL. v0.10 accepts loopback hosts only.")
