@@ -14,6 +14,7 @@ import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.debug.SwarmDebugState;
 import dev.swarmmobs.network.SwarmControlNetwork;
 import dev.swarmmobs.experiment.SwarmExperimentManager;
+import dev.swarmmobs.experiment.SwarmExperimentMetrics;
 import dev.swarmmobs.experiment.SwarmExperimentPreset;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -156,7 +157,13 @@ public final class SwarmCommands {
                                 .executes(context -> setExperimentSeed(
                                         context.getSource(),
                                         IntegerArgumentType.getInteger(context, "value")
-                                ))));
+                                ))))
+                .then(Commands.literal("start")
+                        .executes(context -> startExperiment(context.getSource())))
+                .then(Commands.literal("reset")
+                        .executes(context -> resetExperiment(context.getSource())))
+                .then(Commands.literal("snapshot")
+                        .executes(context -> snapshotExperiment(context.getSource())));
 
         root.then(experiment);
         root.then(debug);
