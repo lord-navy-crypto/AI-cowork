@@ -88,6 +88,7 @@ public final class SwarmMobEvents {
         TargetSelection selection = findTarget(level, mob, state, gameTick);
 
         if (selection == null) {
+            state.recordSearchFailure();
             state.forgetTarget();
             state.clearLocalPlan(movementNeighbors.size());
             if (mob.getTarget() instanceof Player) {
@@ -97,6 +98,9 @@ public final class SwarmMobEvents {
         }
 
         TargetObservation observation = selection.observation();
+        if (selection.direct()) {
+            state.recordDirectReacquisition(gameTick, observation.targetId());
+        }
         int slots = SwarmConfig.FORMATION_SLOTS.get();
 
         List<Vec2> neighborPositions = movementNeighbors.stream()
@@ -162,6 +166,7 @@ public final class SwarmMobEvents {
                 && confidence < SwarmConfig.SEARCH_CONFIDENCE_THRESHOLD.get();
 
         if (searchMode) {
+            state.beginSearchEpisode(gameTick, observation.targetId());
             state.clearPredictionTelemetry();
 
             int sameCapabilityCount = 1 + (int) movementNeighbors.stream()
