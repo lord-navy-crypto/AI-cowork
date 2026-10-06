@@ -103,6 +103,34 @@ public final class SwarmCommands {
                                 ))));
 
         debug.then(communication);
+
+        var sensing = Commands.literal("sensing")
+                .then(Commands.literal("on")
+                        .executes(context -> setSensingEnabled(context.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(context -> setSensingEnabled(context.getSource(), false)))
+                .then(Commands.literal("baseline")
+                        .executes(context -> setSensingBaseline(context.getSource())))
+                .then(Commands.literal("drop")
+                        .then(Commands.argument("rate", DoubleArgumentType.doubleArg(0.0, 1.0))
+                                .executes(context -> setSensingDropoutRate(
+                                        context.getSource(),
+                                        DoubleArgumentType.getDouble(context, "rate")
+                                ))))
+                .then(Commands.literal("noise")
+                        .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0, 8.0))
+                                .executes(context -> setSensingNoise(
+                                        context.getSource(),
+                                        DoubleArgumentType.getDouble(context, "blocks")
+                                ))))
+                .then(Commands.literal("seed")
+                        .then(Commands.argument("value", IntegerArgumentType.integer())
+                                .executes(context -> setSensingSeed(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "value")
+                                ))));
+
+        debug.then(sensing);
         root.then(debug);
         dispatcher.register(root);
     }
@@ -138,6 +166,10 @@ public final class SwarmCommands {
                                 + ", navObstacleArrivalTolerance=" + SwarmConfig.NAV_OBSTACLE_ARRIVAL_TOLERANCE.get()
                                 + ", navWalkabilityEnabled=" + SwarmConfig.NAV_WALKABILITY_ENABLED.get()
                                 + ", navMaxProbeDropBlocks=" + SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.get()
+                                + ", sensingImperfectionEnabled=" + SwarmConfig.SENSING_IMPERFECTION_ENABLED.get()
+                                + ", sensingDropoutRate=" + SwarmConfig.SENSING_DROPOUT_RATE.get()
+                                + ", sensingMaxHorizontalNoise=" + SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.get()
+                                + ", sensingExperimentSeed=" + SwarmConfig.SENSING_EXPERIMENT_SEED.get()
                                 + ", communicationEnabled=" + SwarmConfig.COMMUNICATION_ENABLED.get()
                                 + ", communicationRadius=" + SwarmConfig.COMMUNICATION_RADIUS.get()
                                 + ", latencyTicks=" + SwarmConfig.COMMUNICATION_LATENCY_TICKS.get()
@@ -248,6 +280,13 @@ public final class SwarmCommands {
                                 + " commAccepted=" + state.communicationAcceptedMessages()
                                 + " commDelivered=" + state.communicationDeliveredMessages()
                                 + " commDropped=" + state.communicationDroppedMessages()
+                                + " sensingAccepted=" + state.sensingAcceptedObservations()
+                                + " sensingDropped=" + state.sensingDroppedObservations()
+                                + " sensingNoise=" + String.format(
+                                        java.util.Locale.ROOT,
+                                        "%.3f",
+                                        state.lastSensingNoiseMagnitude()
+                                )
                 ),
                 false
         );
@@ -303,6 +342,9 @@ public final class SwarmCommands {
         int recoveryNavigation = 0;
         long obstacleDetours = 0L;
         long recoveries = 0L;
+        long sensingAccepted = 0L;
+        long sensingDropped = 0L;
+        double sensingNoiseSum = 0.0;
 
         for (PathfinderMob agent : agents) {
             SwarmAgentState state = agent.getData(SwarmAttachments.AGENT_STATE.get());
@@ -344,6 +386,9 @@ public final class SwarmCommands {
             }
             obstacleDetours += state.obstacleDetourCount();
             recoveries += state.recoveryCount();
+            sensingAccepted += state.sensingAcceptedObservations();
+            sensingDropped += state.sensingDroppedObservations();
+            sensingNoiseSum += state.lastSensingNoiseMagnitude();
         }
 
         int total = agents.size();
@@ -357,7 +402,7 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -381,6 +426,9 @@ public final class SwarmCommands {
                 recoveryNavigation,
                 obstacleDetours,
                 recoveries,
+                sensingAccepted,
+                sensingDropped,
+                sensingNoiseSum / total,
                 archetypeSummary,
                 roleSummary
         );
@@ -448,6 +496,65 @@ public final class SwarmCommands {
         SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.set(seed);
         source.sendSuccess(
                 () -> Component.literal("Swarm communication runtime experimentSeed=" + seed),
+                true
+        );
+        return 1;
+    }
+
+    private static int setSensingEnabled(CommandSourceStack source, boolean enabled) {
+        SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(enabled);
+        source.sendSuccess(
+                () -> Component.literal("Swarm sensing imperfections: " + (enabled ? "ON" : "OFF")),
+                true
+        );
+        return 1;
+    }
+
+    private static int setSensingBaseline(CommandSourceStack source) {
+        SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(false);
+        SwarmConfig.SENSING_DROPOUT_RATE.set(0.0D);
+        SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.set(0.0D);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm sensing baseline restored: imperfectionEnabled=false, dropoutRate=0.0, maxHorizontalNoise=0.0"
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setSensingDropoutRate(CommandSourceStack source, double rate) {
+        SwarmConfig.SENSING_DROPOUT_RATE.set(rate);
+        SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(true);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm sensing runtime dropoutRate="
+                                + String.format(java.util.Locale.ROOT, "%.3f", rate)
+                                + " (imperfections enabled)"
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setSensingNoise(CommandSourceStack source, double blocks) {
+        SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.set(blocks);
+        SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(true);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm sensing runtime maxHorizontalNoise="
+                                + String.format(java.util.Locale.ROOT, "%.3f", blocks)
+                                + " blocks (imperfections enabled)"
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setSensingSeed(CommandSourceStack source, int seed) {
+        SwarmConfig.SENSING_EXPERIMENT_SEED.set(seed);
+        source.sendSuccess(
+                () -> Component.literal("Swarm sensing runtime experimentSeed=" + seed),
                 true
         );
         return 1;
