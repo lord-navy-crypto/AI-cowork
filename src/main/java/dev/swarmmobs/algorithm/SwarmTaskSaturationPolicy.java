@@ -1,5 +1,6 @@
 package dev.swarmmobs.algorithm;
 
+import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmTaskType;
 
 /**
@@ -15,6 +16,7 @@ public final class SwarmTaskSaturationPolicy {
     private static final double INCUMBENT_SATURATED_MULTIPLIER = 0.72;
 
     public static double adjustedDemand(
+            SwarmAgentArchetype archetype,
             SwarmTaskType task,
             double baseDemand,
             int localGroupSize,
@@ -22,7 +24,10 @@ public final class SwarmTaskSaturationPolicy {
             SwarmTaskType currentTask
     ) {
         double demand = clamp01(baseDemand);
-        if (task == null || task == SwarmTaskType.RESERVE || demand <= 0.0) {
+        if (task == null
+                || task == SwarmTaskType.RESERVE
+                || demand <= 0.0
+                || isNativeCoreTask(archetype, task)) {
             return demand;
         }
 
@@ -68,6 +73,22 @@ public final class SwarmTaskSaturationPolicy {
         };
 
         return Math.max(1, (int) Math.ceil(group * demand * share));
+    }
+
+    public static boolean isNativeCoreTask(
+            SwarmAgentArchetype archetype,
+            SwarmTaskType task
+    ) {
+        if (archetype == null || task == null) {
+            return false;
+        }
+
+        return switch (archetype) {
+            case RANGED_SUPPORT -> task == SwarmTaskType.RANGED_SUPPORT;
+            case FLANKER -> task == SwarmTaskType.FLANK;
+            case BREACHER -> task == SwarmTaskType.BREACH;
+            case ASSAULT -> false;
+        };
     }
 
     private static double clamp01(double value) {
