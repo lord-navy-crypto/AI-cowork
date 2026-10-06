@@ -242,12 +242,19 @@ public final class SwarmMobEvents {
 
             EnumMap<SwarmTaskType, Integer> peerTaskOccupancy =
                     new EnumMap<>(SwarmTaskType.class);
+            int sameTargetPeerCount = 0;
             for (PathfinderMob peer : movementNeighbors) {
                 SwarmAgentState peerState =
                         peer.getData(SwarmAttachments.AGENT_STATE.get());
+                if (state.targetId() == null
+                        || peerState.targetId() == null
+                        || !state.targetId().equals(peerState.targetId())) {
+                    continue;
+                }
+                sameTargetPeerCount++;
                 peerTaskOccupancy.merge(peerState.currentTask(), 1, Integer::sum);
             }
-            int localGroupSize = movementNeighbors.size() + 1;
+            int localGroupSize = sameTargetPeerCount + 1;
 
             var assignment = SwarmDivisionOfLaborPolicy.choose(
                     mob.getUUID(),
