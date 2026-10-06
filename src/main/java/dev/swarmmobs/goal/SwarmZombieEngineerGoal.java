@@ -5,6 +5,7 @@ import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmBridgeSpanPolicy;
+import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringExecutionLeasePolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringTaskPolicy;
@@ -707,13 +708,14 @@ public final class SwarmZombieEngineerGoal extends Goal {
     }
 
     private static boolean meleeBusy(Zombie candidate) {
-        if (candidate.getTarget() == null) {
-            return false;
-        }
-
-        double release = SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
-        return candidate.distanceToSqr(candidate.getTarget()) <= release * release
-                && candidate.hasLineOfSight(candidate.getTarget());
+        return SwarmCombatBusyPolicy.isBusy(
+                candidate.getTarget() != null,
+                candidate.getTarget() != null && candidate.hasLineOfSight(candidate.getTarget()),
+                candidate.getTarget() == null
+                        ? Double.POSITIVE_INFINITY
+                        : candidate.distanceToSqr(candidate.getTarget()),
+                SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()
+        );
     }
 
     private void tickBreak() {

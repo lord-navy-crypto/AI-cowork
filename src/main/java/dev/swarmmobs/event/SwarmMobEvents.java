@@ -10,6 +10,7 @@ import dev.swarmmobs.agent.SwarmSpecialization;
 import dev.swarmmobs.agent.SwarmTaskType;
 import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
+import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
@@ -235,10 +236,14 @@ public final class SwarmMobEvents {
                             confidence
                     );
 
-            boolean combatBusy = mob.getTarget() != null
-                    && mob.distanceToSqr(mob.getTarget())
-                    <= SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()
-                    * SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
+            boolean combatBusy = SwarmCombatBusyPolicy.isBusy(
+                    mob.getTarget() != null,
+                    mob.getTarget() != null && mob.hasLineOfSight(mob.getTarget()),
+                    mob.getTarget() == null
+                            ? Double.POSITIVE_INFINITY
+                            : mob.distanceToSqr(mob.getTarget()),
+                    SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()
+            );
 
             EnumMap<SwarmTaskType, Integer> peerTaskOccupancy =
                     new EnumMap<>(SwarmTaskType.class);
