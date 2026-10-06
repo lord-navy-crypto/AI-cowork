@@ -165,13 +165,22 @@ Current v0.8.3 extension:
 v0.8 is now a complete bounded local-planning baseline. Future work moves into v0.9 experiment/evaluation infrastructure.
 
 ### v0.9 — experiment and evaluation layer
+Current v0.9.0 implementation:
+- server-authoritative repeatable experiment presets;
+- BASELINE, NOISY_SENSING, LOSSY_COMMS, COMBINED_FAULTS, and NAVIGATION_STRESS conditions;
+- one shared experiment seed propagated to sensing and communication fault models;
+- Experiment page in the live control panel;
+- command-line preset and seed controls;
+- automatic CUSTOM state when parameters are manually tuned after applying a preset.
+
+Next within v0.9:
 - reacquisition time;
 - search success rate;
 - coverage efficiency;
 - communication overhead;
 - role imbalance;
 - obstacle-detour/recovery rate;
-- repeatable experiment presets.
+- metric snapshots and experiment reset/export workflow.
 
 ### v1.0 deterministic research baseline
 A stable non-AI swarm system that can be evaluated under imperfect sensing, imperfect communication, heterogeneous agents, target loss, and complex terrain.
