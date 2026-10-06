@@ -288,7 +288,9 @@ public final class SwarmApproachGoal extends Goal {
             return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
         }
 
-        int side = choice.waypoint().subtract(frontProbe).dot(left) >= 0.0 ? 1 : -1;
+        Vec2 lateralDelta = choice.waypoint().subtract(frontProbe);
+        double lateralProjection = lateralDelta.x() * left.x() + lateralDelta.z() * left.z();
+        int side = lateralProjection >= 0.0 ? 1 : -1;
         return new SwarmObstacleAvoidancePolicy.Avoidance(choice.waypoint(), true, side);
     }
 
