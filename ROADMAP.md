@@ -118,10 +118,17 @@ Panel actions are sent to the server, permission-checked, applied to the live co
 ## Next milestones
 
 ### v0.7 — stronger task allocation and local mission logic
-- explicit per-agent responsibility state;
-- local reassignment when one capability disappears;
-- bounded role switching and anti-thrashing;
-- metrics for role balance and reassignment count.
+Current implementation:
+- explicit stable tactical-role state per agent;
+- pending-role state before a reassignment is committed;
+- configurable role hysteresis to prevent rapid role thrashing;
+- reassignment counters and group telemetry;
+- live Coordination controls in the in-game panel.
+
+Next within v0.7:
+- deeper capability-loss redistribution beyond the current local composition policy;
+- mission-level responsibilities that persist across ENGAGE / SEARCH transitions;
+- role-balance metrics and explicit responsibility coverage checks.
 
 ### v0.8 — terrain-aware local planning
 - richer candidate scoring beyond binary left/right probes;
