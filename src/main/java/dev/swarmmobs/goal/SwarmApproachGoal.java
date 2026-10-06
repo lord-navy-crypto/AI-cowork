@@ -12,6 +12,7 @@ import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmRecoveryCandidatePolicy;
+import dev.swarmmobs.algorithm.SwarmRangedHandoffPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
 import dev.swarmmobs.algorithm.SwarmTerrainSupportPolicy;
@@ -38,6 +39,10 @@ import java.util.List;
  * vanilla ranged-combat goals can take over.
  */
 public final class SwarmApproachGoal extends Goal {
+    // Vanilla AbstractSkeleton configures RangedBowAttackGoal with a 15-block
+    // attack radius. Yielding inside that envelope prevents the priority-1
+    // swarm MOVE goal from starving the vanilla priority-4 bow goal.
+    private static final double VANILLA_SKELETON_BOW_HANDOFF_DISTANCE = 15.0;
     private final PathfinderMob mob;
     private double progressSampleX;
     private double progressSampleZ;
@@ -78,6 +83,18 @@ public final class SwarmApproachGoal extends Goal {
 
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
         if (profile.archetype() == SwarmAgentArchetype.RANGED_SUPPORT) {
+            if (mob.getTarget() instanceof Player target
+                    && validTarget(target)
+                    && SwarmRangedHandoffPolicy.shouldYieldToVanilla(
+                            state.directObservation(),
+                            state.targetId().equals(target.getUUID()),
+                            mob.hasLineOfSight(target),
+                            mob.distanceToSqr(target),
+                            VANILLA_SKELETON_BOW_HANDOFF_DISTANCE
+                    )) {
+                return false;
+            }
+
             double tolerance = Math.max(0.5, profile.arrivalTolerance());
             return mob.distanceToSqr(
                     state.destinationX(),
