@@ -115,8 +115,7 @@ public final class SwarmControlScreen extends Screen {
 
         addStatusRow(leftX, y, "Swarm agents",
                 Integer.toString((int) number("liveAgents")));
-        addStatusRow(rightX, y, "Master",
-                bool("master") ? "§aENABLED" : "§cDISABLED");
+        addToggleRow(rightX, y, "Swarm master", bool("master"), "toggle_master");
         y += 28;
 
         addStatusRow(leftX, y, "Species",
