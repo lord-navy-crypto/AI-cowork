@@ -6,6 +6,7 @@ import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmBridgeSpanPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
+import dev.swarmmobs.algorithm.SwarmEngineeringExecutionLeasePolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringTaskPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmZombieEngineeringPolicy;
@@ -53,6 +54,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
     private int requiredTicks;
     private boolean completed;
     private SwarmEngineeringTask activeTask;
+    private long executionDeadlineTick = Long.MIN_VALUE;
 
     public SwarmZombieEngineerGoal(Zombie zombie) {
         this.zombie = zombie;
@@ -73,6 +75,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
         if (assigned != null && configureFromTask(assigned, state)) {
             state.acceptEngineeringTask(assigned, gameTick);
             activeTask = assigned;
+            armExecutionLease(gameTick);
             return true;
         }
 
@@ -118,6 +121,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
 
         state.acceptEngineeringTask(task, gameTick);
         activeTask = task;
+        armExecutionLease(gameTick);
         return true;
     }
 
@@ -133,7 +137,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         if (activeTask != null && zombie.level() instanceof ServerLevel level) {
-            return activeTask.active(level.getGameTime());
+            return level.getGameTime() < executionDeadlineTick;
         }
         return true;
     }
@@ -186,6 +190,18 @@ public final class SwarmZombieEngineerGoal extends Goal {
         requiredTicks = 0;
         completed = false;
         activeTask = null;
+        executionDeadlineTick = Long.MIN_VALUE;
+    }
+
+    private void armExecutionLease(long gameTick) {
+        long advertisedExpiry = activeTask == null
+                ? gameTick
+                : activeTask.expiresTick();
+        executionDeadlineTick = SwarmEngineeringExecutionLeasePolicy.deadline(
+                gameTick,
+                advertisedExpiry,
+                requiredTicks
+        );
     }
 
     private boolean baseEligible() {
