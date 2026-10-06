@@ -7,6 +7,7 @@ import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
@@ -176,9 +177,6 @@ public final class SwarmCommands {
                                 + ", navStuckWindowTicks=" + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get()
                                 + ", navStuckMinProgress=" + SwarmConfig.NAV_STUCK_MIN_PROGRESS.get()
                                 + ", navRecoveryLateralDistance=" + SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()
-                                + ", navStuckWindowTicks=" + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get()
-                                + ", navStuckMinProgress=" + SwarmConfig.NAV_STUCK_MIN_PROGRESS.get()
-                                + ", navRecoveryLateralDistance=" + SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()
                                 + ", navRecoveryDurationTicks=" + SwarmConfig.NAV_RECOVERY_DURATION_TICKS.get()
                                 + ", navObstacleAvoidanceEnabled=" + SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()
                                 + ", navObstacleLookahead=" + SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.get()
@@ -194,6 +192,7 @@ public final class SwarmCommands {
                                 + ", navPathEvidenceEnabled=" + SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
                                 + ", navPathNodePenalty=" + SwarmConfig.NAV_PATH_NODE_PENALTY.get()
                                 + ", navPathResidualPenalty=" + SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()
+                                + ", navPathMaxResidualDistance=" + SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get()
                                 + ", sensingImperfectionEnabled=" + SwarmConfig.SENSING_IMPERFECTION_ENABLED.get()
                                 + ", sensingDropoutRate=" + SwarmConfig.SENSING_DROPOUT_RATE.get()
                                 + ", sensingMaxHorizontalNoise=" + SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.get()
@@ -304,6 +303,18 @@ public final class SwarmCommands {
                                 + " recoveries=" + state.recoveryCount()
                                 + " recoveryPlanAttempts=" + state.recoveryPlanningAttempts()
                                 + " recoveryPlanFailures=" + state.recoveryPlanningFailures()
+                                + " plannerContext=" + state.plannerContext()
+                                + " plannerCandidates=" + state.plannerCandidateCount()
+                                + " plannerBlocked=" + state.plannerBlockedCount()
+                                + " plannerUnreachable=" + state.plannerUnreachableCount()
+                                + " plannerFeasible=" + state.plannerFeasibleCount()
+                                + " plannerSelectedIndex=" + state.plannerSelectedIndex()
+                                + " plannerSelectedScore=" + String.format(
+                                        java.util.Locale.ROOT,
+                                        "%.3f",
+                                        state.plannerSelectedScore()
+                                )
+                                + " plannerPathQueries=" + state.plannerPathQueryCount()
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
                                 + " alignment=" + String.format(java.util.Locale.ROOT, "%.3f", state.alignmentMagnitude())
@@ -376,6 +387,8 @@ public final class SwarmCommands {
         long recoveries = 0L;
         long recoveryPlanAttempts = 0L;
         long recoveryPlanFailures = 0L;
+        long plannerPathQueries = 0L;
+        int agentsWithPlannerDiagnostics = 0;
         long sensingAccepted = 0L;
         long sensingDropped = 0L;
         double sensingNoiseSum = 0.0;
@@ -424,6 +437,10 @@ public final class SwarmCommands {
             recoveries += state.recoveryCount();
             recoveryPlanAttempts += state.recoveryPlanningAttempts();
             recoveryPlanFailures += state.recoveryPlanningFailures();
+            plannerPathQueries += state.plannerPathQueryCount();
+            if (state.plannerContext() != SwarmPlannerContext.NONE) {
+                agentsWithPlannerDiagnostics++;
+            }
             sensingAccepted += state.sensingAcceptedObservations();
             sensingDropped += state.sensingDroppedObservations();
             sensingNoiseSum += state.lastSensingNoiseMagnitude();
@@ -444,7 +461,7 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, plannerDiagnostics=%d, plannerPathQueries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -470,6 +487,8 @@ public final class SwarmCommands {
                 recoveries,
                 recoveryPlanAttempts,
                 recoveryPlanFailures,
+                agentsWithPlannerDiagnostics,
+                plannerPathQueries,
                 sensingAccepted,
                 sensingDropped,
                 sensingNoiseSum / total,

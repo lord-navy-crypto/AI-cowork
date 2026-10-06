@@ -405,6 +405,15 @@ public final class SwarmControlScreen extends Screen {
                 "nav_path_residual_penalty_delta",
                 0.05
         );
+        rightY += 28;
+
+        addNumericRow(
+                rightX, rightY,
+                "Max path residual",
+                format(number("navPathMaxResidual")) + " blocks",
+                "nav_path_max_residual_delta",
+                0.25
+        );
         rightY += 34;
 
         addRenderableWidget(

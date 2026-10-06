@@ -588,4 +588,120 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_recovery_planner", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
+    public static void immobileZombieTriggersValidatedRecoveryPlanner(GameTestHelper helper) {
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+
+        var movementSpeed = zombie.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (movementSpeed != null) {
+            movementSpeed.setBaseValue(0.0D);
+        }
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        // Keep the target far enough for SwarmApproachGoal to own movement while
+        // leaving at least the forward-left and forward-right recovery candidates
+        // inside the 5x5 GameTest floor. The previous axial layout placed every
+        // default-distance recovery candidate on/outside the floor, correctly
+        // producing zero feasible candidates and testing the fixture rather than
+        // the recovery planner.
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 4.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        final SwarmApproachGoal[] recoveryGoal = new SwarmApproachGoal[1];
+
+        helper.runAfterDelay(4, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            state.rememberTarget(player.getUUID(), helper.getTick(), true);
+            state.updateLocalPlan(
+                    0,
+                    0,
+                    SwarmRole.CHASER,
+                    player.getX(),
+                    player.getZ(),
+                    0.0,
+                    0.0
+            );
+            zombie.setTarget(player);
+
+            SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null || !approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal was not eligible before forced recovery test");
+                return;
+            }
+
+            zombie.goalSelector.removeGoal(approachGoal);
+            recoveryGoal[0] = approachGoal;
+            approachGoal.start();
+        });
+
+        int recoveryCheckTick = 4 + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + 4;
+        helper.runAfterDelay(recoveryCheckTick, () -> {
+            SwarmApproachGoal approachGoal = recoveryGoal[0];
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal was not retained for forced recovery test");
+                return;
+            }
+
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            state.rememberTarget(player.getUUID(), helper.getTick(), true);
+            state.updateLocalPlan(
+                    0,
+                    0,
+                    SwarmRole.CHASER,
+                    player.getX(),
+                    player.getZ(),
+                    0.0,
+                    0.0
+            );
+            zombie.setTarget(player);
+
+            approachGoal.tick();
+
+            if (state.recoveryPlanningAttempts() <= 0L) {
+                playerHandle.close();
+                helper.fail("Forced immobility did not trigger recovery planning");
+                return;
+            }
+
+            if (state.recoveryCount() <= 0L) {
+                playerHandle.close();
+                helper.fail(
+                        "Recovery planner never committed a feasible recovery waypoint"
+                                + " candidates=" + state.plannerCandidateCount()
+                                + " blocked=" + state.plannerBlockedCount()
+                                + " unreachable=" + state.plannerUnreachableCount()
+                                + " feasible=" + state.plannerFeasibleCount()
+                                + " selected=" + state.plannerSelectedIndex()
+                );
+                return;
+            }
+
+            if (state.plannerPathQueryCount() <= 0L && SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()) {
+                playerHandle.close();
+                helper.fail("Recovery planner did not record PathNavigation evidence queries");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+
 }

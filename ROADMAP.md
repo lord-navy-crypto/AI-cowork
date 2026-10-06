@@ -154,10 +154,15 @@ Current v0.8.2 extension:
 - record recovery-planner attempts and failures;
 - live control-panel tuning for stuck window, minimum progress, recovery distance, and recovery duration.
 
-Next within v0.8:
-- explicit planner score/candidate telemetry;
-- performance telemetry for path-evidence query counts;
-- runtime GameTest that deliberately forces a blocked-navigation recovery event.
+Current v0.8.3 extension:
+- record whether the latest local plan decision came from OBSTACLE_DETOUR or RECOVERY;
+- expose total, blocked, unreachable, and feasible candidate counts;
+- expose selected candidate index and selected score;
+- accumulate PathNavigation evidence query counts;
+- show planner diagnostics in inspect/group telemetry;
+- add a dedicated Runtime GameTest that forces an immobile Zombie through stuck detection and asserts recovery planning and recovery commitment.
+
+v0.8 is now a complete bounded local-planning baseline. Future work moves into v0.9 experiment/evaluation infrastructure.
 
 ### v0.9 — experiment and evaluation layer
 - reacquisition time;

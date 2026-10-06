@@ -6,8 +6,10 @@ import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmNavigationMode;
+import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
+import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmRecoveryCandidatePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
@@ -261,11 +263,15 @@ public final class SwarmApproachGoal extends Goal {
 
         double[] lateralScales = {0.75, -0.75, 1.50, -1.50};
         List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
+        int blockedCount = 0;
+        int unreachableCount = 0;
+        int pathQueries = 0;
 
         for (double scale : lateralScales) {
             double lateralOffset = lateralDistance * scale;
             Vec2 candidate = frontProbe.add(left.scale(lateralOffset));
             boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
+            if (blocked) blockedCount++;
             double congestion = localCongestion(level, candidate);
 
             boolean pathReachable = true;
@@ -273,16 +279,25 @@ public final class SwarmApproachGoal extends Goal {
             double pathResidualDistance = 0.0;
 
             if (!blocked && SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()) {
+                pathQueries++;
                 var path = mob.getNavigation().createPath(
                         BlockPos.containing(candidate.x(), mob.getY(), candidate.z()),
                         0
                 );
 
-                pathReachable = path != null && path.canReach();
                 if (path != null) {
                     pathNodeCount = path.getNodeCount();
                     pathResidualDistance = path.getDistToTarget();
+                } else {
+                    pathResidualDistance = Double.POSITIVE_INFINITY;
                 }
+                pathReachable = SwarmPathEvidencePolicy.acceptable(
+                        path != null,
+                        path != null && path.canReach(),
+                        pathResidualDistance,
+                        SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get()
+                );
+                if (!pathReachable) unreachableCount++;
             }
 
             candidates.add(new SwarmLocalPlannerPolicy.Candidate(
@@ -305,6 +320,17 @@ public final class SwarmApproachGoal extends Goal {
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get(),
                 SwarmConfig.NAV_PATH_NODE_PENALTY.get(),
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()
+        );
+
+        mob.getData(SwarmAttachments.AGENT_STATE.get()).updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                candidates.size(),
+                blockedCount,
+                unreachableCount,
+                Math.max(0, candidates.size() - blockedCount - unreachableCount),
+                choice.candidateIndex(),
+                choice.score(),
+                pathQueries
         );
 
         if (!choice.active()) {
@@ -388,9 +414,13 @@ public final class SwarmApproachGoal extends Goal {
         }
 
         List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
+        int blockedCount = 0;
+        int unreachableCount = 0;
+        int pathQueries = 0;
         for (var recoveryCandidate : generated) {
             Vec2 candidate = recoveryCandidate.waypoint();
             boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
+            if (blocked) blockedCount++;
             double congestion = localCongestion(level, candidate);
 
             boolean pathReachable = true;
@@ -398,15 +428,24 @@ public final class SwarmApproachGoal extends Goal {
             double pathResidualDistance = 0.0;
 
             if (!blocked && SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()) {
+                pathQueries++;
                 var path = mob.getNavigation().createPath(
                         BlockPos.containing(candidate.x(), mob.getY(), candidate.z()),
                         0
                 );
-                pathReachable = path != null && path.canReach();
                 if (path != null) {
                     pathNodeCount = path.getNodeCount();
                     pathResidualDistance = path.getDistToTarget();
+                } else {
+                    pathResidualDistance = Double.POSITIVE_INFINITY;
                 }
+                pathReachable = SwarmPathEvidencePolicy.acceptable(
+                        path != null,
+                        path != null && path.canReach(),
+                        pathResidualDistance,
+                        SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get()
+                );
+                if (!pathReachable) unreachableCount++;
             }
 
             candidates.add(new SwarmLocalPlannerPolicy.Candidate(
@@ -429,6 +468,17 @@ public final class SwarmApproachGoal extends Goal {
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get(),
                 SwarmConfig.NAV_PATH_NODE_PENALTY.get(),
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()
+        );
+
+        mob.getData(SwarmAttachments.AGENT_STATE.get()).updatePlannerTelemetry(
+                SwarmPlannerContext.RECOVERY,
+                candidates.size(),
+                blockedCount,
+                unreachableCount,
+                Math.max(0, candidates.size() - blockedCount - unreachableCount),
+                choice.candidateIndex(),
+                choice.score(),
+                pathQueries
         );
 
         if (!choice.active()) {

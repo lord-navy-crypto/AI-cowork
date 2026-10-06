@@ -221,6 +221,11 @@ public final class SwarmControlNetwork {
                     0.0,
                     2.0
             ));
+            case "nav_path_max_residual_delta" -> SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.set(clamp(
+                    SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get() + value,
+                    0.0,
+                    4.0
+            ));
             case "nav_baseline" -> {
                 SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(true);
                 SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.set(1.5);
@@ -238,6 +243,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
+                SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.set(1.5);
             }
 
             case "baseline_all" -> {
@@ -273,6 +279,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
+                SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.set(1.5);
             }
 
             default -> {
@@ -317,7 +324,8 @@ public final class SwarmControlNetwork {
                 pair("navCongestionRadius", SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get()),
                 pair("navPathEvidenceEnabled", SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()),
                 pair("navPathNodePenalty", SwarmConfig.NAV_PATH_NODE_PENALTY.get()),
-                pair("navPathResidualPenalty", SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get())
+                pair("navPathResidualPenalty", SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()),
+                pair("navPathMaxResidual", SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get())
         );
     }
 
