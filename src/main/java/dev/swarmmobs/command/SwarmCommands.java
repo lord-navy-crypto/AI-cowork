@@ -176,6 +176,9 @@ public final class SwarmCommands {
                                 + ", navStuckWindowTicks=" + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get()
                                 + ", navStuckMinProgress=" + SwarmConfig.NAV_STUCK_MIN_PROGRESS.get()
                                 + ", navRecoveryLateralDistance=" + SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()
+                                + ", navStuckWindowTicks=" + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get()
+                                + ", navStuckMinProgress=" + SwarmConfig.NAV_STUCK_MIN_PROGRESS.get()
+                                + ", navRecoveryLateralDistance=" + SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()
                                 + ", navRecoveryDurationTicks=" + SwarmConfig.NAV_RECOVERY_DURATION_TICKS.get()
                                 + ", navObstacleAvoidanceEnabled=" + SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()
                                 + ", navObstacleLookahead=" + SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.get()
@@ -299,6 +302,8 @@ public final class SwarmCommands {
                                         : "none")
                                 + " obstacleDetours=" + state.obstacleDetourCount()
                                 + " recoveries=" + state.recoveryCount()
+                                + " recoveryPlanAttempts=" + state.recoveryPlanningAttempts()
+                                + " recoveryPlanFailures=" + state.recoveryPlanningFailures()
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
                                 + " alignment=" + String.format(java.util.Locale.ROOT, "%.3f", state.alignmentMagnitude())
@@ -369,6 +374,8 @@ public final class SwarmCommands {
         int recoveryNavigation = 0;
         long obstacleDetours = 0L;
         long recoveries = 0L;
+        long recoveryPlanAttempts = 0L;
+        long recoveryPlanFailures = 0L;
         long sensingAccepted = 0L;
         long sensingDropped = 0L;
         double sensingNoiseSum = 0.0;
@@ -415,6 +422,8 @@ public final class SwarmCommands {
             }
             obstacleDetours += state.obstacleDetourCount();
             recoveries += state.recoveryCount();
+            recoveryPlanAttempts += state.recoveryPlanningAttempts();
+            recoveryPlanFailures += state.recoveryPlanningFailures();
             sensingAccepted += state.sensingAcceptedObservations();
             sensingDropped += state.sensingDroppedObservations();
             sensingNoiseSum += state.lastSensingNoiseMagnitude();
@@ -435,7 +444,7 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -459,6 +468,8 @@ public final class SwarmCommands {
                 recoveryNavigation,
                 obstacleDetours,
                 recoveries,
+                recoveryPlanAttempts,
+                recoveryPlanFailures,
                 sensingAccepted,
                 sensingDropped,
                 sensingNoiseSum / total,
