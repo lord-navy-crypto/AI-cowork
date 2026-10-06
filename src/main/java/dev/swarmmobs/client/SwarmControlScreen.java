@@ -10,6 +10,7 @@ import java.util.Map;
 
 public final class SwarmControlScreen extends Screen {
     private enum Page {
+        AI("AI Shadow"),
         EXPERIMENT("Experiment"),
         COORDINATION("Coordination"),
         SENSING("Sensing"),
@@ -83,12 +84,143 @@ public final class SwarmControlScreen extends Screen {
         );
 
         switch (page) {
+            case AI -> buildAi();
             case EXPERIMENT -> buildExperiment();
             case COORDINATION -> buildCoordination();
             case SENSING -> buildSensing();
             case COMMUNICATION -> buildCommunication();
             case SEARCH -> buildSearch();
             case NAVIGATION -> buildNavigation();
+        }
+    }
+
+    private void buildAi() {
+        int leftX = width / 2 - 310;
+        int rightX = width / 2 + 10;
+        int y = 82;
+
+        addToggleRow(
+                leftX, y,
+                "Local Ollama shadow",
+                bool("aiEnabled"),
+                "ai_toggle"
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Model: " + values.getOrDefault("aiModel", "(select with /swarmmobs ai model <name>)")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 30;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Run Shadow Recommendation"),
+                        button -> SwarmControlClient.sendAction("ai_shadow", 0.0)
+                ).bounds(leftX, y, 300, 20).build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Refresh AI State"),
+                        button -> SwarmControlClient.sendAction("ai_refresh", 0.0)
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 30;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "State=" + values.getOrDefault("aiStatus", "IDLE")
+                                        + " | inFlight=" + bool("aiInFlight")
+                                        + " | latency=" + (int) number("aiLatencyMs") + " ms"
+                        ),
+                        button -> {
+                        }
+                ).bounds(leftX, y, 300, 20).build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Provider=" + values.getOrDefault("aiProvider", "none")
+                                        + " | mode=" + values.getOrDefault("aiMode", "BASELINE")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 30;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "formation=" + format(number("aiFormationMultiplier"))
+                                        + " separation=" + format(number("aiSeparationMultiplier"))
+                        ),
+                        button -> {
+                        }
+                ).bounds(leftX, y, 300, 20).build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "cohesion=" + format(number("aiCohesionMultiplier"))
+                                        + " searchRadius=" + format(number("aiSearchRadiusMultiplier"))
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 30;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "success=" + (int) number("aiSuccessCount")
+                                        + " fallback=" + (int) number("aiFallbackCount")
+                                        + " errors=" + (int) number("aiErrorCount")
+                        ),
+                        button -> {
+                        }
+                ).bounds(leftX, y, 300, 20).build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Shadow only: recommendation is never applied to gameplay"
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 30;
+
+        String rationale = values.getOrDefault("aiRationale", "");
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Rationale: " + abbreviate(rationale, 90)),
+                        button -> {
+                        }
+                ).bounds(leftX, y, 620, 20).build()
+        );
+        y += 26;
+
+        String error = values.getOrDefault("aiLastError", "");
+        if (!error.isBlank()) {
+            addRenderableWidget(
+                    Button.builder(
+                            Component.literal("Last error: " + abbreviate(error, 90)),
+                            button -> {
+                            }
+                    ).bounds(leftX, y, 620, 20).build()
+            );
         }
     }
 
@@ -716,6 +848,13 @@ public final class SwarmControlScreen extends Screen {
         } catch (NumberFormatException ignored) {
             return 0.0;
         }
+    }
+
+    private static String abbreviate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value == null ? "" : value;
+        }
+        return value.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
     private static String format(double value) {

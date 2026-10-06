@@ -216,3 +216,25 @@ When introduced, it should:
 - fall back to deterministic policies when unavailable or uncertain.
 
 The deterministic baseline must remain independently playable, measurable, and testable.
+
+
+## v0.10 — local AI strategy layer
+
+### v0.10.0 AI Shadow Mode
+
+Current implementation:
+- local-only Ollama endpoint with loopback validation;
+- asynchronous Java 21 HTTP so inference never blocks the Minecraft server thread;
+- structured JSON-schema strategy output;
+- aggregate v0.9 experiment telemetry as model input;
+- bounded strategy modes and sanitized multipliers;
+- explicit deterministic fallback;
+- AI OFF by default;
+- Shadow Mode records recommendations only and cannot alter gameplay;
+- commands for provider status, model listing/selection, enable/disable, and one-shot shadow inference;
+- in-game AI Shadow panel with latency/provider/rationale/fallback/error telemetry.
+
+Next within v0.10:
+- repeated/event-driven shadow sampling with rate limits;
+- AI-vs-deterministic experiment comparison metrics;
+- only after validation, an optional bounded active strategy adapter with TTL/hysteresis and deterministic fallback.
