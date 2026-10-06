@@ -126,11 +126,15 @@ public final class SwarmApproachGoal extends Goal {
                 ? SwarmCreeperSwellGoal.HANDOFF_DISTANCE
                 : SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
 
-        if (state.directObservation()
-                && mob.getTarget() instanceof Player target
+        if (mob.getTarget() instanceof Player target
                 && validTarget(target)
                 && state.targetId().equals(target.getUUID())) {
-            return mob.distanceToSqr(target) > release * release;
+            if (!mob.hasLineOfSight(target)) {
+                return true;
+            }
+            if (state.directObservation()) {
+                return mob.distanceToSqr(target) > release * release;
+            }
         }
 
         TargetObservation observation = state.targetObservation();
