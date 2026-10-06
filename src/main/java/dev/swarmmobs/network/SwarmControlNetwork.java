@@ -56,6 +56,10 @@ public final class SwarmControlNetwork {
     }
 
     private static void applyAction(String action, double value) {
+        if (!action.startsWith("preset_") && !action.equals("experiment_seed_delta")) {
+            SwarmExperimentManager.markCustom();
+        }
+
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
 
@@ -260,6 +264,7 @@ public final class SwarmControlNetwork {
             }
 
             case "baseline_all" -> {
+                SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
                 SwarmConfig.ENABLED.set(true);
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
