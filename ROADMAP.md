@@ -146,10 +146,18 @@ Current v0.8.1 extension:
 - bound the extra pathfinding work to at most four candidates and only after a confirmed front obstruction;
 - live Navigation-page controls for path evidence and path penalties.
 
+Current v0.8.2 extension:
+- replace single parity-based recovery waypoint with six deterministic escape candidates;
+- include forward-side, pure-side, and backward-side recovery options;
+- validate recovery candidates with collision, walkability, local congestion, and optional PathNavigation evidence;
+- score recovery candidates with the same bounded local cost function as obstacle detours;
+- record recovery-planner attempts and failures;
+- live control-panel tuning for stuck window, minimum progress, recovery distance, and recovery duration.
+
 Next within v0.8:
-- improved recovery candidate validation;
 - explicit planner score/candidate telemetry;
-- performance telemetry for path-evidence query counts.
+- performance telemetry for path-evidence query counts;
+- runtime GameTest that deliberately forces a blocked-navigation recovery event.
 
 ### v0.9 — experiment and evaluation layer
 - reacquisition time;
