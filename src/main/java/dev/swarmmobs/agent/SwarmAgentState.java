@@ -430,6 +430,8 @@ public final class SwarmAgentState {
 
     public void clearLocalPlan(int neighborCount) {
         this.neighborCount = neighborCount;
+        this.pendingRole = null;
+        this.pendingRoleSinceTick = Long.MIN_VALUE;
         this.hasDestination = false;
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
         this.searchRadius = 0.0;
