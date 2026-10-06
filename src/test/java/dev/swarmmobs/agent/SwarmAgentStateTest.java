@@ -3,6 +3,7 @@ package dev.swarmmobs.agent;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
 import org.junit.jupiter.api.Test;
+import net.minecraft.world.level.block.Blocks;
 
 import java.util.UUID;
 
@@ -222,6 +223,31 @@ class SwarmAgentStateTest {
         assertEquals(1.0, state.targetConfidence(100L, 100), 1.0e-9);
         assertEquals(0.5, state.targetConfidence(150L, 100), 1.0e-9);
         assertEquals(0.0, state.targetConfidence(200L, 100), 1.0e-9);
+    }
+
+    @Test
+    void engineeringMaterialTransferMovesExactlyOneBlockWithoutPlacementAccounting() {
+        SwarmAgentState donor = new SwarmAgentState();
+        SwarmAgentState receiver = new SwarmAgentState();
+
+        assertTrue(donor.salvageEngineeringBlock(Blocks.DIRT.defaultBlockState(), 4));
+        assertTrue(donor.salvageEngineeringBlock(Blocks.DIRT.defaultBlockState(), 4));
+
+        long donorBrokenBefore = donor.engineeringBlocksBroken();
+        long receiverBrokenBefore = receiver.engineeringBlocksBroken();
+
+        assertTrue(donor.transferOneEngineeringBlockTo(receiver, 4));
+
+        assertEquals(1, donor.carriedEngineeringBlockCount());
+        assertEquals(1, receiver.carriedEngineeringBlockCount());
+        assertTrue(receiver.carriedEngineeringBlock().is(Blocks.DIRT));
+
+        assertEquals(donorBrokenBefore, donor.engineeringBlocksBroken());
+        assertEquals(receiverBrokenBefore, receiver.engineeringBlocksBroken());
+        assertEquals(0L, donor.engineeringBlocksPlaced());
+        assertEquals(0L, receiver.engineeringBlocksPlaced());
+        assertEquals(1L, donor.engineeringMaterialsGiven());
+        assertEquals(1L, receiver.engineeringMaterialsReceived());
     }
 
     private static TargetObservation observation(UUID target, long tick) {
