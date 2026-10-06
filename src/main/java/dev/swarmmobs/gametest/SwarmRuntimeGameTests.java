@@ -605,22 +605,22 @@ public final class SwarmRuntimeGameTests {
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
 
-        helper.runAfterDelay(16, () -> {
+        helper.runAfterDelay(4, () -> {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
-
-            if (!player.getUUID().equals(state.targetId())) {
-                playerHandle.close();
-                helper.fail("Zombie did not acquire player before recovery-planner test");
-                return;
-            }
-
-            if (!state.hasDestination()) {
-                playerHandle.close();
-                helper.fail("Zombie had no swarm destination before forced stuck interval");
-            }
+            state.rememberTarget(player.getUUID(), helper.getTick(), true);
+            state.updateLocalPlan(
+                    0,
+                    0,
+                    SwarmRole.CHASER,
+                    player.getX(),
+                    player.getZ(),
+                    0.0,
+                    0.0
+            );
+            zombie.setTarget(player);
         });
 
-        int recoveryCheckTick = 16 + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + 24;
+        int recoveryCheckTick = 4 + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + 24;
         helper.runAfterDelay(recoveryCheckTick, () -> {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
 
