@@ -47,6 +47,7 @@ public final class SwarmExperimentPresetPolicy {
                     true, 0, 0.0, 16.0,
                     14, 2.75, 1.25, true
             );
+            case CUSTOM -> throw new IllegalArgumentException("CUSTOM is not an applicable preset");
         };
     }
 
