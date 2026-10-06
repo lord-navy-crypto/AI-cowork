@@ -1403,6 +1403,67 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_division_of_labor", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void skeletonTeamDifferentiatesRangedSpecializations(GameTestHelper helper) {
+        Skeleton skeletonA = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 1));
+        Skeleton skeletonB = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 2));
+        Skeleton skeletonC = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 3));
+        skeletonA.setNoGravity(true);
+        skeletonB.setNoGravity(true);
+        skeletonC.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(7.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(48, () -> {
+            java.util.List<Skeleton> skeletons = java.util.List.of(
+                    skeletonA,
+                    skeletonB,
+                    skeletonC
+            );
+            java.util.Set<dev.swarmmobs.agent.SwarmSpecialization> specializations =
+                    new java.util.HashSet<>();
+
+            for (Skeleton skeleton : skeletons) {
+                SwarmAgentState state =
+                        skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+
+                if (!player.getUUID().equals(state.targetId())) {
+                    playerHandle.close();
+                    helper.fail("Ranged division-of-labor team did not converge on shared target");
+                    return;
+                }
+
+                if (state.currentTask() != dev.swarmmobs.agent.SwarmTaskType.RANGED_SUPPORT) {
+                    playerHandle.close();
+                    helper.fail("Skeleton did not select ranged-support task under engage demand");
+                    return;
+                }
+
+                if (state.role() != SwarmRole.RANGED_SUPPORT) {
+                    playerHandle.close();
+                    helper.fail("Dynamic specialization rewrote Skeleton out of ranged combat role");
+                    return;
+                }
+
+                specializations.add(state.specialization());
+            }
+
+            if (specializations.size() < 2) {
+                playerHandle.close();
+                helper.fail("Same-species Skeleton team failed to differentiate ranged specializations");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_spider_flanker", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void spiderJoinsSharedSwarmAsFlanker(GameTestHelper helper) {
         var spider = helper.spawn(EntityType.SPIDER, new BlockPos(2, 1, 2));
