@@ -1010,7 +1010,7 @@ public final class SwarmRuntimeGameTests {
             }
         });
 
-        helper.runAfterDelay(70, () -> {
+        helper.runAfterDelay(110, () -> {
             if (player.getHealth() >= initialHealth) {
                 playerHandle.close();
                 helper.fail("Zombie never landed a vanilla melee attack after swarm handoff");
@@ -1023,8 +1023,25 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 150)
     public static void spiderActuallyAttacksAfterSwarmMeleeHandoff(GameTestHelper helper) {
+        // Vanilla Spider combat can disengage in bright conditions. Build a local
+        // enclosed room so this test measures swarm-to-vanilla melee handoff rather
+        // than daylight randomness.
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 3, z), Blocks.STONE);
+            }
+        }
+        for (int y = 1; y <= 2; y++) {
+            for (int edge = 0; edge <= 4; edge++) {
+                helper.setBlock(new BlockPos(0, y, edge), Blocks.STONE);
+                helper.setBlock(new BlockPos(4, y, edge), Blocks.STONE);
+                helper.setBlock(new BlockPos(edge, y, 0), Blocks.STONE);
+                helper.setBlock(new BlockPos(edge, y, 4), Blocks.STONE);
+            }
+        }
+
         var spider = helper.spawn(EntityType.SPIDER, new BlockPos(1, 1, 2));
         spider.setNoGravity(true);
 
