@@ -500,14 +500,26 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 gridStepZ = stepZ >= 0.0 ? 1 : -1;
             }
 
-            SwarmBridgeSpanPolicy.Evaluation bridge = evaluateBridgeSpan(
-                    state,
-                    support,
-                    gridStepX,
-                    gridStepZ
-            );
-            if (!bridge.allowed()) {
-                return Action.NONE;
+            BlockPos lowerSupport = support.below();
+            boolean shallowSupport = !zombie.level()
+                    .getBlockState(lowerSupport)
+                    .getCollisionShape(zombie.level(), lowerSupport)
+                    .isEmpty();
+
+            if (shallowSupport) {
+                if (availableBridgeMaterials(state) < 1) {
+                    return Action.NONE;
+                }
+            } else {
+                SwarmBridgeSpanPolicy.Evaluation bridge = evaluateBridgeSpan(
+                        state,
+                        support,
+                        gridStepX,
+                        gridStepZ
+                );
+                if (!bridge.allowed()) {
+                    return Action.NONE;
+                }
             }
 
             if (state.carriedEngineeringBlockCount() > 0
