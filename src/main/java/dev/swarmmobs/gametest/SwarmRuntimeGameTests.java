@@ -588,4 +588,64 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_recovery_planner", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
+    public static void immobileZombieTriggersValidatedRecoveryPlanner(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        zombie.setNoGravity(true);
+
+        var movementSpeed = zombie.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (movementSpeed != null) {
+            movementSpeed.setBaseValue(0.0D);
+        }
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(8.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(16, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId())) {
+                playerHandle.close();
+                helper.fail("Zombie did not acquire player before recovery-planner test");
+                return;
+            }
+
+            if (!state.hasDestination()) {
+                playerHandle.close();
+                helper.fail("Zombie had no swarm destination before forced stuck interval");
+            }
+        });
+
+        int recoveryCheckTick = 16 + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + 24;
+        helper.runAfterDelay(recoveryCheckTick, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (state.recoveryPlanningAttempts() <= 0L) {
+                playerHandle.close();
+                helper.fail("Forced immobility did not trigger recovery planning");
+                return;
+            }
+
+            if (state.recoveryCount() <= 0L) {
+                playerHandle.close();
+                helper.fail("Recovery planner never committed a feasible recovery waypoint");
+                return;
+            }
+
+            if (state.plannerPathQueryCount() <= 0L && SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()) {
+                playerHandle.close();
+                helper.fail("Recovery planner did not record PathNavigation evidence queries");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+
 }
