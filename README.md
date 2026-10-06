@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.9.1; current integration work: `swarm-reacquisition-metrics-v0.9.2`
+Active stable line: `main` through v0.9.2; current integration work: `swarm-ai-shadow-v0.10.0`
 
 The current playable system includes:
 
@@ -68,6 +68,7 @@ The current playable system includes:
 - multi-direction stuck recovery planning that validates six escape candidates with terrain, congestion, and path evidence before committing;
 - explainable local-planner telemetry for candidate counts, blocked/unreachable filtering, selected index/score, and cumulative PathNavigation query count;
 - experiment snapshots with communication, navigation, recovery, role-reassignment, SEARCH-success, and reacquisition-latency metrics;
+- optional local Ollama AI Shadow Mode that reads aggregate telemetry and emits bounded structured strategy recommendations without changing gameplay;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -97,6 +98,26 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.9.1 is merged on `main`; v0.9.2 SEARCH success and reacquisition metrics are under integration.**
+**Swarm Mobs v0.9.2 is merged on `main`; v0.10.0 local Ollama AI Shadow Mode is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.
+
+
+## Local AI Shadow Mode
+
+v0.10 introduces an optional local-only Ollama strategy advisor. It is **OFF by default** and **never applies recommendations to movement, combat, navigation, or swarm parameters**.
+
+Commands:
+
+```text
+/swarmmobs ai status
+/swarmmobs ai models
+/swarmmobs ai model <name>
+/swarmmobs ai on
+/swarmmobs ai off
+/swarmmobs ai shadow
+```
+
+The in-game control panel includes an **AI Shadow** page showing the last recommendation, provider, latency, bounded multipliers, rationale, fallback count, and error count.
+
+See `docs/OLLAMA_SHADOW.md` for architecture and safety boundaries.
