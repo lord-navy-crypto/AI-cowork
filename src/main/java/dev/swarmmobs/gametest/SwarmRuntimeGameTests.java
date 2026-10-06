@@ -34,7 +34,7 @@ public final class SwarmRuntimeGameTests {
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_integration", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
     public static void zombieReceivesSwarmRuntimeIntegration(GameTestHelper helper) {
-        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
         zombie.setNoGravity(true);
 
         helper.runAfterDelay(4, () -> {
@@ -597,7 +597,7 @@ public final class SwarmRuntimeGameTests {
             }
         }
 
-        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
 
         var movementSpeed = zombie.getAttribute(Attributes.MOVEMENT_SPEED);
         if (movementSpeed != null) {
