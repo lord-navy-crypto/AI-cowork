@@ -24,7 +24,12 @@ public final class SwarmExperimentMetrics {
             long recoveryPlanningAttempts,
             long recoveryPlanningFailures,
             long pathQueries,
-            long roleReassignments
+            long roleReassignments,
+            long searchEpisodesStarted,
+            long searchEpisodesSucceeded,
+            long searchEpisodesFailed,
+            long searchReacquisitionTicksTotal,
+            int activeSearchEpisodes
     ) {
         public double recoveryFailureRate() {
             return recoveryPlanningAttempts <= 0L
@@ -35,6 +40,17 @@ public final class SwarmExperimentMetrics {
         public double communicationDropRate() {
             long total = communicationDelivered + communicationDropped;
             return total <= 0L ? 0.0 : (double) communicationDropped / total;
+        }
+
+        public double searchSuccessRate() {
+            long completed = searchEpisodesSucceeded + searchEpisodesFailed;
+            return completed <= 0L ? 0.0 : (double) searchEpisodesSucceeded / completed;
+        }
+
+        public double averageReacquisitionTicks() {
+            return searchEpisodesSucceeded <= 0L
+                    ? 0.0
+                    : (double) searchReacquisitionTicksTotal / searchEpisodesSucceeded;
         }
     }
 
@@ -47,7 +63,11 @@ public final class SwarmExperimentMetrics {
             long recoveryPlanningAttempts,
             long recoveryPlanningFailures,
             long pathQueries,
-            long roleReassignments
+            long roleReassignments,
+            long searchEpisodesStarted,
+            long searchEpisodesSucceeded,
+            long searchEpisodesFailed,
+            long searchReacquisitionTicksTotal
     ) {}
 
     private static final Map<UUID, Counters> BASELINES = new HashMap<>();
@@ -80,6 +100,11 @@ public final class SwarmExperimentMetrics {
         long recoveryFailures = 0L;
         long pathQueries = 0L;
         long roleReassignments = 0L;
+        long searchStarted = 0L;
+        long searchSucceeded = 0L;
+        long searchFailed = 0L;
+        long reacquisitionTicks = 0L;
+        int activeSearchEpisodes = 0;
         int agents = 0;
 
         for (var entity : level.getAllEntities()) {
@@ -101,6 +126,13 @@ public final class SwarmExperimentMetrics {
             recoveryFailures += delta(current.recoveryPlanningFailures(), baseline.recoveryPlanningFailures());
             pathQueries += delta(current.pathQueries(), baseline.pathQueries());
             roleReassignments += delta(current.roleReassignments(), baseline.roleReassignments());
+            searchStarted += delta(current.searchEpisodesStarted(), baseline.searchEpisodesStarted());
+            searchSucceeded += delta(current.searchEpisodesSucceeded(), baseline.searchEpisodesSucceeded());
+            searchFailed += delta(current.searchEpisodesFailed(), baseline.searchEpisodesFailed());
+            reacquisitionTicks += delta(current.searchReacquisitionTicksTotal(), baseline.searchReacquisitionTicksTotal());
+            if (state.searchEpisodeActive()) {
+                activeSearchEpisodes++;
+            }
         }
 
         long elapsed = active ? Math.max(0L, level.getGameTime() - startTick) : 0L;
@@ -117,7 +149,12 @@ public final class SwarmExperimentMetrics {
                 recoveryAttempts,
                 recoveryFailures,
                 pathQueries,
-                roleReassignments
+                roleReassignments,
+                searchStarted,
+                searchSucceeded,
+                searchFailed,
+                reacquisitionTicks,
+                activeSearchEpisodes
         );
     }
 
@@ -135,7 +172,11 @@ public final class SwarmExperimentMetrics {
                 state.recoveryPlanningAttempts(),
                 state.recoveryPlanningFailures(),
                 state.plannerPathQueryCount(),
-                state.roleReassignmentCount()
+                state.roleReassignmentCount(),
+                state.searchEpisodesStarted(),
+                state.searchEpisodesSucceeded(),
+                state.searchEpisodesFailed(),
+                state.searchReacquisitionTicksTotal()
         );
     }
 
@@ -143,7 +184,10 @@ public final class SwarmExperimentMetrics {
         return Math.max(0L, current - baseline);
     }
 
-    private static final Counters ZERO = new Counters(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+    private static final Counters ZERO = new Counters(
+            0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+            0L, 0L, 0L, 0L
+    );
 
     private SwarmExperimentMetrics() {}
 }
