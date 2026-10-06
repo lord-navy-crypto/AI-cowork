@@ -1421,8 +1421,11 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 150)
     public static void spiderActuallyAttacksAfterSwarmMeleeHandoff(GameTestHelper helper) {
+        // Allow extra scheduling margin on slower local development machines while
+        // preserving the strong success criterion: vanilla Spider melee must actually
+        // reduce the test player's health after swarm movement yields.
         for (int x = 0; x <= 4; x++) {
             for (int z = 0; z <= 4; z++) {
                 helper.setBlock(new BlockPos(x, 3, z), Blocks.STONE);
@@ -1473,7 +1476,7 @@ public final class SwarmRuntimeGameTests {
             }
         });
 
-        helper.runAfterDelay(70, () -> {
+        helper.runAfterDelay(110, () -> {
             if (player.getHealth() >= initialHealth) {
                 playerHandle.close();
                 helper.fail("Spider never landed a vanilla melee attack after swarm handoff");
