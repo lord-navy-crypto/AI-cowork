@@ -1,5 +1,6 @@
 package dev.swarmmobs.algorithm;
 
+import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmTaskType;
 import org.junit.jupiter.api.Test;
 
@@ -90,6 +91,36 @@ class SwarmTaskSaturationPolicyTest {
 
         assertTrue(incumbent > recruit);
         assertTrue(incumbent > 0.5);
+    }
+
+    @Test
+    void nativeSpeciesCoreTasksBypassSaturation() {
+        assertEquals(0.7, SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.RANGED_SUPPORT,
+                SwarmTaskType.RANGED_SUPPORT,
+                0.7,
+                4,
+                3,
+                SwarmTaskType.RESERVE
+        ), 1e-9);
+
+        assertEquals(0.7, SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.FLANKER,
+                SwarmTaskType.FLANK,
+                0.7,
+                4,
+                3,
+                SwarmTaskType.RESERVE
+        ), 1e-9);
+
+        assertEquals(0.65, SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.BREACHER,
+                SwarmTaskType.BREACH,
+                0.65,
+                4,
+                3,
+                SwarmTaskType.RESERVE
+        ), 1e-9);
     }
 
     @Test
