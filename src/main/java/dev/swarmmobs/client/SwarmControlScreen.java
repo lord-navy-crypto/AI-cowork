@@ -312,6 +312,33 @@ public final class SwarmControlScreen extends Screen {
 
         addNumericRow(
                 leftX, leftY,
+                "Stuck window",
+                Integer.toString((int) number("stuckWindow")) + " ticks",
+                "nav_stuck_window_delta",
+                2.0
+        );
+        leftY += 28;
+
+        addNumericRow(
+                leftX, leftY,
+                "Min progress",
+                format(number("stuckMinProgress")) + " blocks",
+                "nav_stuck_progress_delta",
+                0.10
+        );
+        leftY += 28;
+
+        addNumericRow(
+                leftX, leftY,
+                "Recovery distance",
+                format(number("recoveryDistance")) + " blocks",
+                "nav_recovery_distance_delta",
+                0.25
+        );
+        leftY += 28;
+
+        addNumericRow(
+                leftX, leftY,
                 "Recovery duration",
                 Integer.toString((int) number("recoveryDuration")) + " ticks",
                 "nav_recovery_duration_delta",
