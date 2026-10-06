@@ -184,6 +184,16 @@ public final class SwarmRuntimeGameTests {
                 zombie.getZ()
         );
         helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
 
         if (!engineer.canUse()) {
             server.setDifficulty(previousDifficulty, true);
@@ -1325,6 +1335,20 @@ public final class SwarmRuntimeGameTests {
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void spiderActuallyAttacksAfterSwarmMeleeHandoff(GameTestHelper helper) {
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 3, z), Blocks.STONE);
+            }
+        }
+        for (int y = 1; y <= 2; y++) {
+            for (int i = 0; i <= 4; i++) {
+                helper.setBlock(new BlockPos(0, y, i), Blocks.STONE);
+                helper.setBlock(new BlockPos(4, y, i), Blocks.STONE);
+                helper.setBlock(new BlockPos(i, y, 0), Blocks.STONE);
+                helper.setBlock(new BlockPos(i, y, 4), Blocks.STONE);
+            }
+        }
+
         var spider = helper.spawn(EntityType.SPIDER, new BlockPos(1, 1, 2));
         spider.setNoGravity(true);
 
