@@ -19,8 +19,12 @@ import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.debug.SwarmDebugParticles;
 import dev.swarmmobs.goal.SwarmApproachGoal;
+import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
+import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -44,6 +48,12 @@ public final class SwarmMobEvents {
                 || event.getLevel().isClientSide()
                 || !SwarmAgentProfiles.isSupported(mob)) {
             return;
+        }
+
+        if (mob instanceof Skeleton skeleton) {
+            mob.goalSelector.addGoal(0, new SwarmSkeletonBowGoal(skeleton));
+        } else if (mob instanceof Creeper creeper) {
+            mob.goalSelector.addGoal(0, new SwarmCreeperSwellGoal(creeper));
         }
 
         mob.goalSelector.addGoal(1, new SwarmApproachGoal(mob));
