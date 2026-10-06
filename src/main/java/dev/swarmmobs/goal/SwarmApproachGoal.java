@@ -12,6 +12,8 @@ import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmRecoveryCandidatePolicy;
+import dev.swarmmobs.algorithm.SwarmRangedHandoffPolicy;
+import dev.swarmmobs.algorithm.SwarmCreeperHandoffPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
 import dev.swarmmobs.algorithm.SwarmTerrainSupportPolicy;
@@ -23,6 +25,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 
@@ -38,6 +41,8 @@ import java.util.List;
  * vanilla ranged-combat goals can take over.
  */
 public final class SwarmApproachGoal extends Goal {
+    // Combat bridges own priority 0 only inside their bounded engagement
+    // envelopes; the swarm MOVE goal remains responsible for approach outside.
     private final PathfinderMob mob;
     private double progressSampleX;
     private double progressSampleZ;
@@ -76,8 +81,36 @@ public final class SwarmApproachGoal extends Goal {
             ) > tolerance * tolerance;
         }
 
+        if (mob instanceof Creeper creeper
+                && creeper.getTarget() instanceof Player target
+                && validTarget(target)
+                && state.targetId().equals(target.getUUID())
+                && SwarmCreeperHandoffPolicy.shouldYieldToSwell(
+                        state.directObservation(),
+                        true,
+                        creeper.hasLineOfSight(target),
+                        creeper.distanceToSqr(target),
+                        SwarmCreeperSwellGoal.HANDOFF_DISTANCE,
+                        creeper.getSwellDir(),
+                        creeper.isIgnited()
+                )) {
+            return false;
+        }
+
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
         if (profile.archetype() == SwarmAgentArchetype.RANGED_SUPPORT) {
+            if (mob.getTarget() instanceof Player target
+                    && validTarget(target)
+                    && SwarmRangedHandoffPolicy.shouldYieldToVanilla(
+                            state.directObservation(),
+                            state.targetId().equals(target.getUUID()),
+                            mob.hasLineOfSight(target),
+                            mob.distanceToSqr(target),
+                            SwarmSkeletonBowGoal.HANDOFF_DISTANCE
+                    )) {
+                return false;
+            }
+
             double tolerance = Math.max(0.5, profile.arrivalTolerance());
             return mob.distanceToSqr(
                     state.destinationX(),

@@ -18,7 +18,11 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -403,6 +407,187 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_skeleton_bow_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 170)
+    public static void skeletonKeepsVanillaBowAttackInsideRangedEnvelope(GameTestHelper helper) {
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+
+        var skeleton = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 2));
+        skeleton.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        skeleton.reassessWeaponGoal();
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        final boolean[] observedBowCombat = {false};
+
+        helper.runAfterDelay(20, () -> {
+            SwarmAgentState state = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Skeleton did not establish direct swarm observation before bow-handoff check");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = skeleton.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Skeleton did not retain SwarmApproachGoal");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield inside Skeleton bow range");
+                return;
+            }
+
+            boolean hasBridgeGoal = skeleton.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(wrapped -> wrapped.getGoal() instanceof dev.swarmmobs.goal.SwarmSkeletonBowGoal);
+            if (!hasBridgeGoal) {
+                playerHandle.close();
+                helper.fail("Skeleton did not receive the high-priority bow bridge goal");
+            }
+        });
+
+        for (int sampleTick : new int[] {35, 55, 75, 95}) {
+            helper.runAfterDelay(sampleTick, () -> {
+                if (skeleton.isUsingItem()) {
+                    observedBowCombat[0] = true;
+                }
+
+                boolean arrowPresent = !skeleton.level().getEntitiesOfClass(
+                        AbstractArrow.class,
+                        skeleton.getBoundingBox().inflate(24.0),
+                        arrow -> arrow.isAlive()
+                ).isEmpty();
+                if (arrowPresent) {
+                    observedBowCombat[0] = true;
+                }
+            });
+        }
+
+        helper.runAfterDelay(110, () -> {
+            boolean arrowPresent = !skeleton.level().getEntitiesOfClass(
+                    AbstractArrow.class,
+                    skeleton.getBoundingBox().inflate(32.0),
+                    arrow -> arrow.isAlive()
+            ).isEmpty();
+
+            if (!observedBowCombat[0] && !arrowPresent) {
+                playerHandle.close();
+                helper.fail("Skeleton never drew/fired its bow after swarm ranged handoff");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_creeper_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void creeperKeepsSwarmApproachThenYieldsToFuse(GameTestHelper helper) {
+        var creeper = helper.spawn(EntityType.CREEPER, new BlockPos(1, 1, 2));
+        creeper.setNoGravity(true);
+
+        var movementSpeed = creeper.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (movementSpeed != null) {
+            movementSpeed.setBaseValue(0.0D);
+        }
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 farPosition = helper.absoluteVec(new Vec3(5.0, 1.0, 2.0));
+        player.setPos(farPosition.x, farPosition.y, farPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = creeper.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Creeper did not establish direct swarm observation");
+                return;
+            }
+
+            if (!state.hasDestination()) {
+                playerHandle.close();
+                helper.fail("Creeper did not receive a swarm approach destination");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = creeper.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null || !approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("Creeper swarm approach was not active outside fuse range");
+                return;
+            }
+
+            Vec3 nearPosition = helper.absoluteVec(new Vec3(3.5, 1.0, 2.0));
+            player.setPos(nearPosition.x, nearPosition.y, nearPosition.z);
+        });
+
+        helper.runAfterDelay(34, () -> {
+            SwarmAgentState state = creeper.getData(SwarmAttachments.AGENT_STATE.get());
+
+            SwarmApproachGoal approachGoal = creeper.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Creeper lost SwarmApproachGoal registration");
+                return;
+            }
+
+            if (creeper.getSwellDir() <= 0) {
+                playerHandle.close();
+                helper.fail("Creeper never entered vanilla swell/fuse behavior inside handoff range");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield after Creeper fuse handoff");
+                return;
+            }
+
+            if (!state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Creeper fuse handoff occurred without a direct target observation");
+                return;
+            }
+
+            creeper.discard();
             playerHandle.close();
             helper.succeed();
         });
