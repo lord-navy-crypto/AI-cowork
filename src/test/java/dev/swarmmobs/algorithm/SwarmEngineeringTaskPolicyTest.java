@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SwarmEngineeringTaskPolicyTest {
 
@@ -20,10 +20,10 @@ class SwarmEngineeringTaskPolicyTest {
                 SwarmEngineeringTask.Type.BRIDGE,
                 List.of(
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                requester, 1.0, SwarmRole.REAR_PRESSURE, 0, true, false, true, true
+                                requester, 1.0, SwarmRole.REAR_PRESSURE, 0, true, false, true
                         ),
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                helper, 9.0, SwarmRole.CHASER, 1, false, false, true, true
+                                helper, 9.0, SwarmRole.CHASER, 1, false, false, true
                         )
                 )
         );
@@ -40,10 +40,10 @@ class SwarmEngineeringTaskPolicyTest {
                 SwarmEngineeringTask.Type.BREAK,
                 List.of(
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                chaser, 4.0, SwarmRole.CHASER, 0, false, false, true, true
+                                chaser, 4.0, SwarmRole.CHASER, 0, false, false, true
                         ),
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                rear, 5.0, SwarmRole.REAR_PRESSURE, 0, false, false, true, true
+                                rear, 5.0, SwarmRole.REAR_PRESSURE, 0, false, false, true
                         )
                 )
         );
@@ -63,7 +63,7 @@ class SwarmEngineeringTaskPolicyTest {
                                 busy, 1.0, SwarmRole.REAR_PRESSURE, 0, false, true, true
                         ),
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                free, 16.0, SwarmRole.CHASER, 0, false, false, true, true
+                                free, 16.0, SwarmRole.CHASER, 0, false, false, true
                         )
                 )
         );
