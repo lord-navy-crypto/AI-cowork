@@ -191,6 +191,24 @@ public final class SwarmCommands {
         return 1;
     }
 
+    private static int startExperiment(CommandSourceStack source) {
+        SwarmExperimentMetrics.start(source.getLevel());
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm experiment run started: preset=" + SwarmExperimentManager.activePreset()
+                                + ", seed=" + SwarmExperimentManager.experimentSeed()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int resetExperiment(CommandSourceStack source) {
+        SwarmExperimentMetrics.reset(source.getLevel());
+        source.sendSuccess(() -> Component.literal("Swarm experiment measurement baseline reset."), true);
+        return 1;
+    }
+
     private static int openControlPanel(CommandSourceStack source) {
         ServerPlayer player;
         try {
