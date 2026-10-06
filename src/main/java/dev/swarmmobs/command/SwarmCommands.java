@@ -533,6 +533,10 @@ public final class SwarmCommands {
                                 + ", formationRadius=" + SwarmConfig.FORMATION_RADIUS.get()
                                 + ", formationSlotHysteresisTicks=" + SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()
                                 + ", roleHysteresisTicks=" + SwarmConfig.ROLE_HYSTERESIS_TICKS.get()
+                                + ", divisionOfLaborEnabled=" + SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
+                                + ", specializationMinHoldTicks=" + SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.get()
+                                + ", specializationExperienceGain=" + SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.get()
+                                + ", specializationExperienceDecay=" + SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.get()
                                 + ", alignmentWeight=" + SwarmConfig.ALIGNMENT_WEIGHT.get()
                                 + ", maxSteeringCorrection=" + SwarmConfig.MAX_STEERING_CORRECTION.get()
                                 + ", staleTargetMinSpeedFactor=" + SwarmConfig.STALE_TARGET_MIN_SPEED_FACTOR.get()
@@ -694,6 +698,14 @@ public final class SwarmCommands {
                                 + " engineeringCompleted=" + state.engineeringTasksCompleted()
                                 + " engineeringMaterialsGiven=" + state.engineeringMaterialsGiven()
                                 + " engineeringMaterialsReceived=" + state.engineeringMaterialsReceived()
+                                + " task=" + state.currentTask()
+                                + " specialization=" + state.specialization()
+                                + " specializationSwitches=" + state.specializationSwitchCount()
+                                + " specializationExperience=" + String.format(
+                                        java.util.Locale.ROOT,
+                                        "%.3f",
+                                        state.taskExperience(state.currentTask())
+                                )
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
                                 + " alignment=" + String.format(java.util.Locale.ROOT, "%.3f", state.alignmentMagnitude())
@@ -742,6 +754,10 @@ public final class SwarmCommands {
                 new java.util.EnumMap<>(dev.swarmmobs.agent.SwarmRole.class);
         java.util.EnumMap<SwarmAgentArchetype, Integer> archetypes =
                 new java.util.EnumMap<>(SwarmAgentArchetype.class);
+        java.util.EnumMap<dev.swarmmobs.agent.SwarmTaskType, Integer> tasks =
+                new java.util.EnumMap<>(dev.swarmmobs.agent.SwarmTaskType.class);
+        java.util.EnumMap<dev.swarmmobs.agent.SwarmSpecialization, Integer> specializations =
+                new java.util.EnumMap<>(dev.swarmmobs.agent.SwarmSpecialization.class);
         int withTarget = 0;
         int direct = 0;
         int engageCount = 0;
@@ -786,6 +802,8 @@ public final class SwarmCommands {
             SwarmAgentState state = agent.getData(SwarmAttachments.AGENT_STATE.get());
             roles.merge(state.role(), 1, Integer::sum);
             archetypes.merge(SwarmAgentProfiles.profile(agent).archetype(), 1, Integer::sum);
+            tasks.merge(state.currentTask(), 1, Integer::sum);
+            specializations.merge(state.specialization(), 1, Integer::sum);
             if (state.targetId() != null) {
                 withTarget++;
             }
@@ -854,9 +872,17 @@ public final class SwarmCommands {
                 .map(archetype -> archetype + "=" + archetypes.getOrDefault(archetype, 0))
                 .collect(java.util.stream.Collectors.joining(", "));
 
+        String taskSummary = java.util.Arrays.stream(dev.swarmmobs.agent.SwarmTaskType.values())
+                .map(task -> task + "=" + tasks.getOrDefault(task, 0))
+                .collect(java.util.stream.Collectors.joining(", "));
+
+        String specializationSummary = java.util.Arrays.stream(dev.swarmmobs.agent.SwarmSpecialization.values())
+                .map(spec -> spec + "=" + specializations.getOrDefault(spec, 0))
+                .collect(java.util.stream.Collectors.joining(", "));
+
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, plannerDiagnostics=%d, plannerPathQueries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d, engineeringRequests=%d, engineeringClaims=%d, engineeringCompleted=%d, engineeringMaterialsGiven=%d, engineeringMaterialsReceived=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, plannerDiagnostics=%d, plannerPathQueries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d, engineeringRequests=%d, engineeringClaims=%d, engineeringCompleted=%d, engineeringMaterialsGiven=%d, engineeringMaterialsReceived=%d, archetypes={%s}, roles={%s}, tasks={%s}, specializations={%s}",
                 total,
                 withTarget,
                 direct,
@@ -898,7 +924,9 @@ public final class SwarmCommands {
                 engineeringMaterialsGiven,
                 engineeringMaterialsReceived,
                 archetypeSummary,
-                roleSummary
+                roleSummary,
+                taskSummary,
+                specializationSummary
         );
 
         source.sendSuccess(() -> Component.literal(summary), false);

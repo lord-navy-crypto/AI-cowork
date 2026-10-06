@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -81,6 +82,13 @@ public final class SwarmAgentState {
     private long engineeringTasksCompleted;
     private long engineeringMaterialsGiven;
     private long engineeringMaterialsReceived;
+
+    private SwarmTaskType currentTask = SwarmTaskType.RESERVE;
+    private SwarmSpecialization specialization = SwarmSpecialization.RESERVE;
+    private long specializationSinceTick = Long.MIN_VALUE;
+    private long specializationSwitchCount;
+    private final EnumMap<SwarmTaskType, Double> taskExperience =
+            new EnumMap<>(SwarmTaskType.class);
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -159,6 +167,80 @@ public final class SwarmAgentState {
 
     public long formationSlotSwitchCount() {
         return formationSlotSwitchCount;
+    }
+
+    public SwarmTaskType currentTask() {
+        return currentTask;
+    }
+
+    public SwarmSpecialization specialization() {
+        return specialization;
+    }
+
+    public long specializationSinceTick() {
+        return specializationSinceTick;
+    }
+
+    public long specializationSwitchCount() {
+        return specializationSwitchCount;
+    }
+
+    public double taskExperience(SwarmTaskType task) {
+        if (task == null) {
+            return 0.0;
+        }
+        return taskExperience.getOrDefault(task, 0.0);
+    }
+
+    public SwarmSpecialization stabilizeSpecialization(
+            SwarmTaskType candidateTask,
+            SwarmSpecialization candidateSpecialization,
+            long gameTick,
+            int minHoldTicks
+    ) {
+        SwarmTaskType nextTask = candidateTask == null
+                ? SwarmTaskType.RESERVE
+                : candidateTask;
+        SwarmSpecialization nextSpecialization = candidateSpecialization == null
+                ? SwarmSpecialization.RESERVE
+                : candidateSpecialization;
+        int hold = Math.max(0, minHoldTicks);
+
+        if (specializationSinceTick == Long.MIN_VALUE) {
+            currentTask = nextTask;
+            specialization = nextSpecialization;
+            specializationSinceTick = gameTick;
+            return specialization;
+        }
+
+        if (nextTask == currentTask && nextSpecialization == specialization) {
+            return specialization;
+        }
+
+        if (gameTick - specializationSinceTick < hold) {
+            return specialization;
+        }
+
+        currentTask = nextTask;
+        specialization = nextSpecialization;
+        specializationSinceTick = gameTick;
+        specializationSwitchCount++;
+        return specialization;
+    }
+
+    public void updateTaskExperience(
+            SwarmTaskType activeTask,
+            double gain,
+            double decay
+    ) {
+        double retention = Math.max(0.0, Math.min(1.0, decay));
+        for (SwarmTaskType task : SwarmTaskType.values()) {
+            double value = taskExperience(task) * retention;
+            if (task == activeTask) {
+                value += Math.max(0.0, gain);
+            }
+            taskExperience.put(task, Math.max(0.0, Math.min(1.0, value)));
+        }
     }
 
     public SwarmRole role() {

@@ -6,11 +6,16 @@ import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmLocalComposition;
 import dev.swarmmobs.agent.SwarmRole;
+import dev.swarmmobs.agent.SwarmSpecialization;
+import dev.swarmmobs.agent.SwarmTaskType;
 import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
+import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
+import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
+import dev.swarmmobs.algorithm.SwarmTaskDemandPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
@@ -19,6 +24,7 @@ import dev.swarmmobs.algorithm.TargetPredictionPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
 import dev.swarmmobs.ai.SwarmAiActiveState;
 import dev.swarmmobs.ai.SwarmAiRoleBiasPolicy;
+import dev.swarmmobs.ai.SwarmAiTaskDemandPolicy;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.debug.SwarmDebugParticles;
@@ -186,12 +192,6 @@ public final class SwarmMobEvents {
             );
         }
 
-        SwarmRole tacticalRole = state.stabilizeRole(
-                candidateRole,
-                gameTick,
-                SwarmConfig.ROLE_HYSTERESIS_TICKS.get()
-        );
-
         double confidence = state.targetConfidence(
                 gameTick,
                 SwarmConfig.TARGET_MEMORY_TICKS.get()
@@ -212,6 +212,79 @@ public final class SwarmMobEvents {
 
         boolean searchMode = !selection.direct()
                 && confidence < SwarmConfig.SEARCH_CONFIDENCE_THRESHOLD.get();
+
+        if (SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()) {
+            boolean routeBlocked = state.plannerContext() != dev.swarmmobs.agent.SwarmPlannerContext.NONE
+                    && state.plannerFeasibleCount() == 0
+                    && (state.plannerBlockedCount() > 0 || state.plannerUnreachableCount() > 0);
+
+            SwarmTaskDemandPolicy.Signals demandSignals =
+                    new SwarmTaskDemandPolicy.Signals(
+                            searchMode,
+                            routeBlocked,
+                            state.carriedEngineeringBlockCount() > 0,
+                            composition.dedicatedFlankCoverage(),
+                            composition.hasBreacher(),
+                            composition.rangedSupportCount() > 0,
+                            confidence
+                    );
+
+            boolean combatBusy = mob.getTarget() != null
+                    && mob.distanceToSqr(mob.getTarget())
+                    <= SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()
+                    * SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
+
+            var assignment = SwarmDivisionOfLaborPolicy.choose(
+                    mob.getUUID(),
+                    profile.archetype(),
+                    state.currentTask(),
+                    task -> {
+                        double demand = SwarmTaskDemandPolicy.demand(task, demandSignals);
+                        if (activeStrategy != null && activeStrategy.active()) {
+                            demand = SwarmAiTaskDemandPolicy.apply(
+                                    demand,
+                                    activeStrategy.decision().mode(),
+                                    task
+                            );
+                        }
+                        return demand;
+                    },
+                    state::taskExperience,
+                    0.0,
+                    combatBusy
+            );
+
+            SwarmSpecialization specializationCandidate =
+                    SwarmSpecialization.forAssignment(
+                            profile.archetype(),
+                            assignment.task(),
+                            assignedSlot
+                    );
+
+            SwarmSpecialization specialization = state.stabilizeSpecialization(
+                    assignment.task(),
+                    specializationCandidate,
+                    gameTick,
+                    SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.get()
+            );
+
+            state.updateTaskExperience(
+                    state.currentTask(),
+                    SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.get(),
+                    SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.get()
+            );
+
+            candidateRole = SwarmSpecializationRolePolicy.role(
+                    specialization,
+                    candidateRole
+            );
+        }
+
+        SwarmRole tacticalRole = state.stabilizeRole(
+                candidateRole,
+                gameTick,
+                SwarmConfig.ROLE_HYSTERESIS_TICKS.get()
+        );
 
         if (searchMode) {
             state.beginSearchEpisode(gameTick, observation.targetId());
@@ -293,6 +366,10 @@ public final class SwarmMobEvents {
                     profile.archetype(),
                     composition
             );
+            if (SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()) {
+                effectiveFormationRadius *= SwarmSpecializationRolePolicy
+                        .formationRadiusMultiplier(state.specialization());
+            }
 
             SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
                     tacticalRole,
