@@ -16,6 +16,7 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
@@ -125,7 +126,8 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 || action == Action.NONE
                 || actionPos == null
                 || !zombie.isAlive()
-                || zombie.level().getDifficulty() != Difficulty.HARD) {
+                || zombie.level().getDifficulty() != Difficulty.HARD
+                || !zombie.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
             return false;
         }
 
@@ -190,6 +192,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 && SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.get()
                 && !zombie.level().isClientSide()
                 && zombie.level().getDifficulty() == Difficulty.HARD
+                && zombie.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)
                 && zombie.isAlive();
     }
 
