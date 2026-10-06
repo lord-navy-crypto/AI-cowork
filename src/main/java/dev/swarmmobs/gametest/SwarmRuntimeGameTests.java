@@ -294,6 +294,100 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_close_wall", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void closePlayerBehindWallDoesNotSuppressZombieEngineering(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        player.setNoGravity(true);
+        player.setPos(zombie.getX() + 2.5, zombie.getY(), zombie.getZ());
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+        helper.getLevel().setBlockAndUpdate(obstacle.above(), Blocks.DIRT.defaultBlockState());
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(player.getUUID(), helper.getTick(), true);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                player.getX(),
+                player.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.RECOVERY,
+                6,
+                4,
+                1,
+                1,
+                5,
+                0.25,
+                6L
+        );
+        zombie.setTarget(player);
+
+        if (zombie.distanceToSqr(player)
+                > SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()
+                * SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()) {
+            playerHandle.close();
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Fixture did not place player inside nominal melee handoff distance");
+            return;
+        }
+
+        if (zombie.hasLineOfSight(player)) {
+            playerHandle.close();
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Fixture wall did not block Zombie line of sight");
+            return;
+        }
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            playerHandle.close();
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Close blocked player incorrectly suppressed Zombie engineering");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 20; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+            playerHandle.close();
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not break the soft wall blocking a close player");
+            return;
+        }
+
+        playerHandle.close();
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_gamerule", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void zombieEngineeringRespectsMobGriefing(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
