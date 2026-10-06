@@ -82,6 +82,65 @@ class SwarmDivisionOfLaborPolicyTest {
     }
 
     @Test
+    void responseThresholdIsDeterministicAndHighDemandRecruits() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000abcd");
+        double thresholdA = SwarmTaskBidPolicy.responseThreshold(
+                id,
+                SwarmTaskType.SEARCH,
+                SwarmTaskBidPolicy.capability(SwarmAgentArchetype.FLANKER, SwarmTaskType.SEARCH)
+        );
+        double thresholdB = SwarmTaskBidPolicy.responseThreshold(
+                id,
+                SwarmTaskType.SEARCH,
+                SwarmTaskBidPolicy.capability(SwarmAgentArchetype.FLANKER, SwarmTaskType.SEARCH)
+        );
+
+        assertEquals(thresholdA, thresholdB, 1e-12);
+
+        var low = SwarmTaskBidPolicy.bid(
+                new SwarmTaskBidPolicy.Candidate(
+                        id,
+                        SwarmAgentArchetype.FLANKER,
+                        SwarmTaskType.RESERVE,
+                        0.0,
+                        0.0,
+                        false
+                ),
+                SwarmTaskType.SEARCH,
+                0.05
+        );
+        var high = SwarmTaskBidPolicy.bid(
+                new SwarmTaskBidPolicy.Candidate(
+                        id,
+                        SwarmAgentArchetype.FLANKER,
+                        SwarmTaskType.RESERVE,
+                        0.0,
+                        0.0,
+                        false
+                ),
+                SwarmTaskType.SEARCH,
+                1.0
+        );
+
+        assertFalse(Double.isFinite(low.utility()));
+        assertTrue(Double.isFinite(high.utility()));
+    }
+
+    @Test
+    void genericAllocatorKeepsDeterministicHighestUtilityWinner() {
+        UUID a = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
+        UUID b = UUID.fromString("00000000-0000-0000-0000-0000000000bb");
+
+        assertEquals(
+                b,
+                SwarmTaskAllocator.winner(List.of(
+                        new SwarmTaskAllocator.Offer(a, 0.5, true),
+                        new SwarmTaskAllocator.Offer(b, 0.8, true)
+                ))
+        );
+    }
+
+    @Test
     void specializationMapsSpeciesAndStableSlotIntoSubroles() {
         assertEquals(
                 SwarmSpecialization.CROSSFIRE_LEFT,
