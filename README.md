@@ -121,3 +121,10 @@ Commands:
 The in-game control panel includes an **AI Shadow** page showing the last recommendation, provider, latency, bounded multipliers, rationale, fallback count, and error count.
 
 See `docs/OLLAMA_SHADOW.md` for architecture and safety boundaries.
+
+
+### v0.10.1 Skeleton ranged handoff fix
+
+Skeletons remain heterogeneous `RANGED_SUPPORT` swarm members, but the swarm movement goal now yields when a directly observed target with line of sight enters the vanilla bow engagement envelope. This restores vanilla bow draw/aim/fire behavior while retaining swarm repositioning outside that envelope.
+
+A dedicated Runtime GameTest now fails if a bow-equipped Skeleton cannot damage a visible player while swarm control is enabled.
