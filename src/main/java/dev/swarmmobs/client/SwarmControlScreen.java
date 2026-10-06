@@ -93,7 +93,8 @@ public final class SwarmControlScreen extends Screen {
     }
 
     private void buildExperiment() {
-        int x = width / 2 - 150;
+        int leftX = width / 2 - 310;
+        int rightX = width / 2 + 10;
         int y = 82;
 
         addRenderableWidget(
@@ -101,16 +102,45 @@ public final class SwarmControlScreen extends Screen {
                         Component.literal("Active preset: " + values.getOrDefault("activePreset", "BASELINE")),
                         button -> {
                         }
-                ).bounds(x, y, 300, 20).build()
+                ).bounds(leftX, y, 300, 20).build()
+        );
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Run: " + (bool("experimentActive") ? "§aACTIVE" : "§7IDLE")
+                                        + "  |  elapsed=" + (int) number("experimentElapsedTicks")
+                                        + " ticks  |  agents=" + (int) number("experimentAgents")
+                        ),
+                        button -> SwarmControlClient.sendAction("experiment_snapshot", 0.0)
+                ).bounds(rightX, y, 300, 20).build()
         );
         y += 28;
 
         addNumericRow(
-                x, y,
+                leftX, y,
                 "Experiment seed",
                 Integer.toString((int) number("experimentSeed")),
                 "experiment_seed_delta",
                 1.0
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Start"),
+                        button -> SwarmControlClient.sendAction("experiment_start", 0.0)
+                ).bounds(rightX, y, 94, 20).build()
+        );
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Reset"),
+                        button -> SwarmControlClient.sendAction("experiment_reset", 0.0)
+                ).bounds(rightX + 103, y, 94, 20).build()
+        );
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Refresh"),
+                        button -> SwarmControlClient.sendAction("experiment_snapshot", 0.0)
+                ).bounds(rightX + 206, y, 94, 20).build()
         );
         y += 34;
 
@@ -118,13 +148,25 @@ public final class SwarmControlScreen extends Screen {
                 Button.builder(
                         Component.literal("Baseline"),
                         button -> SwarmControlClient.sendAction("preset_baseline", 0.0)
-                ).bounds(x, y, 145, 20).build()
+                ).bounds(leftX, y, 145, 20).build()
         );
         addRenderableWidget(
                 Button.builder(
                         Component.literal("Noisy Sensing"),
                         button -> SwarmControlClient.sendAction("preset_noisy_sensing", 0.0)
-                ).bounds(x + 155, y, 145, 20).build()
+                ).bounds(leftX + 155, y, 145, 20).build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Comm: accepted=" + (int) number("metricCommAccepted")
+                                        + " delivered=" + (int) number("metricCommDelivered")
+                                        + " dropped=" + (int) number("metricCommDropped")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
         );
         y += 26;
 
@@ -132,13 +174,24 @@ public final class SwarmControlScreen extends Screen {
                 Button.builder(
                         Component.literal("Lossy Comms"),
                         button -> SwarmControlClient.sendAction("preset_lossy_comms", 0.0)
-                ).bounds(x, y, 145, 20).build()
+                ).bounds(leftX, y, 145, 20).build()
         );
         addRenderableWidget(
                 Button.builder(
                         Component.literal("Combined Faults"),
                         button -> SwarmControlClient.sendAction("preset_combined_faults", 0.0)
-                ).bounds(x + 155, y, 145, 20).build()
+                ).bounds(leftX + 155, y, 145, 20).build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Observed comm drop=" + formatPercent(number("metricObservedCommDropRate"))
+                                        + "  recover fail=" + formatPercent(number("metricRecoveryFailureRate"))
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
         );
         y += 26;
 
@@ -146,7 +199,42 @@ public final class SwarmControlScreen extends Screen {
                 Button.builder(
                         Component.literal("Navigation Stress"),
                         button -> SwarmControlClient.sendAction("preset_navigation_stress", 0.0)
-                ).bounds(x, y, 300, 20).build()
+                ).bounds(leftX, y, 300, 20).build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Nav: detours=" + (int) number("metricDetours")
+                                        + " recoveries=" + (int) number("metricRecoveries")
+                                        + " pathQueries=" + (int) number("metricPathQueries")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 26;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Recovery attempts=" + (int) number("metricRecoveryAttempts")
+                                        + " failures=" + (int) number("metricRecoveryFailures")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
+        );
+        y += 26;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "Role reassignments=" + (int) number("metricRoleReassignments")
+                        ),
+                        button -> {
+                        }
+                ).bounds(rightX, y, 300, 20).build()
         );
     }
 
