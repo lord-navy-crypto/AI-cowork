@@ -174,6 +174,26 @@ public final class SwarmControlNetwork {
                     3.0,
                     100.0
             ));
+            case "nav_progress_weight_delta" -> SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.set(clamp(
+                    SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get() + value,
+                    0.0,
+                    4.0
+            ));
+            case "nav_lateral_penalty_delta" -> SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(clamp(
+                    SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get() + value,
+                    0.0,
+                    4.0
+            ));
+            case "nav_congestion_penalty_delta" -> SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(clamp(
+                    SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get() + value,
+                    0.0,
+                    4.0
+            ));
+            case "nav_congestion_radius_delta" -> SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(clamp(
+                    SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get() + value,
+                    0.5,
+                    8.0
+            ));
             case "nav_baseline" -> {
                 SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(true);
                 SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.set(1.5);
@@ -181,6 +201,10 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_WALKABILITY_ENABLED.set(true);
                 SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.set(1);
                 SwarmConfig.NAV_RECOVERY_DURATION_TICKS.set(18);
+                SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.set(1.0);
+                SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
+                SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
+                SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
             }
 
             case "baseline_all" -> {
@@ -209,6 +233,10 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_WALKABILITY_ENABLED.set(true);
                 SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.set(1);
                 SwarmConfig.NAV_RECOVERY_DURATION_TICKS.set(18);
+                SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.set(1.0);
+                SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
+                SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
+                SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
             }
 
             default -> {
@@ -243,7 +271,11 @@ public final class SwarmControlNetwork {
                 pair("navLateral", SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.get()),
                 pair("walkabilityEnabled", SwarmConfig.NAV_WALKABILITY_ENABLED.get()),
                 pair("navMaxDrop", SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.get()),
-                pair("recoveryDuration", SwarmConfig.NAV_RECOVERY_DURATION_TICKS.get())
+                pair("recoveryDuration", SwarmConfig.NAV_RECOVERY_DURATION_TICKS.get()),
+                pair("navProgressWeight", SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get()),
+                pair("navLateralPenalty", SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get()),
+                pair("navCongestionPenalty", SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get()),
+                pair("navCongestionRadius", SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get())
         );
     }
 
