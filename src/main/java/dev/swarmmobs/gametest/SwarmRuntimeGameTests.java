@@ -34,7 +34,7 @@ public final class SwarmRuntimeGameTests {
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_integration", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
     public static void zombieReceivesSwarmRuntimeIntegration(GameTestHelper helper) {
-        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
         zombie.setNoGravity(true);
 
         helper.runAfterDelay(4, () -> {
@@ -606,7 +606,13 @@ public final class SwarmRuntimeGameTests {
 
         TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
         ServerPlayer player = playerHandle.player();
-        Vec3 playerPosition = helper.absoluteVec(new Vec3(8.0, 1.0, 2.0));
+        // Keep the target far enough for SwarmApproachGoal to own movement while
+        // leaving at least the forward-left and forward-right recovery candidates
+        // inside the 5x5 GameTest floor. The previous axial layout placed every
+        // default-distance recovery candidate on/outside the floor, correctly
+        // producing zero feasible candidates and testing the fixture rather than
+        // the recovery planner.
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 4.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
         final SwarmApproachGoal[] recoveryGoal = new SwarmApproachGoal[1];
