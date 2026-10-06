@@ -51,6 +51,7 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NAV_PATH_EVIDENCE_ENABLED;
     public static final ModConfigSpec.DoubleValue NAV_PATH_NODE_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_PATH_RESIDUAL_PENALTY;
+    public static final ModConfigSpec.DoubleValue NAV_PATH_MAX_RESIDUAL_DISTANCE;
 
     public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
     public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
@@ -253,6 +254,10 @@ public final class SwarmConfig {
         NAV_PATH_RESIDUAL_PENALTY = BUILDER
                 .comment("Penalty for PathNavigation residual distance when a path cannot end exactly on the target block.")
                 .defineInRange("navPathResidualPenalty", 0.25, 0.0, 2.0);
+
+        NAV_PATH_MAX_RESIDUAL_DISTANCE = BUILDER
+                .comment("Maximum residual distance accepted for a non-null PathNavigation near-miss candidate.")
+                .defineInRange("navPathMaxResidualDistance", 1.5, 0.0, 4.0);
 
         BUILDER.pop();
 
