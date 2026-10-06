@@ -32,7 +32,10 @@ public final class SwarmExperimentMetrics {
             int activeSearchEpisodes,
             long engineeringBlocksBroken,
             long engineeringBlocksPlaced,
-            int carriedEngineeringBlocks
+            int carriedEngineeringBlocks,
+            long engineeringRequestsPublished,
+            long engineeringTasksClaimed,
+            long engineeringTasksCompleted
     ) {
         public double recoveryFailureRate() {
             return recoveryPlanningAttempts <= 0L
@@ -72,7 +75,10 @@ public final class SwarmExperimentMetrics {
             long searchEpisodesFailed,
             long searchReacquisitionTicksTotal,
             long engineeringBlocksBroken,
-            long engineeringBlocksPlaced
+            long engineeringBlocksPlaced,
+            long engineeringRequestsPublished,
+            long engineeringTasksClaimed,
+            long engineeringTasksCompleted
     ) {}
 
     private static final Map<UUID, Counters> BASELINES = new HashMap<>();
@@ -111,6 +117,9 @@ public final class SwarmExperimentMetrics {
         long reacquisitionTicks = 0L;
         long engineeringBroken = 0L;
         long engineeringPlaced = 0L;
+        long engineeringRequestsPublished = 0L;
+        long engineeringTasksClaimed = 0L;
+        long engineeringTasksCompleted = 0L;
         int carriedEngineeringBlocks = 0;
         int activeSearchEpisodes = 0;
         int agents = 0;
@@ -140,6 +149,9 @@ public final class SwarmExperimentMetrics {
             reacquisitionTicks += delta(current.searchReacquisitionTicksTotal(), baseline.searchReacquisitionTicksTotal());
             engineeringBroken += delta(current.engineeringBlocksBroken(), baseline.engineeringBlocksBroken());
             engineeringPlaced += delta(current.engineeringBlocksPlaced(), baseline.engineeringBlocksPlaced());
+            engineeringRequestsPublished += delta(current.engineeringRequestsPublished(), baseline.engineeringRequestsPublished());
+            engineeringTasksClaimed += delta(current.engineeringTasksClaimed(), baseline.engineeringTasksClaimed());
+            engineeringTasksCompleted += delta(current.engineeringTasksCompleted(), baseline.engineeringTasksCompleted());
             carriedEngineeringBlocks += Math.max(0, state.carriedEngineeringBlockCount());
             if (state.searchEpisodeActive()) {
                 activeSearchEpisodes++;
@@ -168,7 +180,10 @@ public final class SwarmExperimentMetrics {
                 activeSearchEpisodes,
                 engineeringBroken,
                 engineeringPlaced,
-                carriedEngineeringBlocks
+                carriedEngineeringBlocks,
+                engineeringRequestsPublished,
+                engineeringTasksClaimed,
+                engineeringTasksCompleted
         );
     }
 
@@ -192,7 +207,10 @@ public final class SwarmExperimentMetrics {
                 state.searchEpisodesFailed(),
                 state.searchReacquisitionTicksTotal(),
                 state.engineeringBlocksBroken(),
-                state.engineeringBlocksPlaced()
+                state.engineeringBlocksPlaced(),
+                state.engineeringRequestsPublished(),
+                state.engineeringTasksClaimed(),
+                state.engineeringTasksCompleted()
         );
     }
 
@@ -202,7 +220,7 @@ public final class SwarmExperimentMetrics {
 
     private static final Counters ZERO = new Counters(
             0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
-            0L, 0L, 0L, 0L, 0L, 0L
+            0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
     );
 
     private SwarmExperimentMetrics() {}

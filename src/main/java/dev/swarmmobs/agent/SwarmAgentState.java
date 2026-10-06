@@ -2,6 +2,7 @@ package dev.swarmmobs.agent;
 
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
@@ -73,6 +74,11 @@ public final class SwarmAgentState {
     private int carriedEngineeringBlockCount;
     private long engineeringBlocksBroken;
     private long engineeringBlocksPlaced;
+    private SwarmEngineeringTask engineeringRequest;
+    private SwarmEngineeringTask claimedEngineeringTask;
+    private long engineeringRequestsPublished;
+    private long engineeringTasksClaimed;
+    private long engineeringTasksCompleted;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -295,6 +301,94 @@ public final class SwarmAgentState {
 
     public BlockState carriedEngineeringBlock() {
         return carriedEngineeringBlock;
+    }
+
+    public SwarmEngineeringTask engineeringRequest(long gameTick) {
+        if (engineeringRequest != null && !engineeringRequest.active(gameTick)) {
+            engineeringRequest = null;
+        }
+        return engineeringRequest;
+    }
+
+    public SwarmEngineeringTask claimedEngineeringTask(long gameTick) {
+        if (claimedEngineeringTask != null && !claimedEngineeringTask.active(gameTick)) {
+            claimedEngineeringTask = null;
+        }
+        return claimedEngineeringTask;
+    }
+
+    public long engineeringRequestsPublished() {
+        return engineeringRequestsPublished;
+    }
+
+    public long engineeringTasksClaimed() {
+        return engineeringTasksClaimed;
+    }
+
+    public long engineeringTasksCompleted() {
+        return engineeringTasksCompleted;
+    }
+
+    public SwarmEngineeringTask publishEngineeringRequest(
+            SwarmEngineeringTask.Type type,
+            UUID requesterId,
+            UUID claimantId,
+            BlockPos position,
+            long gameTick,
+            int ttlTicks
+    ) {
+        engineeringRequest = new SwarmEngineeringTask(
+                type,
+                requesterId,
+                claimantId,
+                position,
+                gameTick,
+                gameTick + Math.max(1, ttlTicks)
+        );
+        engineeringRequestsPublished++;
+        return engineeringRequest;
+    }
+
+    public boolean acceptEngineeringTask(SwarmEngineeringTask task, long gameTick) {
+        if (task == null || !task.active(gameTick)) {
+            return false;
+        }
+        SwarmEngineeringTask previous = claimedEngineeringTask(gameTick);
+        if (previous != null
+                && previous.requesterId().equals(task.requesterId())
+                && previous.createdTick() == task.createdTick()) {
+            return true;
+        }
+        claimedEngineeringTask = task;
+        engineeringTasksClaimed++;
+        return true;
+    }
+
+    public void completeEngineeringTask(SwarmEngineeringTask task) {
+        if (task == null) {
+            return;
+        }
+        if (claimedEngineeringTask != null
+                && claimedEngineeringTask.requesterId().equals(task.requesterId())
+                && claimedEngineeringTask.createdTick() == task.createdTick()) {
+            claimedEngineeringTask = null;
+            engineeringTasksCompleted++;
+        }
+    }
+
+    public void clearEngineeringRequestIfMatches(SwarmEngineeringTask task) {
+        if (task == null || engineeringRequest == null) {
+            return;
+        }
+        if (engineeringRequest.requesterId().equals(task.requesterId())
+                && engineeringRequest.createdTick() == task.createdTick()) {
+            engineeringRequest = null;
+        }
+    }
+
+    public void clearEngineeringCoordination() {
+        engineeringRequest = null;
+        claimedEngineeringTask = null;
     }
 
     public int carriedEngineeringBlockCount() {

@@ -28,7 +28,10 @@ class SwarmExperimentMetricsTest {
                 1,
                 7L,
                 4L,
-                2
+                2,
+                6L,
+                5L,
+                4L
         );
 
         assertEquals(0.20, snapshot.communicationDropRate(), 1.0e-9);
@@ -38,6 +41,9 @@ class SwarmExperimentMetricsTest {
         assertEquals(7L, snapshot.engineeringBlocksBroken());
         assertEquals(4L, snapshot.engineeringBlocksPlaced());
         assertEquals(2, snapshot.carriedEngineeringBlocks());
+        assertEquals(6L, snapshot.engineeringRequestsPublished());
+        assertEquals(5L, snapshot.engineeringTasksClaimed());
+        assertEquals(4L, snapshot.engineeringTasksCompleted());
     }
 
     @Test
@@ -62,7 +68,10 @@ class SwarmExperimentMetricsTest {
                 0,
                 0L,
                 0L,
-                0
+                0,
+                0L,
+                0L,
+                0L
         );
 
         assertEquals(0.0, snapshot.communicationDropRate(), 1.0e-9);
