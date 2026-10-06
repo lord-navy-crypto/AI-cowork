@@ -10,6 +10,7 @@ import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
+import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
@@ -273,14 +274,33 @@ public final class SwarmMobEvents {
                     SwarmConfig.MAX_STEERING_CORRECTION.get()
             );
 
+            Vec2 plannedDestination = plan.destination();
+
+            if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
+                    && composition.hasBreacher()) {
+                List<Vec2> breacherPositions = movementNeighbors.stream()
+                        .filter(peer -> SwarmAgentProfiles.profile(peer).archetype()
+                                == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER)
+                        .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                        .toList();
+
+                plannedDestination = SwarmFireSupportLanePolicy.apply(
+                        plannedDestination,
+                        new Vec2(prediction.x(), prediction.z()),
+                        new Vec2(observation.forwardX(), observation.forwardZ()),
+                        assignedSlot,
+                        breacherPositions
+                );
+            }
+
             state.updateLocalPlan(
                     movementNeighbors.size(),
                     plan.formationSlot(),
                     plan.role(),
                     SwarmBehaviorMode.ENGAGE,
                     0.0,
-                    plan.destination().x(),
-                    plan.destination().z(),
+                    plannedDestination.x(),
+                    plannedDestination.z(),
                     plan.separationMagnitude(),
                     plan.cohesionMagnitude(),
                     plan.alignmentMagnitude(),
