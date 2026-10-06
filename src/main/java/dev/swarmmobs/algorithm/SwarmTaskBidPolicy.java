@@ -38,7 +38,13 @@ public final class SwarmTaskBidPolicy {
             return new Bid(candidate.entityId(), task, Double.NEGATIVE_INFINITY);
         }
 
-        double utility = clamp01(demand) * capability
+        double boundedDemand = clamp01(demand);
+        double threshold = responseThreshold(candidate.entityId(), task, capability);
+        if (task != SwarmTaskType.RESERVE && boundedDemand < threshold) {
+            return new Bid(candidate.entityId(), task, Double.NEGATIVE_INFINITY);
+        }
+
+        double utility = boundedDemand * capability
                 + clamp01(candidate.experience()) * EXPERIENCE_WEIGHT
                 - Math.max(0.0, candidate.normalizedDistance()) * DISTANCE_WEIGHT
                 - (candidate.combatBusy() ? BUSY_PENALTY : 0.0)
@@ -67,6 +73,33 @@ public final class SwarmTaskBidPolicy {
                 )
                 .map(Bid::entityId)
                 .orElse(null);
+    }
+
+    public static double responseThreshold(
+            UUID entityId,
+            SwarmTaskType task,
+            double capability
+    ) {
+        if (entityId == null || task == null) {
+            return 1.0;
+        }
+
+        long mixed = entityId.getMostSignificantBits()
+                ^ Long.rotateLeft(entityId.getLeastSignificantBits(), 17)
+                ^ (0x9E3779B97F4A7C15L * (task.ordinal() + 1L));
+        mixed ^= mixed >>> 33;
+        mixed *= 0xff51afd7ed558ccdL;
+        mixed ^= mixed >>> 33;
+
+        double unit = (double) (mixed & 0xffffL) / 65535.0;
+        double specializationPenalty = (1.0 - clamp01(capability)) * 0.25;
+        double threshold = 0.22 + unit * 0.42 + specializationPenalty;
+
+        if (task == SwarmTaskType.RESERVE) {
+            threshold = 0.0;
+        }
+
+        return Math.max(0.10, Math.min(0.90, threshold));
     }
 
     public static double capability(
