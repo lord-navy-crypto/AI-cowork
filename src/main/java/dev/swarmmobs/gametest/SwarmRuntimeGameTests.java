@@ -11,6 +11,7 @@ import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
+import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -53,6 +54,13 @@ public final class SwarmRuntimeGameTests {
                     .anyMatch(wrapped -> wrapped.getGoal() instanceof SwarmApproachGoal);
             if (!hasApproachGoal) {
                 helper.fail("SwarmApproachGoal was not installed on zombie join");
+                return;
+            }
+
+            boolean hasEngineerGoal = zombie.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(wrapped -> wrapped.getGoal() instanceof SwarmZombieEngineerGoal);
+            if (!hasEngineerGoal) {
+                helper.fail("SwarmZombieEngineerGoal was not installed on zombie join");
                 return;
             }
 

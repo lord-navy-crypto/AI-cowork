@@ -53,6 +53,10 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue NAV_PATH_RESIDUAL_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_PATH_MAX_RESIDUAL_DISTANCE;
 
+    public static final ModConfigSpec.BooleanValue ZOMBIE_ENGINEERING_ENABLED;
+    public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS;
+    public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS;
+
     public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
     public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
     public static final ModConfigSpec.DoubleValue SENSING_MAX_HORIZONTAL_NOISE;
@@ -262,6 +266,18 @@ public final class SwarmConfig {
         NAV_PATH_MAX_RESIDUAL_DISTANCE = BUILDER
                 .comment("Maximum residual distance accepted for a non-null PathNavigation near-miss candidate.")
                 .defineInRange("navPathMaxResidualDistance", 1.5, 0.0, 4.0);
+
+        ZOMBIE_ENGINEERING_ENABLED = BUILDER
+                .comment("Allow swarm Zombies on HARD difficulty to hand-break bounded soft obstacles and place salvaged blocks as simple bridge support.")
+                .define("zombieEngineeringEnabled", true);
+
+        ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS = BUILDER
+                .comment("Maximum block hardness a bare-handed swarm Zombie may attempt to break. Unbreakable and block-entity blocks are always rejected.")
+                .defineInRange("zombieEngineeringMaxBreakHardness", 2.0, 0.0, 10.0);
+
+        ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS = BUILDER
+                .comment("Maximum salvaged placeable blocks carried by one Zombie engineer.")
+                .defineInRange("zombieEngineeringMaxCarriedBlocks", 4, 0, 16);
 
         BUILDER.pop();
 
