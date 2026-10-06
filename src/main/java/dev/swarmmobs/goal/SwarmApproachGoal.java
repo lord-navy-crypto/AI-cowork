@@ -267,11 +267,31 @@ public final class SwarmApproachGoal extends Goal {
             boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
             double congestion = localCongestion(level, candidate);
 
+            boolean pathReachable = true;
+            int pathNodeCount = 0;
+            double pathResidualDistance = 0.0;
+
+            if (!blocked && SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()) {
+                var path = mob.getNavigation().createPath(
+                        BlockPos.containing(candidate.x(), mob.getY(), candidate.z()),
+                        0
+                );
+
+                pathReachable = path != null && path.canReach();
+                if (path != null) {
+                    pathNodeCount = path.getNodeCount();
+                    pathResidualDistance = path.getDistToTarget();
+                }
+            }
+
             candidates.add(new SwarmLocalPlannerPolicy.Candidate(
                     candidate,
                     blocked,
                     lateralOffset,
-                    congestion
+                    congestion,
+                    pathReachable,
+                    pathNodeCount,
+                    pathResidualDistance
             ));
         }
 
@@ -281,7 +301,9 @@ public final class SwarmApproachGoal extends Goal {
                 candidates,
                 SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get(),
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get(),
-                SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get()
+                SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get(),
+                SwarmConfig.NAV_PATH_NODE_PENALTY.get(),
+                SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()
         );
 
         if (!choice.active()) {
