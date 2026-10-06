@@ -26,6 +26,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.network.registration.NetworkRegistry;
@@ -627,6 +628,120 @@ public final class SwarmRuntimeGameTests {
                     .anyMatch(wrapped -> wrapped.getGoal() instanceof SwarmApproachGoal);
             if (!hasApproachGoal) {
                 helper.fail("Spider did not receive the heterogeneous SwarmApproachGoal");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void zombieYieldsSwarmMovementAndActuallyMeleeAttacks(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        zombie.setNoGravity(true);
+        zombie.setInvulnerable(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        float startingHealth = player.getHealth();
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Zombie did not establish direct swarm observation before melee handoff");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Zombie lost SwarmApproachGoal registration");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield inside Zombie melee range");
+            }
+        });
+
+        helper.runAfterDelay(50, () -> {
+            if (player.getHealth() >= startingHealth) {
+                playerHandle.close();
+                helper.fail("Zombie never delivered a vanilla melee attack after swarm handoff");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void spiderYieldsSwarmMovementAndActuallyMeleeAttacks(GameTestHelper helper) {
+        Spider spider = helper.spawn(EntityType.SPIDER, new BlockPos(2, 1, 2));
+        spider.setNoGravity(true);
+        spider.setInvulnerable(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        float startingHealth = player.getHealth();
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = spider.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Spider did not establish direct swarm observation before melee handoff");
+                return;
+            }
+
+            if (state.role() != SwarmRole.FLANK_LEFT && state.role() != SwarmRole.FLANK_RIGHT) {
+                playerHandle.close();
+                helper.fail("Spider lost its flanker role before melee handoff");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = spider.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Spider lost SwarmApproachGoal registration");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield inside Spider melee range");
+            }
+        });
+
+        helper.runAfterDelay(50, () -> {
+            if (player.getHealth() >= startingHealth) {
+                playerHandle.close();
+                helper.fail("Spider never delivered a vanilla melee attack after swarm handoff");
                 return;
             }
 
