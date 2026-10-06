@@ -1420,6 +1420,13 @@ public final class SwarmRuntimeGameTests {
         player.setNoGravity(true);
         player.setInvulnerable(true);
 
+        // Target acquisition itself is covered by other Runtime GameTests.
+        // This fixture isolates division-of-labor behavior by giving the
+        // same live target to all three ranged agents.
+        skeletonA.setTarget(player);
+        skeletonB.setTarget(player);
+        skeletonC.setTarget(player);
+
         helper.runAfterDelay(48, () -> {
             java.util.List<Skeleton> skeletons = java.util.List.of(
                     skeletonA,
