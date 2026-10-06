@@ -28,6 +28,8 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
@@ -284,13 +286,37 @@ public final class SwarmMobEvents {
                         .map(peer -> new Vec2(peer.getX(), peer.getZ()))
                         .toList();
 
-                plannedDestination = SwarmFireSupportLanePolicy.apply(
+                Vec2 targetPoint = new Vec2(prediction.x(), prediction.z());
+
+                Vec2 positiveLane = SwarmFireSupportLanePolicy.applyWithPreferredSign(
                         plannedDestination,
-                        new Vec2(prediction.x(), prediction.z()),
+                        targetPoint,
                         new Vec2(observation.forwardX(), observation.forwardZ()),
-                        assignedSlot,
+                        1.0,
                         breacherPositions
                 );
+                Vec2 negativeLane = SwarmFireSupportLanePolicy.applyWithPreferredSign(
+                        plannedDestination,
+                        targetPoint,
+                        new Vec2(observation.forwardX(), observation.forwardZ()),
+                        -1.0,
+                        breacherPositions
+                );
+
+                boolean positiveClear = false;
+                boolean negativeClear = false;
+                if (selection.direct() && selection.player() != null) {
+                    positiveClear = hasClearSupportShot(level, mob, selection.player(), positiveLane);
+                    negativeClear = hasClearSupportShot(level, mob, selection.player(), negativeLane);
+                }
+
+                double preferredSign = SwarmFireSupportLanePolicy.choosePreferredSign(
+                        assignedSlot,
+                        positiveClear,
+                        negativeClear
+                );
+
+                plannedDestination = preferredSign > 0.0 ? positiveLane : negativeLane;
             }
 
             state.updateLocalPlan(
@@ -319,6 +345,29 @@ public final class SwarmMobEvents {
         if (gameTick % 10L == 0L) {
             SwarmDebugParticles.render(level, mob, communicationNeighbors);
         }
+    }
+
+    private static boolean hasClearSupportShot(
+            ServerLevel level,
+            PathfinderMob shooter,
+            Player target,
+            Vec2 candidate
+    ) {
+        Vec3 start = new Vec3(
+                candidate.x(),
+                shooter.getY() + shooter.getEyeHeight(),
+                candidate.z()
+        );
+        Vec3 end = target.getEyePosition();
+
+        HitResult hit = level.clip(new ClipContext(
+                start,
+                end,
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                shooter
+        ));
+        return hit.getType() == HitResult.Type.MISS;
     }
 
     private static List<PathfinderMob> findMovementNeighbors(

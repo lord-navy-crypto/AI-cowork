@@ -31,6 +31,20 @@ class SwarmFireSupportLanePolicyTest {
     }
 
     @Test
+    void clearLaneOverridesDeterministicSlotPreference() {
+        assertTrue(SwarmFireSupportLanePolicy.choosePreferredSign(1, true, false) > 0.0);
+        assertTrue(SwarmFireSupportLanePolicy.choosePreferredSign(0, false, true) < 0.0);
+    }
+
+    @Test
+    void equalVisibilityFallsBackToStableSlotSide() {
+        assertTrue(SwarmFireSupportLanePolicy.choosePreferredSign(0, true, true) > 0.0);
+        assertTrue(SwarmFireSupportLanePolicy.choosePreferredSign(1, true, true) < 0.0);
+        assertTrue(SwarmFireSupportLanePolicy.choosePreferredSign(0, false, false) > 0.0);
+        assertTrue(SwarmFireSupportLanePolicy.choosePreferredSign(1, false, false) < 0.0);
+    }
+
+    @Test
     void adjacentSupportSlotsSplitAcrossOppositeCrossfireLanes() {
         var target = new SwarmCombatPlanner.Vec2(10.0, 0.0);
         var breacher = new SwarmCombatPlanner.Vec2(6.0, 0.0);
