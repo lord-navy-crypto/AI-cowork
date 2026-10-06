@@ -11,7 +11,8 @@ import java.util.UUID;
  * Deterministic local claimant selection for Zombie engineering tasks.
  *
  * Lower score wins. The policy prefers nearby agents, preserves front-line
- * pressure when possible, and requires carried material for BRIDGE work.
+ * pressure when possible, and requires real carried/transferable material for
+ * placement tasks such as BRIDGE and STEP.
  */
 public final class SwarmEngineeringTaskPolicy {
     private static final double CHASER_ROLE_PENALTY = 3.0;
@@ -65,8 +66,12 @@ public final class SwarmEngineeringTaskPolicy {
             return false;
         }
 
-        return type != SwarmEngineeringTask.Type.BRIDGE
-                || candidate.materialAvailable();
+        return !requiresMaterial(type) || candidate.materialAvailable();
+    }
+
+    public static boolean requiresMaterial(SwarmEngineeringTask.Type type) {
+        return type == SwarmEngineeringTask.Type.BRIDGE
+                || type == SwarmEngineeringTask.Type.STEP;
     }
 
     public static double score(
