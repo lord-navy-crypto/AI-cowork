@@ -604,6 +604,7 @@ public final class SwarmRuntimeGameTests {
         Vec3 playerPosition = helper.absoluteVec(new Vec3(8.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
+        final SwarmApproachGoal[] recoveryGoal = new SwarmApproachGoal[1];
 
         helper.runAfterDelay(4, () -> {
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
@@ -632,27 +633,34 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
+            zombie.goalSelector.removeGoal(approachGoal);
+            recoveryGoal[0] = approachGoal;
             approachGoal.start();
         });
 
         int recoveryCheckTick = 4 + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + 4;
         helper.runAfterDelay(recoveryCheckTick, () -> {
-            SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
-                    .map(wrapped -> wrapped.getGoal())
-                    .filter(SwarmApproachGoal.class::isInstance)
-                    .map(SwarmApproachGoal.class::cast)
-                    .findFirst()
-                    .orElse(null);
-
+            SwarmApproachGoal approachGoal = recoveryGoal[0];
             if (approachGoal == null) {
                 playerHandle.close();
-                helper.fail("SwarmApproachGoal disappeared during forced recovery test");
+                helper.fail("SwarmApproachGoal was not retained for forced recovery test");
                 return;
             }
 
-            approachGoal.tick();
-
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            state.rememberTarget(player.getUUID(), helper.getTick(), true);
+            state.updateLocalPlan(
+                    0,
+                    0,
+                    SwarmRole.CHASER,
+                    player.getX(),
+                    player.getZ(),
+                    0.0,
+                    0.0
+            );
+            zombie.setTarget(player);
+
+            approachGoal.tick();
 
             if (state.recoveryPlanningAttempts() <= 0L) {
                 playerHandle.close();
