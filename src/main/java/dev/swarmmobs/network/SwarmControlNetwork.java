@@ -194,6 +194,18 @@ public final class SwarmControlNetwork {
                     0.5,
                     8.0
             ));
+            case "toggle_path_evidence" ->
+                    SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(!SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get());
+            case "nav_path_node_penalty_delta" -> SwarmConfig.NAV_PATH_NODE_PENALTY.set(clamp(
+                    SwarmConfig.NAV_PATH_NODE_PENALTY.get() + value,
+                    0.0,
+                    2.0
+            ));
+            case "nav_path_residual_penalty_delta" -> SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(clamp(
+                    SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get() + value,
+                    0.0,
+                    2.0
+            ));
             case "nav_baseline" -> {
                 SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(true);
                 SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.set(1.5);
@@ -205,6 +217,9 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
                 SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
+                SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
+                SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
+                SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
             }
 
             case "baseline_all" -> {
@@ -237,6 +252,9 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
                 SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
+                SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
+                SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
+                SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
             }
 
             default -> {
@@ -275,7 +293,10 @@ public final class SwarmControlNetwork {
                 pair("navProgressWeight", SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get()),
                 pair("navLateralPenalty", SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get()),
                 pair("navCongestionPenalty", SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get()),
-                pair("navCongestionRadius", SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get())
+                pair("navCongestionRadius", SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get()),
+                pair("navPathEvidenceEnabled", SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()),
+                pair("navPathNodePenalty", SwarmConfig.NAV_PATH_NODE_PENALTY.get()),
+                pair("navPathResidualPenalty", SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get())
         );
     }
 

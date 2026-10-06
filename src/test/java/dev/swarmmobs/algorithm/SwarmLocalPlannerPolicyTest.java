@@ -18,12 +18,14 @@ class SwarmLocalPlannerPolicyTest {
                 self,
                 destination,
                 List.of(
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 2.0), true, 2.0, 0.0),
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -2.0), false, -2.0, 0.0)
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 2.0), true, 2.0, 0.0, true, 2, 0.0),
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -2.0), false, -2.0, 0.0, true, 2, 0.0)
                 ),
                 1.0,
                 0.2,
-                0.5
+                0.5,
+                0.05,
+                0.25
         );
 
         assertTrue(choice.active());
@@ -39,12 +41,14 @@ class SwarmLocalPlannerPolicyTest {
                 self,
                 destination,
                 List.of(
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 2.0), false, 2.0, 3.0),
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -2.0), false, -2.0, 0.2)
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 2.0), false, 2.0, 3.0, true, 2, 0.0),
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -2.0), false, -2.0, 0.2, true, 2, 0.0)
                 ),
                 1.0,
                 0.2,
-                1.0
+                1.0,
+                0.05,
+                0.25
         );
 
         assertEquals(1, choice.candidateIndex());
@@ -59,12 +63,14 @@ class SwarmLocalPlannerPolicyTest {
                 self,
                 destination,
                 List.of(
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(1.0, 2.0), false, 2.0, 0.0),
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(3.0, -2.0), false, -2.0, 0.0)
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(1.0, 2.0), false, 2.0, 0.0, true, 2, 0.0),
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(3.0, -2.0), false, -2.0, 0.0, true, 2, 0.0)
                 ),
                 1.0,
                 0.1,
-                0.0
+                0.0,
+                0.05,
+                0.25
         );
 
         assertEquals(1, choice.candidateIndex());
@@ -77,11 +83,13 @@ class SwarmLocalPlannerPolicyTest {
                 new Vec2(0.0, 0.0),
                 destination,
                 List.of(
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 1.0), true, 1.0, 0.0)
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 1.0), true, 1.0, 0.0, true, 2, 0.0)
                 ),
                 1.0,
                 1.0,
-                1.0
+                1.0,
+                0.05,
+                0.25
         );
 
         assertFalse(choice.active());
@@ -97,14 +105,59 @@ class SwarmLocalPlannerPolicyTest {
                 self,
                 destination,
                 List.of(
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 2.0), false, 2.0, 0.0),
-                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -2.0), false, -2.0, 0.0)
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 2.0), false, 2.0, 0.0, true, 2, 0.0),
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -2.0), false, -2.0, 0.0, true, 2, 0.0)
                 ),
                 1.0,
                 0.2,
-                0.0
+                0.0,
+                0.05,
+                0.25
         );
 
         assertEquals(0, choice.candidateIndex());
+    }
+    @Test
+    void unreachableCandidateIsRejectedEvenWhenGeometryLooksGood() {
+        Vec2 self = new Vec2(0.0, 0.0);
+        Vec2 destination = new Vec2(10.0, 0.0);
+
+        var choice = SwarmLocalPlannerPolicy.choose(
+                self,
+                destination,
+                List.of(
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(3.0, 1.0), false, 1.0, 0.0, false, 1, 0.0),
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -1.0), false, -1.0, 0.0, true, 4, 0.0)
+                ),
+                1.0,
+                0.1,
+                0.0,
+                0.05,
+                0.25
+        );
+
+        assertEquals(1, choice.candidateIndex());
+    }
+
+    @Test
+    void pathCostCanBreakOtherwiseSimilarCandidateTie() {
+        Vec2 self = new Vec2(0.0, 0.0);
+        Vec2 destination = new Vec2(10.0, 0.0);
+
+        var choice = SwarmLocalPlannerPolicy.choose(
+                self,
+                destination,
+                List.of(
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, 1.5), false, 1.5, 0.0, true, 10, 0.0),
+                        new SwarmLocalPlannerPolicy.Candidate(new Vec2(2.0, -1.5), false, -1.5, 0.0, true, 3, 0.0)
+                ),
+                1.0,
+                0.1,
+                0.0,
+                0.10,
+                0.25
+        );
+
+        assertEquals(1, choice.candidateIndex());
     }
 }

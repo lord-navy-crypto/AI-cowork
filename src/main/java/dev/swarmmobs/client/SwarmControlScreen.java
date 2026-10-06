@@ -262,102 +262,129 @@ public final class SwarmControlScreen extends Screen {
     }
 
     private void buildNavigation() {
-        int x = width / 2 - 150;
-        int y = 82;
+        int leftX = width / 2 - 310;
+        int rightX = width / 2 + 10;
+        int leftY = 82;
+        int rightY = 82;
 
         addToggleRow(
-                x, y,
+                leftX, leftY,
                 "Obstacle avoidance",
                 bool("obstacleEnabled"),
                 "toggle_obstacle"
         );
-        y += 28;
+        leftY += 28;
 
         addNumericRow(
-                x, y,
+                leftX, leftY,
                 "Lookahead",
                 format(number("navLookahead")) + " blocks",
                 "nav_lookahead_delta",
                 0.25
         );
-        y += 28;
+        leftY += 28;
 
         addNumericRow(
-                x, y,
+                leftX, leftY,
                 "Lateral detour",
                 format(number("navLateral")) + " blocks",
                 "nav_lateral_delta",
                 0.25
         );
-        y += 28;
+        leftY += 28;
 
         addToggleRow(
-                x, y,
+                leftX, leftY,
                 "Walkability",
                 bool("walkabilityEnabled"),
                 "toggle_walkability"
         );
-        y += 28;
+        leftY += 28;
 
         addNumericRow(
-                x, y,
+                leftX, leftY,
                 "Accepted drop",
                 Integer.toString((int) number("navMaxDrop")) + " blocks",
                 "nav_max_drop_delta",
                 1.0
         );
-        y += 28;
+        leftY += 28;
 
         addNumericRow(
-                x, y,
+                leftX, leftY,
                 "Recovery duration",
                 Integer.toString((int) number("recoveryDuration")) + " ticks",
                 "nav_recovery_duration_delta",
                 3.0
         );
-        y += 28;
 
         addNumericRow(
-                x, y,
+                rightX, rightY,
                 "Progress weight",
                 format(number("navProgressWeight")),
                 "nav_progress_weight_delta",
                 0.10
         );
-        y += 28;
+        rightY += 28;
 
         addNumericRow(
-                x, y,
+                rightX, rightY,
                 "Lateral penalty",
                 format(number("navLateralPenalty")),
                 "nav_lateral_penalty_delta",
                 0.10
         );
-        y += 28;
+        rightY += 28;
 
         addNumericRow(
-                x, y,
+                rightX, rightY,
                 "Congestion penalty",
                 format(number("navCongestionPenalty")),
                 "nav_congestion_penalty_delta",
                 0.10
         );
-        y += 28;
+        rightY += 28;
 
         addNumericRow(
-                x, y,
+                rightX, rightY,
                 "Congestion radius",
                 format(number("navCongestionRadius")) + " blocks",
                 "nav_congestion_radius_delta",
                 0.25
         );
-        y += 34;
+        rightY += 28;
+
+        addToggleRow(
+                rightX, rightY,
+                "Path evidence",
+                bool("navPathEvidenceEnabled"),
+                "toggle_path_evidence"
+        );
+        rightY += 28;
+
+        addNumericRow(
+                rightX, rightY,
+                "Path node penalty",
+                format(number("navPathNodePenalty")),
+                "nav_path_node_penalty_delta",
+                0.05
+        );
+        rightY += 28;
+
+        addNumericRow(
+                rightX, rightY,
+                "Path residual penalty",
+                format(number("navPathResidualPenalty")),
+                "nav_path_residual_penalty_delta",
+                0.05
+        );
+        rightY += 34;
 
         addRenderableWidget(
                 Button.builder(
                         Component.literal("Navigation baseline"),
                         button -> SwarmControlClient.sendAction("nav_baseline", 0.0)
-                ).bounds(x, y, 300, 20).build()
+                ).bounds(rightX, rightY, 300, 20).build()
         );
     }
 

@@ -16,7 +16,10 @@ public final class SwarmLocalPlannerPolicy {
             Vec2 waypoint,
             boolean blocked,
             double lateralOffset,
-            double congestion
+            double congestion,
+            boolean pathReachable,
+            int pathNodeCount,
+            double pathResidualDistance
     ) {}
 
     public record Choice(
@@ -32,7 +35,9 @@ public final class SwarmLocalPlannerPolicy {
             List<Candidate> candidates,
             double progressWeight,
             double lateralPenaltyWeight,
-            double congestionPenaltyWeight
+            double congestionPenaltyWeight,
+            double pathNodePenaltyWeight,
+            double pathResidualPenaltyWeight
     ) {
         if (self == null || destination == null || candidates == null || candidates.isEmpty()) {
             return new Choice(destination, false, -1, Double.NEGATIVE_INFINITY);
@@ -50,10 +55,15 @@ public final class SwarmLocalPlannerPolicy {
         double progressW = Math.max(0.0, progressWeight);
         double lateralW = Math.max(0.0, lateralPenaltyWeight);
         double congestionW = Math.max(0.0, congestionPenaltyWeight);
+        double pathNodeW = Math.max(0.0, pathNodePenaltyWeight);
+        double pathResidualW = Math.max(0.0, pathResidualPenaltyWeight);
 
         for (int i = 0; i < candidates.size(); i++) {
             Candidate candidate = candidates.get(i);
-            if (candidate == null || candidate.blocked() || candidate.waypoint() == null) {
+            if (candidate == null
+                    || candidate.blocked()
+                    || candidate.waypoint() == null
+                    || !candidate.pathReachable()) {
                 continue;
             }
 
@@ -61,10 +71,14 @@ public final class SwarmLocalPlannerPolicy {
             double progress = baselineDistance - remaining;
             double lateralPenalty = Math.max(0.0, Math.abs(candidate.lateralOffset()));
             double congestionPenalty = Math.max(0.0, candidate.congestion());
+            double pathNodePenalty = Math.max(0, candidate.pathNodeCount());
+            double pathResidualPenalty = Math.max(0.0, candidate.pathResidualDistance());
 
             double score = progress * progressW
                     - lateralPenalty * lateralW
-                    - congestionPenalty * congestionW;
+                    - congestionPenalty * congestionW
+                    - pathNodePenalty * pathNodeW
+                    - pathResidualPenalty * pathResidualW;
 
             if (score > bestScore + 1.0e-9) {
                 bestScore = score;
