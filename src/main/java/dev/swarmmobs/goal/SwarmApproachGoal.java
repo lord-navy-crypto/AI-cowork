@@ -129,7 +129,8 @@ public final class SwarmApproachGoal extends Goal {
         if (state.directObservation()
                 && mob.getTarget() instanceof Player target
                 && validTarget(target)
-                && state.targetId().equals(target.getUUID())) {
+                && state.targetId().equals(target.getUUID())
+                && mob.hasLineOfSight(target)) {
             return mob.distanceToSqr(target) > release * release;
         }
 
