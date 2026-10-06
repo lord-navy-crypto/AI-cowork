@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class SwarmEngineeringTaskPolicyTest {
 
     @Test
-    void bridgeRequiresCarriedMaterial() {
+    void bridgeRequiresAvailableMaterialSupply() {
         UUID requester = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID helper = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
@@ -20,10 +20,12 @@ class SwarmEngineeringTaskPolicyTest {
                 SwarmEngineeringTask.Type.BRIDGE,
                 List.of(
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                requester, 1.0, SwarmRole.REAR_PRESSURE, 0, true, false, true
+                                requester, 1.0, SwarmRole.REAR_PRESSURE, 0,
+                                true, false, true, false
                         ),
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                helper, 9.0, SwarmRole.CHASER, 1, false, false, true
+                                helper, 9.0, SwarmRole.CHASER, 0,
+                                false, false, true, true
                         )
                 )
         );
@@ -40,10 +42,12 @@ class SwarmEngineeringTaskPolicyTest {
                 SwarmEngineeringTask.Type.BREAK,
                 List.of(
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                chaser, 4.0, SwarmRole.CHASER, 0, false, false, true
+                                chaser, 4.0, SwarmRole.CHASER, 0,
+                                false, false, true, true
                         ),
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                rear, 5.0, SwarmRole.REAR_PRESSURE, 0, false, false, true
+                                rear, 5.0, SwarmRole.REAR_PRESSURE, 0,
+                                false, false, true, true
                         )
                 )
         );
@@ -60,10 +64,12 @@ class SwarmEngineeringTaskPolicyTest {
                 SwarmEngineeringTask.Type.BREAK,
                 List.of(
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                busy, 1.0, SwarmRole.REAR_PRESSURE, 0, false, true, true
+                                busy, 1.0, SwarmRole.REAR_PRESSURE, 0,
+                                false, true, true, true
                         ),
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                free, 16.0, SwarmRole.CHASER, 0, false, false, true
+                                free, 16.0, SwarmRole.CHASER, 0,
+                                false, false, true, true
                         )
                 )
         );
@@ -80,10 +86,12 @@ class SwarmEngineeringTaskPolicyTest {
                 SwarmEngineeringTask.Type.BREAK,
                 List.of(
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                blocked, 1.0, SwarmRole.REAR_PRESSURE, 0, false, false, false
+                                blocked, 1.0, SwarmRole.REAR_PRESSURE, 0,
+                                false, false, false, true
                         ),
                         new SwarmEngineeringTaskPolicy.Candidate(
-                                reachable, 25.0, SwarmRole.CHASER, 0, false, false, true
+                                reachable, 25.0, SwarmRole.CHASER, 0,
+                                false, false, true, true
                         )
                 )
         );
@@ -98,10 +106,12 @@ class SwarmEngineeringTaskPolicyTest {
 
         var candidates = List.of(
                 new SwarmEngineeringTaskPolicy.Candidate(
-                        b, 4.0, SwarmRole.REAR_PRESSURE, 0, false, false, true
+                        b, 4.0, SwarmRole.REAR_PRESSURE, 0,
+                        false, false, true, true
                 ),
                 new SwarmEngineeringTaskPolicy.Candidate(
-                        a, 4.0, SwarmRole.REAR_PRESSURE, 0, false, false, true
+                        a, 4.0, SwarmRole.REAR_PRESSURE, 0,
+                        false, false, true, true
                 )
         );
 

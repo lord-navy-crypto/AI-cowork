@@ -79,6 +79,8 @@ public final class SwarmAgentState {
     private long engineeringRequestsPublished;
     private long engineeringTasksClaimed;
     private long engineeringTasksCompleted;
+    private long engineeringMaterialsGiven;
+    private long engineeringMaterialsReceived;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -328,6 +330,47 @@ public final class SwarmAgentState {
     public long engineeringTasksCompleted() {
         return engineeringTasksCompleted;
     }
+
+    public long engineeringMaterialsGiven() {
+        return engineeringMaterialsGiven;
+    }
+
+    public long engineeringMaterialsReceived() {
+        return engineeringMaterialsReceived;
+    }
+
+    public boolean transferOneEngineeringBlockTo(
+            SwarmAgentState receiver,
+            int receiverMaxCount
+    ) {
+        if (receiver == null
+                || receiver == this
+                || carriedEngineeringBlockCount <= 0
+                || carriedEngineeringBlock == null
+                || !receiver.canCarryEngineeringBlock(
+                        carriedEngineeringBlock,
+                        receiverMaxCount
+                )) {
+            return false;
+        }
+
+        BlockState material = carriedEngineeringBlock;
+        carriedEngineeringBlockCount--;
+        if (carriedEngineeringBlockCount == 0) {
+            carriedEngineeringBlock = null;
+        }
+
+        if (receiver.carriedEngineeringBlockCount == 0) {
+            receiver.carriedEngineeringBlock = material;
+        }
+        receiver.carriedEngineeringBlockCount++;
+
+        engineeringMaterialsGiven++;
+        receiver.engineeringMaterialsReceived++;
+        return true;
+    }
+
+
 
     public SwarmEngineeringTask publishEngineeringRequest(
             SwarmEngineeringTask.Type type,

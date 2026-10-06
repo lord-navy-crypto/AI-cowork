@@ -474,7 +474,7 @@ public final class SwarmCommands {
         source.sendSuccess(
                 () -> Component.literal(String.format(
                         java.util.Locale.ROOT,
-                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d, searchStarted=%d, searchSucceeded=%d, searchFailed=%d, activeSearch=%d, searchSuccessRate=%.3f, avgReacquisitionTicks=%.2f, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d, engineeringRequests=%d, engineeringClaims=%d, engineeringCompleted=%d",
+                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d, searchStarted=%d, searchSucceeded=%d, searchFailed=%d, activeSearch=%d, searchSuccessRate=%.3f, avgReacquisitionTicks=%.2f, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d, engineeringRequests=%d, engineeringClaims=%d, engineeringCompleted=%d, engineeringMaterialsGiven=%d, engineeringMaterialsReceived=%d",
                         metrics.active(),
                         metrics.elapsedTicks(),
                         metrics.agentCount(),
@@ -500,7 +500,9 @@ public final class SwarmCommands {
                         metrics.carriedEngineeringBlocks(),
                         metrics.engineeringRequestsPublished(),
                         metrics.engineeringTasksClaimed(),
-                        metrics.engineeringTasksCompleted()
+                        metrics.engineeringTasksCompleted(),
+                        metrics.engineeringMaterialsGiven(),
+                        metrics.engineeringMaterialsReceived()
                 )),
                 false
         );
@@ -690,6 +692,8 @@ public final class SwarmCommands {
                                 + " engineeringRequests=" + state.engineeringRequestsPublished()
                                 + " engineeringClaims=" + state.engineeringTasksClaimed()
                                 + " engineeringCompleted=" + state.engineeringTasksCompleted()
+                                + " engineeringMaterialsGiven=" + state.engineeringMaterialsGiven()
+                                + " engineeringMaterialsReceived=" + state.engineeringMaterialsReceived()
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
                                 + " alignment=" + String.format(java.util.Locale.ROOT, "%.3f", state.alignmentMagnitude())
@@ -774,6 +778,8 @@ public final class SwarmCommands {
         long engineeringRequests = 0L;
         long engineeringClaims = 0L;
         long engineeringCompleted = 0L;
+        long engineeringMaterialsGiven = 0L;
+        long engineeringMaterialsReceived = 0L;
         int carriedEngineeringBlocks = 0;
 
         for (PathfinderMob agent : agents) {
@@ -834,6 +840,8 @@ public final class SwarmCommands {
             engineeringRequests += state.engineeringRequestsPublished();
             engineeringClaims += state.engineeringTasksClaimed();
             engineeringCompleted += state.engineeringTasksCompleted();
+            engineeringMaterialsGiven += state.engineeringMaterialsGiven();
+            engineeringMaterialsReceived += state.engineeringMaterialsReceived();
             carriedEngineeringBlocks += Math.max(0, state.carriedEngineeringBlockCount());
         }
 
@@ -848,7 +856,7 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, plannerDiagnostics=%d, plannerPathQueries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d, engineeringRequests=%d, engineeringClaims=%d, engineeringCompleted=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, plannerDiagnostics=%d, plannerPathQueries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d, engineeringRequests=%d, engineeringClaims=%d, engineeringCompleted=%d, engineeringMaterialsGiven=%d, engineeringMaterialsReceived=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -887,6 +895,8 @@ public final class SwarmCommands {
                 engineeringRequests,
                 engineeringClaims,
                 engineeringCompleted,
+                engineeringMaterialsGiven,
+                engineeringMaterialsReceived,
                 archetypeSummary,
                 roleSummary
         );
