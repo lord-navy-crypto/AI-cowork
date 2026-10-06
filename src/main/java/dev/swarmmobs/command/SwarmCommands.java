@@ -474,7 +474,7 @@ public final class SwarmCommands {
         source.sendSuccess(
                 () -> Component.literal(String.format(
                         java.util.Locale.ROOT,
-                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d, searchStarted=%d, searchSucceeded=%d, searchFailed=%d, activeSearch=%d, searchSuccessRate=%.3f, avgReacquisitionTicks=%.2f",
+                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d, searchStarted=%d, searchSucceeded=%d, searchFailed=%d, activeSearch=%d, searchSuccessRate=%.3f, avgReacquisitionTicks=%.2f, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d",
                         metrics.active(),
                         metrics.elapsedTicks(),
                         metrics.agentCount(),
@@ -494,7 +494,10 @@ public final class SwarmCommands {
                         metrics.searchEpisodesFailed(),
                         metrics.activeSearchEpisodes(),
                         metrics.searchSuccessRate(),
-                        metrics.averageReacquisitionTicks()
+                        metrics.averageReacquisitionTicks(),
+                        metrics.engineeringBlocksBroken(),
+                        metrics.engineeringBlocksPlaced(),
+                        metrics.carriedEngineeringBlocks()
                 )),
                 false
         );
@@ -678,6 +681,9 @@ public final class SwarmCommands {
                                         state.plannerSelectedScore()
                                 )
                                 + " plannerPathQueries=" + state.plannerPathQueryCount()
+                                + " engineeringCarried=" + state.carriedEngineeringBlockCount()
+                                + " engineeringBroken=" + state.engineeringBlocksBroken()
+                                + " engineeringPlaced=" + state.engineeringBlocksPlaced()
                                 + " separation=" + String.format(java.util.Locale.ROOT, "%.3f", state.separationMagnitude())
                                 + " cohesion=" + String.format(java.util.Locale.ROOT, "%.3f", state.cohesionMagnitude())
                                 + " alignment=" + String.format(java.util.Locale.ROOT, "%.3f", state.alignmentMagnitude())
@@ -757,6 +763,9 @@ public final class SwarmCommands {
         double sensingNoiseSum = 0.0;
         int pendingRoleCount = 0;
         long roleReassignments = 0L;
+        long engineeringBroken = 0L;
+        long engineeringPlaced = 0L;
+        int carriedEngineeringBlocks = 0;
 
         for (PathfinderMob agent : agents) {
             SwarmAgentState state = agent.getData(SwarmAttachments.AGENT_STATE.get());
@@ -811,6 +820,9 @@ public final class SwarmCommands {
                 pendingRoleCount++;
             }
             roleReassignments += state.roleReassignmentCount();
+            engineeringBroken += state.engineeringBlocksBroken();
+            engineeringPlaced += state.engineeringBlocksPlaced();
+            carriedEngineeringBlocks += Math.max(0, state.carriedEngineeringBlockCount());
         }
 
         int total = agents.size();
@@ -824,7 +836,7 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, plannerDiagnostics=%d, plannerPathQueries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, recoveryPlanAttempts=%d, recoveryPlanFailures=%d, plannerDiagnostics=%d, plannerPathQueries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, engineeringBroken=%d, engineeringPlaced=%d, carriedEngineeringBlocks=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -857,6 +869,9 @@ public final class SwarmCommands {
                 sensingNoiseSum / total,
                 pendingRoleCount,
                 roleReassignments,
+                engineeringBroken,
+                engineeringPlaced,
+                carriedEngineeringBlocks,
                 archetypeSummary,
                 roleSummary
         );
