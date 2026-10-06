@@ -58,6 +58,7 @@ public final class SwarmConfig {
     public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS;
     public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_TASK_RADIUS;
     public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_TASK_TTL_TICKS;
+    public static final ModConfigSpec.BooleanValue ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED;
 
     public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
     public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
@@ -291,6 +292,10 @@ public final class SwarmConfig {
         ZOMBIE_ENGINEERING_TASK_TTL_TICKS = BUILDER
                 .comment("Lifetime of one local engineering request before it must be republished.")
                 .defineInRange("zombieEngineeringTaskTtlTicks", 40, 10, 400);
+
+        ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED = BUILDER
+                .comment("Require bounded PathNavigation evidence before a remote Zombie may claim an engineering task.")
+                .define("zombieEngineeringPathEvidenceEnabled", true);
 
         BUILDER.pop();
 
