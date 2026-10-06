@@ -485,6 +485,7 @@ public final class SwarmApproachGoal extends Goal {
                     new Vec2(mob.getX(), mob.getZ()),
                     new Vec2(state.destinationX(), state.destinationZ())
             );
+            state.recordRecoveryPlanning(recovery.active());
 
             if (recovery.active()) {
                 obstacleDetourActive = false;
