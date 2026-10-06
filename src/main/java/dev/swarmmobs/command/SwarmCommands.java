@@ -209,6 +209,32 @@ public final class SwarmCommands {
         return 1;
     }
 
+    private static int snapshotExperiment(CommandSourceStack source) {
+        var metrics = SwarmExperimentMetrics.snapshot(source.getLevel());
+        source.sendSuccess(
+                () -> Component.literal(String.format(
+                        java.util.Locale.ROOT,
+                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d",
+                        metrics.active(),
+                        metrics.elapsedTicks(),
+                        metrics.agentCount(),
+                        metrics.communicationAccepted(),
+                        metrics.communicationDelivered(),
+                        metrics.communicationDropped(),
+                        metrics.communicationDropRate(),
+                        metrics.obstacleDetours(),
+                        metrics.recoveries(),
+                        metrics.recoveryPlanningAttempts(),
+                        metrics.recoveryPlanningFailures(),
+                        metrics.recoveryFailureRate(),
+                        metrics.pathQueries(),
+                        metrics.roleReassignments()
+                )),
+                false
+        );
+        return 1;
+    }
+
     private static int openControlPanel(CommandSourceStack source) {
         ServerPlayer player;
         try {
