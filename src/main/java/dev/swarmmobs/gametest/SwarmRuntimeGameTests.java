@@ -598,7 +598,6 @@ public final class SwarmRuntimeGameTests {
         }
 
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
-        zombie.setNoGravity(true);
 
         var movementSpeed = zombie.getAttribute(Attributes.MOVEMENT_SPEED);
         if (movementSpeed != null) {
