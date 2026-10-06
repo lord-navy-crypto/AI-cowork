@@ -5,5 +5,6 @@ public enum SwarmExperimentPreset {
     NOISY_SENSING,
     LOSSY_COMMS,
     COMBINED_FAULTS,
-    NAVIGATION_STRESS
+    NAVIGATION_STRESS,
+    CUSTOM
 }
