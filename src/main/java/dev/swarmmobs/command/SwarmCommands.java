@@ -578,7 +578,7 @@ public final class SwarmCommands {
                                 + ", packetDropRate=" + SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.get()
                                 + ", experimentSeed=" + SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.get()
                                 + ", debugParticles=" + SwarmDebugState.particlesEnabled()
-                                + ", heterogeneousAgents=ZOMBIE+SKELETON+SPIDER"
+                                + ", heterogeneousAgents=ZOMBIE+SKELETON+SPIDER+CREEPER"
                                 + ", externalAI=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
                 ),
                 false
