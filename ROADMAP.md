@@ -131,10 +131,18 @@ Next within v0.7:
 - role-balance metrics and explicit responsibility coverage checks.
 
 ### v0.8 — terrain-aware local planning
-- richer candidate scoring beyond binary left/right probes;
-- pathability/reachability-aware local candidate selection;
-- terrain cost / congestion evidence;
-- improved recovery candidate validation.
+Current implementation:
+- four deterministic short-horizon detour candidates instead of binary left/right choice;
+- collision and walkability feasibility filtering for every candidate;
+- weighted forward-progress scoring;
+- lateral-detour penalty;
+- local swarm-congestion penalty to reduce same-side crowding;
+- live Navigation-page tuning for local-planner weights.
+
+Next within v0.8:
+- Minecraft PathNavigation reachability/path-cost evidence;
+- improved recovery candidate validation;
+- explicit planner score/candidate telemetry.
 
 ### v0.9 — experiment and evaluation layer
 - reacquisition time;
