@@ -44,6 +44,11 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NAV_WALKABILITY_ENABLED;
     public static final ModConfigSpec.IntValue NAV_MAX_PROBE_DROP_BLOCKS;
 
+    public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
+    public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
+    public static final ModConfigSpec.DoubleValue SENSING_MAX_HORIZONTAL_NOISE;
+    public static final ModConfigSpec.IntValue SENSING_EXPERIMENT_SEED;
+
     public static final ModConfigSpec.BooleanValue COMMUNICATION_ENABLED;
     public static final ModConfigSpec.DoubleValue COMMUNICATION_RADIUS;
     public static final ModConfigSpec.IntValue COMMUNICATION_LATENCY_TICKS;
@@ -208,6 +213,26 @@ public final class SwarmConfig {
         NAV_MAX_PROBE_DROP_BLOCKS = BUILDER
                 .comment("Maximum vertical drop, in blocks, accepted when checking local probe ground support.")
                 .defineInRange("navMaxProbeDropBlocks", 1, 0, 4);
+
+        BUILDER.pop();
+
+        BUILDER.push("sensing");
+
+        SENSING_IMPERFECTION_ENABLED = BUILDER
+                .comment("Enable deterministic direct-sensing dropout and bounded horizontal position noise.")
+                .define("imperfectionEnabled", false);
+
+        SENSING_DROPOUT_RATE = BUILDER
+                .comment("Deterministic probability that a valid direct observation is dropped.")
+                .defineInRange("dropoutRate", 0.0, 0.0, 1.0);
+
+        SENSING_MAX_HORIZONTAL_NOISE = BUILDER
+                .comment("Maximum absolute X/Z observation error, in blocks, injected into accepted direct observations.")
+                .defineInRange("maxHorizontalNoise", 0.0, 0.0, 8.0);
+
+        SENSING_EXPERIMENT_SEED = BUILDER
+                .comment("Seed for reproducible sensing fault/noise experiments.")
+                .defineInRange("experimentSeed", 0, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
         BUILDER.pop();
 
