@@ -17,6 +17,7 @@ import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
 import dev.swarmmobs.algorithm.SwarmTaskDemandPolicy;
+import dev.swarmmobs.algorithm.SwarmTaskSaturationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
@@ -47,6 +48,7 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -238,6 +240,22 @@ public final class SwarmMobEvents {
                     <= SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()
                     * SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
 
+            EnumMap<SwarmTaskType, Integer> peerTaskOccupancy =
+                    new EnumMap<>(SwarmTaskType.class);
+            int sameTargetPeerCount = 0;
+            for (PathfinderMob peer : movementNeighbors) {
+                SwarmAgentState peerState =
+                        peer.getData(SwarmAttachments.AGENT_STATE.get());
+                if (state.targetId() == null
+                        || peerState.targetId() == null
+                        || !state.targetId().equals(peerState.targetId())) {
+                    continue;
+                }
+                sameTargetPeerCount++;
+                peerTaskOccupancy.merge(peerState.currentTask(), 1, Integer::sum);
+            }
+            int localGroupSize = sameTargetPeerCount + 1;
+
             var assignment = SwarmDivisionOfLaborPolicy.choose(
                     mob.getUUID(),
                     profile.archetype(),
@@ -251,7 +269,14 @@ public final class SwarmMobEvents {
                                     task
                             );
                         }
-                        return demand;
+                        return SwarmTaskSaturationPolicy.adjustedDemand(
+                                profile.archetype(),
+                                task,
+                                demand,
+                                localGroupSize,
+                                peerTaskOccupancy.getOrDefault(task, 0),
+                                state.currentTask()
+                        );
                     },
                     state::taskExperience,
                     0.0,
