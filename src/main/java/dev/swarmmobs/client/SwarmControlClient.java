@@ -19,5 +19,9 @@ public final class SwarmControlClient {
         PacketDistributor.sendToServer(new ControlPanelActionPayload(action, value));
     }
 
+    public static void requestPanel() {
+        sendAction("panel_refresh", 0.0);
+    }
+
     private SwarmControlClient() {}
 }
