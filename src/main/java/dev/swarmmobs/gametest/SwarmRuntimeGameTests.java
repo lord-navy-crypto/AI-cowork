@@ -467,6 +467,95 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_creeper_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void creeperKeepsSwarmApproachThenYieldsToFuse(GameTestHelper helper) {
+        var creeper = helper.spawn(EntityType.CREEPER, new BlockPos(1, 1, 2));
+        creeper.setNoGravity(true);
+
+        var movementSpeed = creeper.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (movementSpeed != null) {
+            movementSpeed.setBaseValue(0.0D);
+        }
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 farPosition = helper.absoluteVec(new Vec3(4.5, 1.0, 2.0));
+        player.setPos(farPosition.x, farPosition.y, farPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = creeper.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Creeper did not establish direct swarm observation");
+                return;
+            }
+
+            if (!state.hasDestination()) {
+                playerHandle.close();
+                helper.fail("Creeper did not receive a swarm approach destination");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = creeper.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null || !approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("Creeper swarm approach was not active outside fuse range");
+                return;
+            }
+
+            Vec3 nearPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
+            player.setPos(nearPosition.x, nearPosition.y, nearPosition.z);
+        });
+
+        helper.runAfterDelay(34, () -> {
+            SwarmAgentState state = creeper.getData(SwarmAttachments.AGENT_STATE.get());
+
+            SwarmApproachGoal approachGoal = creeper.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Creeper lost SwarmApproachGoal registration");
+                return;
+            }
+
+            if (creeper.getSwellDir() <= 0) {
+                playerHandle.close();
+                helper.fail("Creeper never entered vanilla swell/fuse behavior inside handoff range");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield after Creeper fuse handoff");
+                return;
+            }
+
+            if (!state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Creeper fuse handoff occurred without a direct target observation");
+                return;
+            }
+
+            creeper.discard();
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_spider_flanker", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void spiderJoinsSharedSwarmAsFlanker(GameTestHelper helper) {
         var spider = helper.spawn(EntityType.SPIDER, new BlockPos(2, 1, 2));
