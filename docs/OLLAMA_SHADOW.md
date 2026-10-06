@@ -130,3 +130,37 @@ A later active mode, if added, should require:
 - anti-thrashing hysteresis;
 - deterministic fallback;
 - explicit user opt-in.
+
+
+## Optional bounded active strategy
+
+Shadow behavior remains the default. Active gameplay influence is a separate explicit opt-in:
+
+```text
+/swarmmobs ai active on
+/swarmmobs ai active apply
+/swarmmobs ai active status
+/swarmmobs ai active off
+```
+
+An active request still uses the same aggregate telemetry and sanitized strategy schema.
+
+Allowed gameplay influence is restricted to:
+- formation-radius multiplier;
+- separation multiplier;
+- cohesion multiplier;
+- search-radius multiplier;
+- a narrow ASSAULT-only role bias for strategy modes such as ENCIRCLE or CONCENTRATE.
+
+Specialist capabilities remain authoritative:
+- Skeleton stays RANGED_SUPPORT;
+- Spider stays FLANKER;
+- Creeper stays BREACHER.
+
+The active overlay has:
+- a configurable TTL;
+- minimum mode-hold hysteresis;
+- deterministic fallback after expiry;
+- immediate clear when active mode or the AI provider is disabled.
+
+It still cannot provide exact coordinates, choose path nodes, issue attacks, bypass collision/walkability, or replace species-specific vanilla combat handoff.
