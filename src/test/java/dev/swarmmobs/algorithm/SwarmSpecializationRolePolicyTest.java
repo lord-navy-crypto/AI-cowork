@@ -46,9 +46,9 @@ class SwarmSpecializationRolePolicyTest {
     }
 
     @Test
-    void interceptorPreservesSpecialistFlankGeometry() {
+    void interceptorMayLeavePureFlankGeometryForPursuit() {
         assertEquals(
-                SwarmRole.FLANK_LEFT,
+                SwarmRole.CHASER,
                 SwarmSpecializationRolePolicy.role(
                         SwarmSpecialization.INTERCEPTOR,
                         SwarmRole.FLANK_LEFT
