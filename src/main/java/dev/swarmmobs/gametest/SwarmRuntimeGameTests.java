@@ -184,6 +184,16 @@ public final class SwarmRuntimeGameTests {
                 zombie.getZ()
         );
         helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
 
         if (!engineer.canUse()) {
             server.setDifficulty(previousDifficulty, true);
@@ -413,6 +423,11 @@ public final class SwarmRuntimeGameTests {
                 requester.getZ()
         );
         helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
 
         SwarmZombieEngineerGoal requesterGoal = requester.goalSelector.getAvailableGoals().stream()
                 .map(wrapped -> wrapped.getGoal())
@@ -478,6 +493,157 @@ public final class SwarmRuntimeGameTests {
                 || requesterState.engineeringRequest(helper.getLevel().getGameTime()) != null) {
             server.setDifficulty(previousDifficulty, true);
             helper.fail("Bridge completion did not consume material and clear shared task");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_bounded_bridge_span", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
+    public static void zombiePreflightsTwoBlockBridgeBeforeCommitting(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+        zombie.setPos(zombie.getX(), zombie.getY() + 1.0, zombie.getZ());
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        UUID targetId = UUID.randomUUID();
+        state.rememberTarget(targetId, helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 5.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos firstSupport = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY() - 1.0,
+                zombie.getZ()
+        );
+        BlockPos secondSupport = firstSupport.east();
+        BlockPos landingSupport = secondSupport.east();
+
+        helper.getLevel().removeBlock(firstSupport, false);
+        helper.getLevel().removeBlock(secondSupport, false);
+        helper.getLevel().removeBlock(firstSupport.below(), false);
+        helper.getLevel().removeBlock(secondSupport.below(), false);
+        helper.getLevel().setBlockAndUpdate(
+                landingSupport,
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(firstSupport.above(), false);
+        helper.getLevel().removeBlock(secondSupport.above(), false);
+        helper.getLevel().removeBlock(landingSupport.above(), false);
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not expose engineer goal for bridge-span test");
+            return;
+        }
+
+        state.salvageEngineeringBlock(
+                Blocks.DIRT.defaultBlockState(),
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        );
+
+        if (engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie committed to a two-block bridge with only one material block");
+            return;
+        }
+
+        state.salvageEngineeringBlock(
+                Blocks.DIRT.defaultBlockState(),
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        );
+
+        if (!engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie rejected bounded two-block bridge after sufficient material became available");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 8; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (helper.getLevel().getBlockState(firstSupport).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not place first block of accepted two-block bridge");
+            return;
+        }
+
+        zombie.setPos(zombie.getX() + 1.0, zombie.getY(), zombie.getZ());
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        if (!engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not continue the preflighted bridge onto its second support");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 8; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (helper.getLevel().getBlockState(secondSupport).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not complete second block of bounded bridge");
+            return;
+        }
+
+        if (state.engineeringBlocksPlaced() != 2L
+                || state.carriedEngineeringBlockCount() != 0) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Two-block bridge placement did not consume exactly two carried materials");
             return;
         }
 
@@ -1174,6 +1340,20 @@ public final class SwarmRuntimeGameTests {
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void spiderActuallyAttacksAfterSwarmMeleeHandoff(GameTestHelper helper) {
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 3, z), Blocks.STONE);
+            }
+        }
+        for (int y = 1; y <= 2; y++) {
+            for (int i = 0; i <= 4; i++) {
+                helper.setBlock(new BlockPos(0, y, i), Blocks.STONE);
+                helper.setBlock(new BlockPos(4, y, i), Blocks.STONE);
+                helper.setBlock(new BlockPos(i, y, 0), Blocks.STONE);
+                helper.setBlock(new BlockPos(i, y, 4), Blocks.STONE);
+            }
+        }
+
         var spider = helper.spawn(EntityType.SPIDER, new BlockPos(1, 1, 2));
         spider.setNoGravity(true);
 

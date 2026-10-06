@@ -4,6 +4,7 @@ import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmPlannerContext;
+import dev.swarmmobs.algorithm.SwarmBridgeSpanPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringTaskPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmZombieEngineeringPolicy;
@@ -489,6 +490,38 @@ public final class SwarmZombieEngineerGoal extends Goal {
 
         if (currentSupport.canBeReplaced()
                 && feetState.getCollisionShape(zombie.level(), feetAhead).isEmpty()) {
+            int gridStepX;
+            int gridStepZ;
+            if (Math.abs(stepX) >= Math.abs(stepZ)) {
+                gridStepX = stepX >= 0.0 ? 1 : -1;
+                gridStepZ = 0;
+            } else {
+                gridStepX = 0;
+                gridStepZ = stepZ >= 0.0 ? 1 : -1;
+            }
+
+            BlockPos lowerSupport = support.below();
+            boolean shallowSupport = !zombie.level()
+                    .getBlockState(lowerSupport)
+                    .getCollisionShape(zombie.level(), lowerSupport)
+                    .isEmpty();
+
+            if (shallowSupport) {
+                if (availableBridgeMaterials(state) < 1) {
+                    return Action.NONE;
+                }
+            } else {
+                SwarmBridgeSpanPolicy.Evaluation bridge = evaluateBridgeSpan(
+                        state,
+                        support,
+                        gridStepX,
+                        gridStepZ
+                );
+                if (!bridge.allowed()) {
+                    return Action.NONE;
+                }
+            }
+
             if (state.carriedEngineeringBlockCount() > 0
                     && state.carriedEngineeringBlock() != null) {
                 BlockState carried = state.carriedEngineeringBlock()
@@ -539,6 +572,93 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         return Action.NONE;
+    }
+
+    private SwarmBridgeSpanPolicy.Evaluation evaluateBridgeSpan(
+            SwarmAgentState requesterState,
+            BlockPos firstSupport,
+            int stepX,
+            int stepZ
+    ) {
+        int maxSpan = SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.get();
+        int gapLength = 0;
+        boolean landingFound = false;
+
+        for (int i = 0; i <= maxSpan; i++) {
+            BlockPos support = firstSupport.offset(stepX * i, 0, stepZ * i);
+            BlockPos feet = support.above();
+
+            BlockState feetState = zombie.level().getBlockState(feet);
+            if (!feetState.getCollisionShape(zombie.level(), feet).isEmpty()) {
+                break;
+            }
+
+            BlockState supportState = zombie.level().getBlockState(support);
+            if (supportState.canBeReplaced()) {
+                if (i >= maxSpan) {
+                    break;
+                }
+                gapLength++;
+                continue;
+            }
+
+            if (!supportState.getCollisionShape(zombie.level(), support).isEmpty()) {
+                landingFound = true;
+            }
+            break;
+        }
+
+        int availableMaterials = availableBridgeMaterials(requesterState);
+
+        return SwarmBridgeSpanPolicy.evaluate(
+                gapLength,
+                landingFound,
+                availableMaterials,
+                maxSpan
+        );
+    }
+
+    private int availableBridgeMaterials(SwarmAgentState requesterState) {
+        if (!(zombie.level() instanceof ServerLevel level)
+                || requesterState == null
+                || requesterState.targetId() == null) {
+            return 0;
+        }
+
+        double radius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
+        List<Zombie> local = new ArrayList<>(level.getEntitiesOfClass(
+                Zombie.class,
+                zombie.getBoundingBox().inflate(radius),
+                peer -> peer.isAlive() && SwarmAgentProfiles.isSupported(peer)
+        ));
+
+        if (!local.contains(zombie)) {
+            local.add(zombie);
+        }
+
+        local.sort(Comparator.comparingDouble(zombie::distanceToSqr));
+        int limit = Math.max(1, SwarmConfig.MAX_NEIGHBORS.get()) + 1;
+        if (local.size() > limit) {
+            local = new ArrayList<>(local.subList(0, limit));
+            if (!local.contains(zombie)) {
+                local.set(local.size() - 1, zombie);
+            }
+        }
+
+        int total = 0;
+        for (Zombie peer : local) {
+            SwarmAgentState peerState =
+                    peer.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!requesterState.targetId().equals(peerState.targetId())
+                    || meleeBusy(peer)) {
+                continue;
+            }
+
+            total += Math.max(0, peerState.carriedEngineeringBlockCount());
+        }
+
+        return total;
     }
 
     private boolean withinWorkRange() {

@@ -327,3 +327,20 @@ Next within v0.11:
 - multi-block bridge plans with bounded length;
 - explicit cover/wall construction policies;
 - AI strategy may choose engineering mission emphasis, but never exact block coordinates.
+
+
+### v0.11.5 — bounded bridge-span preflight
+
+Zombie bridge engineering now preflights a short continuous gap before committing the first placement.
+
+Current contract:
+- bridge direction is reduced to the dominant local movement axis;
+- the planner scans forward for a solid landing within the configured maximum span;
+- default maximum committed span is 4 unsupported blocks;
+- blocked feet/head space aborts the bridge plan;
+- the local same-target swarm must collectively carry at least as many engineering blocks as the detected gap length;
+- if the gap is too long, has no landing, or lacks enough local material, no BRIDGE request is published;
+- accepted spans still execute through the existing one-block task / claim / TTL / material-handoff protocol;
+- every individual placement remains validated by the deterministic engineering goal.
+
+This intentionally avoids an atomic "build an arbitrary structure" action. The swarm commits only when a bounded short bridge is plausibly finishable, then proves progress one block at a time.
