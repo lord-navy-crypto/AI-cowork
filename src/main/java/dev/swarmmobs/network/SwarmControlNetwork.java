@@ -3,6 +3,7 @@ package dev.swarmmobs.network;
 import dev.swarmmobs.client.SwarmControlClient;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.experiment.SwarmExperimentManager;
+import dev.swarmmobs.experiment.SwarmExperimentMetrics;
 import dev.swarmmobs.experiment.SwarmExperimentPreset;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -32,7 +33,7 @@ public final class SwarmControlNetwork {
     public static void sendSnapshot(ServerPlayer player) {
         PacketDistributor.sendToPlayer(
                 player,
-                new ControlPanelSnapshotPayload(snapshotData())
+                new ControlPanelSnapshotPayload(snapshotData(player.serverLevel()))
         );
     }
 
@@ -44,7 +45,7 @@ public final class SwarmControlNetwork {
             return;
         }
 
-        applyAction(payload.action(), payload.value());
+        applyAction(payload.action(), payload.value(), player);
         sendSnapshot(player);
     }
 
@@ -55,7 +56,7 @@ public final class SwarmControlNetwork {
         SwarmControlClient.acceptSnapshot(payload.data());
     }
 
-    private static void applyAction(String action, double value) {
+    private static void applyAction(String action, double value, ServerPlayer player) {
         if (!action.startsWith("preset_") && !action.equals("experiment_seed_delta")) {
             SwarmExperimentManager.markCustom();
         }
@@ -68,6 +69,9 @@ public final class SwarmControlNetwork {
             case "preset_lossy_comms" -> SwarmExperimentManager.apply(SwarmExperimentPreset.LOSSY_COMMS);
             case "preset_combined_faults" -> SwarmExperimentManager.apply(SwarmExperimentPreset.COMBINED_FAULTS);
             case "preset_navigation_stress" -> SwarmExperimentManager.apply(SwarmExperimentPreset.NAVIGATION_STRESS);
+            case "experiment_start" -> SwarmExperimentMetrics.start(player.serverLevel());
+            case "experiment_reset" -> SwarmExperimentMetrics.reset(player.serverLevel());
+
             case "experiment_seed_delta" -> {
                 long next = (long) SwarmExperimentManager.experimentSeed() + Math.round(value);
                 int seed = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, next));
@@ -306,11 +310,26 @@ public final class SwarmControlNetwork {
         }
     }
 
-    private static String snapshotData() {
+    private static String snapshotData(net.minecraft.server.level.ServerLevel level) {
+        var metrics = SwarmExperimentMetrics.snapshot(level);
         return String.join(";",
                 pair("master", SwarmConfig.ENABLED.get()),
                 "activePreset=" + SwarmExperimentManager.activePreset().name(),
                 pair("experimentSeed", SwarmExperimentManager.experimentSeed()),
+                pair("experimentActive", metrics.active()),
+                pair("experimentElapsedTicks", (int) Math.min(Integer.MAX_VALUE, metrics.elapsedTicks())),
+                pair("experimentAgents", metrics.agentCount()),
+                pair("metricCommAccepted", (int) Math.min(Integer.MAX_VALUE, metrics.communicationAccepted())),
+                pair("metricCommDelivered", (int) Math.min(Integer.MAX_VALUE, metrics.communicationDelivered())),
+                pair("metricCommDropped", (int) Math.min(Integer.MAX_VALUE, metrics.communicationDropped())),
+                pair("metricDetours", (int) Math.min(Integer.MAX_VALUE, metrics.obstacleDetours())),
+                pair("metricRecoveries", (int) Math.min(Integer.MAX_VALUE, metrics.recoveries())),
+                pair("metricRecoveryAttempts", (int) Math.min(Integer.MAX_VALUE, metrics.recoveryPlanningAttempts())),
+                pair("metricRecoveryFailures", (int) Math.min(Integer.MAX_VALUE, metrics.recoveryPlanningFailures())),
+                pair("metricPathQueries", (int) Math.min(Integer.MAX_VALUE, metrics.pathQueries())),
+                pair("metricRoleReassignments", (int) Math.min(Integer.MAX_VALUE, metrics.roleReassignments())),
+                pair("metricRecoveryFailureRate", metrics.recoveryFailureRate()),
+                pair("metricObservedCommDropRate", metrics.communicationDropRate()),
                 pair("formationHysteresis", SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()),
                 pair("roleHysteresis", SwarmConfig.ROLE_HYSTERESIS_TICKS.get()),
 
