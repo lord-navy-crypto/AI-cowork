@@ -252,6 +252,9 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
                 SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
+                SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
+                SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
+                SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
             }
 
             default -> {
