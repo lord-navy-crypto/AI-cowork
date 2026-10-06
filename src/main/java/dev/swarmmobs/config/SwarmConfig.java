@@ -56,6 +56,8 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue ZOMBIE_ENGINEERING_ENABLED;
     public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS;
     public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS;
+    public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_TASK_RADIUS;
+    public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_TASK_TTL_TICKS;
 
     public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
     public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
@@ -281,6 +283,14 @@ public final class SwarmConfig {
         ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS = BUILDER
                 .comment("Maximum salvaged placeable blocks carried by one Zombie engineer.")
                 .defineInRange("zombieEngineeringMaxCarriedBlocks", 4, 0, 16);
+
+        ZOMBIE_ENGINEERING_TASK_RADIUS = BUILDER
+                .comment("Local radius in which Zombies may advertise and claim engineering tasks.")
+                .defineInRange("zombieEngineeringTaskRadius", 8.0, 2.0, 24.0);
+
+        ZOMBIE_ENGINEERING_TASK_TTL_TICKS = BUILDER
+                .comment("Lifetime of one local engineering request before it must be republished.")
+                .defineInRange("zombieEngineeringTaskTtlTicks", 40, 10, 400);
 
         BUILDER.pop();
 
