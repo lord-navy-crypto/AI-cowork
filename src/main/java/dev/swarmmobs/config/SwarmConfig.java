@@ -59,6 +59,7 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_TASK_RADIUS;
     public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_TASK_TTL_TICKS;
     public static final ModConfigSpec.BooleanValue ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED;
+    public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS;
 
     public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
     public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
@@ -296,6 +297,10 @@ public final class SwarmConfig {
         ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED = BUILDER
                 .comment("Require bounded PathNavigation evidence before a remote Zombie may claim an engineering task.")
                 .define("zombieEngineeringPathEvidenceEnabled", true);
+
+        ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS = BUILDER
+                .comment("Maximum distance for a one-block engineering material handoff between nearby Zombies.")
+                .defineInRange("zombieEngineeringMaterialHandoffRadius", 2.5, 0.5, 6.0);
 
         BUILDER.pop();
 
