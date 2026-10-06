@@ -943,6 +943,83 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_wall_blocked_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
+    public static void closeWallBlockedTargetDoesNotTriggerVanillaMeleeHandoff(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        player.setNoGravity(true);
+        player.setPos(zombie.getX() + 2.5, zombie.getY(), zombie.getZ());
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+        helper.getLevel().setBlockAndUpdate(obstacle.above(), Blocks.DIRT.defaultBlockState());
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(player.getUUID(), helper.getTick(), true);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                player.getX(),
+                player.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.RECOVERY,
+                6,
+                4,
+                1,
+                1,
+                5,
+                0.25,
+                6L
+        );
+        zombie.setTarget(player);
+
+        SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmApproachGoal.class::isInstance)
+                .map(SwarmApproachGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (approachGoal == null) {
+            playerHandle.close();
+            helper.fail("Zombie did not expose SwarmApproachGoal");
+            return;
+        }
+
+        if (zombie.hasLineOfSight(player)) {
+            playerHandle.close();
+            helper.fail("Fixture wall did not block Zombie line of sight");
+            return;
+        }
+
+        if (!approachGoal.canUse()) {
+            playerHandle.close();
+            helper.fail("Wall-blocked close target incorrectly triggered vanilla melee handoff");
+            return;
+        }
+
+        if (state.plannerContext() != SwarmPlannerContext.RECOVERY) {
+            playerHandle.close();
+            helper.fail("Wall-blocked handoff check unexpectedly cleared recovery telemetry");
+            return;
+        }
+
+        playerHandle.close();
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_perception", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void visiblePlayerIsAcquiredThroughPerceptionLayer(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
