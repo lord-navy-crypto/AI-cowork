@@ -337,6 +337,155 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_material_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
+    public static void bridgeClaimantReceivesOneBlockFromNearbyDonor(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie requester = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        Zombie claimant = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 3));
+        Zombie donor = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 4));
+        requester.setNoGravity(true);
+        claimant.setNoGravity(true);
+        donor.setNoGravity(true);
+
+        requester.setPos(requester.getX(), requester.getY() + 1.0, requester.getZ());
+        claimant.setPos(claimant.getX(), claimant.getY() + 1.0, claimant.getZ());
+        donor.setPos(donor.getX(), donor.getY() + 1.0, donor.getZ());
+
+        UUID sharedTarget = UUID.randomUUID();
+        SwarmAgentState requesterState = requester.getData(SwarmAttachments.AGENT_STATE.get());
+        SwarmAgentState claimantState = claimant.getData(SwarmAttachments.AGENT_STATE.get());
+        SwarmAgentState donorState = donor.getData(SwarmAttachments.AGENT_STATE.get());
+
+        requesterState.rememberTarget(sharedTarget, helper.getTick(), false);
+        claimantState.rememberTarget(sharedTarget, helper.getTick(), false);
+        donorState.rememberTarget(sharedTarget, helper.getTick(), false);
+
+        requesterState.updateLocalPlan(
+                2,
+                0,
+                SwarmRole.CHASER,
+                requester.getX() + 4.0,
+                requester.getZ(),
+                0.0,
+                0.0
+        );
+        requesterState.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        claimantState.updateLocalPlan(
+                2,
+                3,
+                SwarmRole.REAR_PRESSURE,
+                claimant.getX() + 4.0,
+                claimant.getZ(),
+                0.0,
+                0.0
+        );
+        donorState.updateLocalPlan(
+                2,
+                0,
+                SwarmRole.CHASER,
+                donor.getX() + 4.0,
+                donor.getZ(),
+                0.0,
+                0.0
+        );
+
+        donorState.salvageEngineeringBlock(
+                Blocks.DIRT.defaultBlockState(),
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        );
+
+        BlockPos bridgeSupport = BlockPos.containing(
+                requester.getX() + 0.9,
+                requester.getY() - 1.0,
+                requester.getZ()
+        );
+        helper.getLevel().removeBlock(bridgeSupport, false);
+
+        SwarmZombieEngineerGoal requesterGoal = requester.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+        SwarmZombieEngineerGoal claimantGoal = claimant.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (requesterGoal == null || claimantGoal == null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Material-handoff test Zombies did not expose engineer goals");
+            return;
+        }
+
+        if (requesterGoal.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Bridge requester incorrectly kept task instead of delegating");
+            return;
+        }
+
+        var request = requesterState.engineeringRequest(helper.getLevel().getGameTime());
+        if (request == null || !claimant.getUUID().equals(request.claimantId())) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Bridge request did not select expected local claimant");
+            return;
+        }
+
+        if (donorState.carriedEngineeringBlockCount() != 0
+                || claimantState.carriedEngineeringBlockCount() != 1
+                || donorState.engineeringMaterialsGiven() != 1L
+                || claimantState.engineeringMaterialsReceived() != 1L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("One-block engineering material handoff did not occur exactly once");
+            return;
+        }
+
+        if (!claimantGoal.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Claimant did not accept bridge task after receiving material");
+            return;
+        }
+
+        claimantGoal.start();
+        for (int i = 0; i < 8; i++) {
+            claimantGoal.tick();
+        }
+        claimantGoal.stop();
+
+        if (helper.getLevel().getBlockState(bridgeSupport).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Claimant did not place transferred material as bridge support");
+            return;
+        }
+
+        if (claimantState.engineeringBlocksPlaced() != 1L
+                || claimantState.carriedEngineeringBlockCount() != 0
+                || requesterState.engineeringRequest(helper.getLevel().getGameTime()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Bridge completion did not consume material and clear shared task");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
     public static void swarmApproachGoalYieldsNearMeleeRange(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
