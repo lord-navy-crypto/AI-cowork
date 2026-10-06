@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.5.6; current integration work: `swarm-sensing-faults-v0.6.0`
+Active stable line: `main` through v0.6.0; current integration work: `swarm-control-panel-v0.6.1`
 
 The current playable system includes:
 
@@ -61,6 +61,7 @@ The current playable system includes:
 - navigation-layer telemetry exposing the actual PLAN / OBSTACLE_DETOUR / RECOVERY waypoint and cumulative recovery counters;
 - walkability-aware local probes that reject unsupported detours near pits and ledges while allowing a configurable small drop;
 - optional deterministic direct-sensing dropout and bounded horizontal observation noise for reproducible fault-injection experiments;
+- a server-authoritative in-game control panel for live Sensing, Communication, Search/Prediction, and Navigation tuning;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -68,6 +69,7 @@ Development commands:
 
 ```text
 /swarmmobs status
+/swarmmobs panel
 /swarmmobs inspect
 /swarmmobs group
 /swarmmobs debug spawn <count>
@@ -84,6 +86,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.5.6 is merged on `main`; v0.6.0 deterministic sensing-fault injection is under integration.**
+**Swarm Mobs v0.6.0 is merged on `main`; v0.6.1 live control panel is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.

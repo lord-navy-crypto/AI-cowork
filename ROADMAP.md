@@ -103,6 +103,18 @@ This milestone enables experiments such as:
 - noisy sensing + lossy communication;
 - recovery/search performance under combined faults.
 
+## Control and experiment interface — v0.6.1
+
+The in-game control panel provides a server-authoritative interface for live tuning without requiring command memorization.
+
+Initial pages:
+- Sensing
+- Communication
+- Search & Prediction
+- Navigation
+
+Panel actions are sent to the server, permission-checked, applied to the live config, and echoed back as a fresh snapshot. Known-good baselines remain available per subsystem and globally.
+
 ## Next milestones
 
 ### v0.7 — stronger task allocation and local mission logic

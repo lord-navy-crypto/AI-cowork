@@ -11,6 +11,7 @@ import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.debug.SwarmDebugState;
+import dev.swarmmobs.network.SwarmControlNetwork;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -37,7 +38,10 @@ public final class SwarmCommands {
                 .then(Commands.literal("inspect")
                         .executes(context -> inspectNearest(context.getSource())))
                 .then(Commands.literal("group")
-                        .executes(context -> inspectGroup(context.getSource())));
+                        .executes(context -> inspectGroup(context.getSource())))
+                .then(Commands.literal("panel")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(context -> openControlPanel(context.getSource())));
 
         var debug = Commands.literal("debug")
                 .requires(source -> source.hasPermission(2));
@@ -133,6 +137,19 @@ public final class SwarmCommands {
         debug.then(sensing);
         root.then(debug);
         dispatcher.register(root);
+    }
+
+    private static int openControlPanel(CommandSourceStack source) {
+        ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Run this command as a player."));
+            return 0;
+        }
+
+        SwarmControlNetwork.sendSnapshot(player);
+        return 1;
     }
 
     private static int status(CommandSourceStack source) {
