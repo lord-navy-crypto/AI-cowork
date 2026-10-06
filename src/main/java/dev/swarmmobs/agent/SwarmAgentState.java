@@ -60,6 +60,14 @@ public final class SwarmAgentState {
     private long sensingAcceptedObservations;
     private long sensingDroppedObservations;
     private double lastSensingNoiseMagnitude;
+    private boolean searchEpisodeActive;
+    private UUID searchEpisodeTargetId;
+    private long searchEpisodeStartTick = Long.MIN_VALUE;
+    private long searchEpisodesStarted;
+    private long searchEpisodesSucceeded;
+    private long searchEpisodesFailed;
+    private long searchReacquisitionTicksTotal;
+    private long lastSearchReacquisitionTicks;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -98,6 +106,30 @@ public final class SwarmAgentState {
 
     public boolean directObservation() {
         return directObservation;
+    }
+
+    public boolean searchEpisodeActive() {
+        return searchEpisodeActive;
+    }
+
+    public long searchEpisodesStarted() {
+        return searchEpisodesStarted;
+    }
+
+    public long searchEpisodesSucceeded() {
+        return searchEpisodesSucceeded;
+    }
+
+    public long searchEpisodesFailed() {
+        return searchEpisodesFailed;
+    }
+
+    public long searchReacquisitionTicksTotal() {
+        return searchReacquisitionTicksTotal;
+    }
+
+    public long lastSearchReacquisitionTicks() {
+        return lastSearchReacquisitionTicks;
     }
 
     public int neighborCount() {
@@ -362,6 +394,49 @@ public final class SwarmAgentState {
     public void rememberTarget(UUID targetId, long gameTick, boolean directObservation) {
         this.targetObservation = TargetObservation.unknownPosition(targetId, gameTick);
         this.directObservation = directObservation;
+    }
+
+    public void beginSearchEpisode(long gameTick, UUID targetId) {
+        if (searchEpisodeActive) {
+            return;
+        }
+        searchEpisodeActive = true;
+        searchEpisodeTargetId = targetId;
+        searchEpisodeStartTick = gameTick;
+        searchEpisodesStarted++;
+    }
+
+    public void recordDirectReacquisition(long gameTick, UUID targetId) {
+        if (!searchEpisodeActive) {
+            return;
+        }
+
+        if (searchEpisodeTargetId != null && targetId != null && !searchEpisodeTargetId.equals(targetId)) {
+            recordSearchFailure();
+            return;
+        }
+
+        long elapsed = searchEpisodeStartTick == Long.MIN_VALUE
+                ? 0L
+                : Math.max(0L, gameTick - searchEpisodeStartTick);
+        searchEpisodesSucceeded++;
+        searchReacquisitionTicksTotal += elapsed;
+        lastSearchReacquisitionTicks = elapsed;
+        clearSearchEpisode();
+    }
+
+    public void recordSearchFailure() {
+        if (!searchEpisodeActive) {
+            return;
+        }
+        searchEpisodesFailed++;
+        clearSearchEpisode();
+    }
+
+    private void clearSearchEpisode() {
+        searchEpisodeActive = false;
+        searchEpisodeTargetId = null;
+        searchEpisodeStartTick = Long.MIN_VALUE;
     }
 
     public void forgetTarget() {
