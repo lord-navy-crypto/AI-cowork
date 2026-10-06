@@ -238,3 +238,13 @@ Next within v0.10:
 - repeated/event-driven shadow sampling with rate limits;
 - AI-vs-deterministic experiment comparison metrics;
 - only after validation, an optional bounded active strategy adapter with TTL/hysteresis and deterministic fallback.
+
+
+## v0.10.1 — species combat handoff
+
+- restore Skeleton bow combat with a priority-0 bounded `RangedBowAttackGoal` bridge;
+- keep swarm positioning outside the Skeleton bow envelope;
+- add Creeper as a supported heterogeneous breacher;
+- keep swarm approach outside Creeper fuse range;
+- yield to priority-0 `SwellGoal` inside the fuse envelope or after ignition begins;
+- Runtime GameTests gate both handoffs so future swarm movement changes cannot silently starve vanilla combat again.
