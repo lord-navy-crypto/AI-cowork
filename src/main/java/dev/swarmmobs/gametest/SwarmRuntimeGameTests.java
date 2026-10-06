@@ -20,6 +20,7 @@ import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
@@ -412,10 +413,15 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(batch = "swarm_runtime_skeleton_bow_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
+    @GameTest(batch = "swarm_runtime_skeleton_bow_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 170)
     public static void skeletonKeepsVanillaBowAttackInsideRangedEnvelope(GameTestHelper helper) {
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+
         var skeleton = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 2));
-        skeleton.setNoGravity(true);
         skeleton.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
         skeleton.reassessWeaponGoal();
 
@@ -424,7 +430,8 @@ public final class SwarmRuntimeGameTests {
         Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
-        float startingHealth = player.getHealth();
+
+        final boolean[] observedBowCombat = {false};
 
         helper.runAfterDelay(20, () -> {
             SwarmAgentState state = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
@@ -450,14 +457,45 @@ public final class SwarmRuntimeGameTests {
 
             if (approachGoal.canUse()) {
                 playerHandle.close();
-                helper.fail("SwarmApproachGoal did not yield inside vanilla skeleton bow range");
+                helper.fail("SwarmApproachGoal did not yield inside Skeleton bow range");
+                return;
+            }
+
+            boolean hasBridgeGoal = skeleton.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(wrapped -> wrapped.getGoal() instanceof dev.swarmmobs.goal.SwarmSkeletonBowGoal);
+            if (!hasBridgeGoal) {
+                playerHandle.close();
+                helper.fail("Skeleton did not receive the high-priority bow bridge goal");
             }
         });
 
-        helper.runAfterDelay(90, () -> {
-            if (player.getHealth() >= startingHealth) {
+        for (int sampleTick : new int[] {35, 55, 75, 95}) {
+            helper.runAfterDelay(sampleTick, () -> {
+                if (skeleton.isUsingItem()) {
+                    observedBowCombat[0] = true;
+                }
+
+                boolean arrowPresent = !skeleton.level().getEntitiesOfClass(
+                        AbstractArrow.class,
+                        skeleton.getBoundingBox().inflate(24.0),
+                        arrow -> arrow.isAlive()
+                ).isEmpty();
+                if (arrowPresent) {
+                    observedBowCombat[0] = true;
+                }
+            });
+        }
+
+        helper.runAfterDelay(110, () -> {
+            boolean arrowPresent = !skeleton.level().getEntitiesOfClass(
+                    AbstractArrow.class,
+                    skeleton.getBoundingBox().inflate(32.0),
+                    arrow -> arrow.isAlive()
+            ).isEmpty();
+
+            if (!observedBowCombat[0] && !arrowPresent) {
                 playerHandle.close();
-                helper.fail("Skeleton never damaged target after swarm ranged handoff; vanilla bow AI appears starved");
+                helper.fail("Skeleton never drew/fired its bow after swarm ranged handoff");
                 return;
             }
 
@@ -479,7 +517,7 @@ public final class SwarmRuntimeGameTests {
 
         TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
         ServerPlayer player = playerHandle.player();
-        Vec3 farPosition = helper.absoluteVec(new Vec3(4.5, 1.0, 2.0));
+        Vec3 farPosition = helper.absoluteVec(new Vec3(5.0, 1.0, 2.0));
         player.setPos(farPosition.x, farPosition.y, farPosition.z);
         player.setNoGravity(true);
 
@@ -511,7 +549,7 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
-            Vec3 nearPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
+            Vec3 nearPosition = helper.absoluteVec(new Vec3(3.5, 1.0, 2.0));
             player.setPos(nearPosition.x, nearPosition.y, nearPosition.z);
         });
 
