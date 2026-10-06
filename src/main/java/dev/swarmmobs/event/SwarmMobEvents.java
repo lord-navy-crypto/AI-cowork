@@ -17,6 +17,8 @@ import dev.swarmmobs.algorithm.SwarmSensingPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.TargetPredictionPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
+import dev.swarmmobs.ai.SwarmAiActiveState;
+import dev.swarmmobs.ai.SwarmAiRoleBiasPolicy;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.debug.SwarmDebugParticles;
@@ -163,11 +165,26 @@ public final class SwarmMobEvents {
                         .toList()
         );
 
+        SwarmAiActiveState.Snapshot activeStrategy =
+                SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()
+                        ? SwarmAiActiveState.snapshot(gameTick)
+                        : null;
+
         SwarmRole candidateRole = SwarmAgentProfiles.tacticalRole(
                 profile.archetype(),
                 assignedSlot,
                 composition
         );
+
+        if (activeStrategy != null && activeStrategy.active()) {
+            candidateRole = SwarmAiRoleBiasPolicy.apply(
+                    activeStrategy.decision().mode(),
+                    profile.archetype(),
+                    candidateRole,
+                    assignedSlot,
+                    composition
+            );
+        }
 
         SwarmRole tacticalRole = state.stabilizeRole(
                 candidateRole,
@@ -179,6 +196,19 @@ public final class SwarmMobEvents {
                 gameTick,
                 SwarmConfig.TARGET_MEMORY_TICKS.get()
         );
+
+        double aiFormationMultiplier = activeStrategy == null
+                ? 1.0
+                : activeStrategy.formationRadiusMultiplier();
+        double aiSeparationMultiplier = activeStrategy == null
+                ? 1.0
+                : activeStrategy.separationMultiplier();
+        double aiCohesionMultiplier = activeStrategy == null
+                ? 1.0
+                : activeStrategy.cohesionMultiplier();
+        double aiSearchRadiusMultiplier = activeStrategy == null
+                ? 1.0
+                : activeStrategy.searchRadiusMultiplier();
 
         boolean searchMode = !selection.direct()
                 && confidence < SwarmConfig.SEARCH_CONFIDENCE_THRESHOLD.get();
@@ -202,12 +232,12 @@ public final class SwarmMobEvents {
                     neighborPositions,
                     neighborVelocities,
                     sameCapabilityCount,
-                    SwarmConfig.SEARCH_MIN_RADIUS.get(),
-                    SwarmConfig.SEARCH_MAX_RADIUS.get(),
+                    SwarmConfig.SEARCH_MIN_RADIUS.get() * aiSearchRadiusMultiplier,
+                    SwarmConfig.SEARCH_MAX_RADIUS.get() * aiSearchRadiusMultiplier,
                     SwarmConfig.SEARCH_PHASE_TICKS.get(),
                     SwarmConfig.SEPARATION_RADIUS.get(),
-                    SwarmConfig.SEPARATION_WEIGHT.get(),
-                    SwarmConfig.COHESION_WEIGHT.get(),
+                    SwarmConfig.SEPARATION_WEIGHT.get() * aiSeparationMultiplier,
+                    SwarmConfig.COHESION_WEIGHT.get() * aiCohesionMultiplier,
                     SwarmConfig.ALIGNMENT_WEIGHT.get(),
                     SwarmConfig.MAX_STEERING_CORRECTION.get()
             );
@@ -252,7 +282,9 @@ public final class SwarmMobEvents {
             );
 
             double effectiveFormationRadius =
-                    SwarmConfig.FORMATION_RADIUS.get() * profile.formationRadiusMultiplier();
+                    SwarmConfig.FORMATION_RADIUS.get()
+                            * profile.formationRadiusMultiplier()
+                            * aiFormationMultiplier;
 
             // Keep ranged support outside the breacher ingress lane. When a Creeper
             // is present locally, Skeletons widen their standoff instead of crowding
@@ -274,8 +306,8 @@ public final class SwarmMobEvents {
                     slots,
                     effectiveFormationRadius,
                     SwarmConfig.SEPARATION_RADIUS.get(),
-                    SwarmConfig.SEPARATION_WEIGHT.get(),
-                    SwarmConfig.COHESION_WEIGHT.get(),
+                    SwarmConfig.SEPARATION_WEIGHT.get() * aiSeparationMultiplier,
+                    SwarmConfig.COHESION_WEIGHT.get() * aiCohesionMultiplier,
                     SwarmConfig.ALIGNMENT_WEIGHT.get(),
                     SwarmConfig.MAX_STEERING_CORRECTION.get()
             );
