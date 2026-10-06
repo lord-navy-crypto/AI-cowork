@@ -2,6 +2,8 @@ package dev.swarmmobs.network;
 
 import dev.swarmmobs.client.SwarmControlClient;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.experiment.SwarmExperimentManager;
+import dev.swarmmobs.experiment.SwarmExperimentPreset;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -54,8 +56,23 @@ public final class SwarmControlNetwork {
     }
 
     private static void applyAction(String action, double value) {
+        if (!action.startsWith("preset_") && !action.equals("experiment_seed_delta")) {
+            SwarmExperimentManager.markCustom();
+        }
+
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
+
+            case "preset_baseline" -> SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
+            case "preset_noisy_sensing" -> SwarmExperimentManager.apply(SwarmExperimentPreset.NOISY_SENSING);
+            case "preset_lossy_comms" -> SwarmExperimentManager.apply(SwarmExperimentPreset.LOSSY_COMMS);
+            case "preset_combined_faults" -> SwarmExperimentManager.apply(SwarmExperimentPreset.COMBINED_FAULTS);
+            case "preset_navigation_stress" -> SwarmExperimentManager.apply(SwarmExperimentPreset.NAVIGATION_STRESS);
+            case "experiment_seed_delta" -> {
+                long next = (long) SwarmExperimentManager.experimentSeed() + Math.round(value);
+                int seed = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, next));
+                SwarmExperimentManager.setExperimentSeed(seed);
+            }
 
             case "formation_hysteresis_delta" -> SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set((int) clamp(
                     SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get() + value,
@@ -247,6 +264,7 @@ public final class SwarmControlNetwork {
             }
 
             case "baseline_all" -> {
+                SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
                 SwarmConfig.ENABLED.set(true);
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
@@ -291,6 +309,8 @@ public final class SwarmControlNetwork {
     private static String snapshotData() {
         return String.join(";",
                 pair("master", SwarmConfig.ENABLED.get()),
+                "activePreset=" + SwarmExperimentManager.activePreset().name(),
+                pair("experimentSeed", SwarmExperimentManager.experimentSeed()),
                 pair("formationHysteresis", SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()),
                 pair("roleHysteresis", SwarmConfig.ROLE_HYSTERESIS_TICKS.get()),
 

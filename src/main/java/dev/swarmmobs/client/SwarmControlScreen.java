@@ -10,6 +10,7 @@ import java.util.Map;
 
 public final class SwarmControlScreen extends Screen {
     private enum Page {
+        EXPERIMENT("Experiment"),
         COORDINATION("Coordination"),
         SENSING("Sensing"),
         COMMUNICATION("Communication"),
@@ -48,7 +49,7 @@ public final class SwarmControlScreen extends Screen {
     private void buildWidgets() {
         int center = width / 2;
         int top = 42;
-        int tabWidth = 90;
+        int tabWidth = 78;
         int totalWidth = tabWidth * Page.values().length;
         int startX = center - totalWidth / 2;
 
@@ -82,12 +83,71 @@ public final class SwarmControlScreen extends Screen {
         );
 
         switch (page) {
+            case EXPERIMENT -> buildExperiment();
             case COORDINATION -> buildCoordination();
             case SENSING -> buildSensing();
             case COMMUNICATION -> buildCommunication();
             case SEARCH -> buildSearch();
             case NAVIGATION -> buildNavigation();
         }
+    }
+
+    private void buildExperiment() {
+        int x = width / 2 - 150;
+        int y = 82;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Active preset: " + values.getOrDefault("activePreset", "BASELINE")),
+                        button -> {
+                        }
+                ).bounds(x, y, 300, 20).build()
+        );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Experiment seed",
+                Integer.toString((int) number("experimentSeed")),
+                "experiment_seed_delta",
+                1.0
+        );
+        y += 34;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Baseline"),
+                        button -> SwarmControlClient.sendAction("preset_baseline", 0.0)
+                ).bounds(x, y, 145, 20).build()
+        );
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Noisy Sensing"),
+                        button -> SwarmControlClient.sendAction("preset_noisy_sensing", 0.0)
+                ).bounds(x + 155, y, 145, 20).build()
+        );
+        y += 26;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Lossy Comms"),
+                        button -> SwarmControlClient.sendAction("preset_lossy_comms", 0.0)
+                ).bounds(x, y, 145, 20).build()
+        );
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Combined Faults"),
+                        button -> SwarmControlClient.sendAction("preset_combined_faults", 0.0)
+                ).bounds(x + 155, y, 145, 20).build()
+        );
+        y += 26;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Navigation Stress"),
+                        button -> SwarmControlClient.sendAction("preset_navigation_stress", 0.0)
+                ).bounds(x, y, 300, 20).build()
+        );
     }
 
     private void buildCoordination() {

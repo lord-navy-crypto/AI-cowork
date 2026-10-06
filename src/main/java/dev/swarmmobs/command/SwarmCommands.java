@@ -13,6 +13,8 @@ import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.debug.SwarmDebugState;
 import dev.swarmmobs.network.SwarmControlNetwork;
+import dev.swarmmobs.experiment.SwarmExperimentManager;
+import dev.swarmmobs.experiment.SwarmExperimentPreset;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -136,8 +138,50 @@ public final class SwarmCommands {
                                 ))));
 
         debug.then(sensing);
+
+        var experiment = Commands.literal("experiment")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("baseline")
+                        .executes(context -> applyExperimentPreset(context.getSource(), SwarmExperimentPreset.BASELINE)))
+                .then(Commands.literal("noisy_sensing")
+                        .executes(context -> applyExperimentPreset(context.getSource(), SwarmExperimentPreset.NOISY_SENSING)))
+                .then(Commands.literal("lossy_comms")
+                        .executes(context -> applyExperimentPreset(context.getSource(), SwarmExperimentPreset.LOSSY_COMMS)))
+                .then(Commands.literal("combined_faults")
+                        .executes(context -> applyExperimentPreset(context.getSource(), SwarmExperimentPreset.COMBINED_FAULTS)))
+                .then(Commands.literal("navigation_stress")
+                        .executes(context -> applyExperimentPreset(context.getSource(), SwarmExperimentPreset.NAVIGATION_STRESS)))
+                .then(Commands.literal("seed")
+                        .then(Commands.argument("value", IntegerArgumentType.integer())
+                                .executes(context -> setExperimentSeed(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "value")
+                                ))));
+
+        root.then(experiment);
         root.then(debug);
         dispatcher.register(root);
+    }
+
+    private static int applyExperimentPreset(CommandSourceStack source, SwarmExperimentPreset preset) {
+        SwarmExperimentManager.apply(preset);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm experiment preset=" + preset
+                                + ", seed=" + SwarmExperimentManager.experimentSeed()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int setExperimentSeed(CommandSourceStack source, int seed) {
+        SwarmExperimentManager.setExperimentSeed(seed);
+        source.sendSuccess(
+                () -> Component.literal("Swarm experiment seed=" + seed),
+                true
+        );
+        return 1;
     }
 
     private static int openControlPanel(CommandSourceStack source) {
@@ -156,7 +200,9 @@ public final class SwarmCommands {
     private static int status(CommandSourceStack source) {
         source.sendSuccess(
                 () -> Component.literal(
-                        "Swarm Mobs: enabled=" + SwarmConfig.ENABLED.get()
+                        "Swarm Mobs: preset=" + SwarmExperimentManager.activePreset()
+                                + ", experimentSeed=" + SwarmExperimentManager.experimentSeed()
+                                + ", enabled=" + SwarmConfig.ENABLED.get()
                                 + ", neighborRadius=" + SwarmConfig.NEIGHBOR_RADIUS.get()
                                 + ", targetRadius=" + SwarmConfig.TARGET_RADIUS.get()
                                 + ", formationRadius=" + SwarmConfig.FORMATION_RADIUS.get()
@@ -503,6 +549,7 @@ public final class SwarmCommands {
     }
 
     private static int setCommunicationEnabled(CommandSourceStack source, boolean enabled) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.COMMUNICATION_ENABLED.set(enabled);
         source.sendSuccess(
                 () -> Component.literal("Swarm communication runtime switch: " + (enabled ? "ON" : "OFF")),
@@ -512,6 +559,7 @@ public final class SwarmCommands {
     }
 
     private static int setCommunicationBaseline(CommandSourceStack source) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.COMMUNICATION_ENABLED.set(true);
         SwarmConfig.COMMUNICATION_LATENCY_TICKS.set(0);
         SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.set(0.0D);
@@ -525,6 +573,7 @@ public final class SwarmCommands {
     }
 
     private static int setCommunicationLatency(CommandSourceStack source, int ticks) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.COMMUNICATION_LATENCY_TICKS.set(ticks);
         source.sendSuccess(
                 () -> Component.literal("Swarm communication runtime latencyTicks=" + ticks),
@@ -534,6 +583,7 @@ public final class SwarmCommands {
     }
 
     private static int setCommunicationDropRate(CommandSourceStack source, double rate) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.set(rate);
         source.sendSuccess(
                 () -> Component.literal(
@@ -546,6 +596,7 @@ public final class SwarmCommands {
     }
 
     private static int setCommunicationRadius(CommandSourceStack source, double radius) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.COMMUNICATION_RADIUS.set(radius);
         source.sendSuccess(
                 () -> Component.literal(
@@ -558,6 +609,7 @@ public final class SwarmCommands {
     }
 
     private static int setCommunicationSeed(CommandSourceStack source, int seed) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.COMMUNICATION_EXPERIMENT_SEED.set(seed);
         source.sendSuccess(
                 () -> Component.literal("Swarm communication runtime experimentSeed=" + seed),
@@ -567,6 +619,7 @@ public final class SwarmCommands {
     }
 
     private static int setSensingEnabled(CommandSourceStack source, boolean enabled) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(enabled);
         source.sendSuccess(
                 () -> Component.literal("Swarm sensing imperfections: " + (enabled ? "ON" : "OFF")),
@@ -576,6 +629,7 @@ public final class SwarmCommands {
     }
 
     private static int setSensingBaseline(CommandSourceStack source) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(false);
         SwarmConfig.SENSING_DROPOUT_RATE.set(0.0D);
         SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.set(0.0D);
@@ -589,6 +643,7 @@ public final class SwarmCommands {
     }
 
     private static int setSensingDropoutRate(CommandSourceStack source, double rate) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.SENSING_DROPOUT_RATE.set(rate);
         SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(true);
         source.sendSuccess(
@@ -603,6 +658,7 @@ public final class SwarmCommands {
     }
 
     private static int setSensingNoise(CommandSourceStack source, double blocks) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.set(blocks);
         SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(true);
         source.sendSuccess(
@@ -617,6 +673,7 @@ public final class SwarmCommands {
     }
 
     private static int setSensingSeed(CommandSourceStack source, int seed) {
+        SwarmExperimentManager.markCustom();
         SwarmConfig.SENSING_EXPERIMENT_SEED.set(seed);
         source.sendSuccess(
                 () -> Component.literal("Swarm sensing runtime experimentSeed=" + seed),

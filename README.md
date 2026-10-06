@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.8.2; current integration work: `swarm-planner-telemetry-v0.8.3`
+Active stable line: `main` through v0.8.3; current integration work: `swarm-experiment-presets-v0.9.0`
 
 The current playable system includes:
 
@@ -61,7 +61,7 @@ The current playable system includes:
 - navigation-layer telemetry exposing the actual PLAN / OBSTACLE_DETOUR / RECOVERY waypoint and cumulative recovery counters;
 - walkability-aware local probes that reject unsupported detours near pits and ledges while allowing a configurable small drop;
 - optional deterministic direct-sensing dropout and bounded horizontal observation noise for reproducible fault-injection experiments;
-- a server-authoritative in-game control panel for live Sensing, Communication, Coordination, Search/Prediction, and Navigation tuning;
+- a server-authoritative in-game control panel for live Experiment, Sensing, Communication, Coordination, Search/Prediction, and Navigation tuning;
 - bounded tactical-role reassignment hysteresis with pending-role and reassignment telemetry;
 - multi-candidate local navigation scoring that combines terrain feasibility, forward progress, lateral cost, and nearby swarm congestion;
 - optional Minecraft PathNavigation reachability/path-cost evidence for local detour candidates;
@@ -75,6 +75,8 @@ Development commands:
 ```text
 /swarmmobs status
 /swarmmobs panel
+/swarmmobs experiment baseline|noisy_sensing|lossy_comms|combined_faults|navigation_stress
+/swarmmobs experiment seed <value>
 /swarmmobs inspect
 /swarmmobs group
 /swarmmobs debug spawn <count>
