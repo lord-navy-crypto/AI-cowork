@@ -123,6 +123,75 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
             }
 
+            case "toggle_division" ->
+                    SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(!SwarmConfig.DIVISION_OF_LABOR_ENABLED.get());
+            case "specialization_hold_delta" -> SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.set((int) clamp(
+                    SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.get() + value,
+                    0.0,
+                    400.0
+            ));
+            case "specialization_gain_delta" -> SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.set(clamp(
+                    SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.get() + value,
+                    0.0,
+                    0.25
+            ));
+            case "specialization_decay_delta" -> SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.set(clamp(
+                    SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.get() + value,
+                    0.90,
+                    1.0
+            ));
+            case "labor_baseline" -> {
+                SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(true);
+                SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.set(30);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.set(0.025);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.set(0.995);
+            }
+
+            case "toggle_engineering" ->
+                    SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(!SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.get());
+            case "engineering_hardness_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.set(clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.get() + value,
+                    0.0,
+                    10.0
+            ));
+            case "engineering_carry_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set((int) clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get() + value,
+                    0.0,
+                    16.0
+            ));
+            case "engineering_radius_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get() + value,
+                    2.0,
+                    24.0
+            ));
+            case "engineering_ttl_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set((int) clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.get() + value,
+                    10.0,
+                    400.0
+            ));
+            case "engineering_handoff_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.get() + value,
+                    0.5,
+                    6.0
+            ));
+            case "engineering_bridge_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set((int) clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.get() + value,
+                    1.0,
+                    8.0
+            ));
+            case "engineering_baseline" -> {
+                SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.set(2.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set(4);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(8.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set(40);
+                SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(2.5);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
+            }
+
+            case "ai_active_toggle" ->
+                    SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(!SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get());
+
             case "toggle_sensing" ->
                     SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(!SwarmConfig.SENSING_IMPERFECTION_ENABLED.get());
             case "sensing_drop_delta" -> {
@@ -302,6 +371,18 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ENABLED.set(true);
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
+                SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(true);
+                SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.set(30);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.set(0.025);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.set(0.995);
+
+                SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.set(2.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set(4);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(8.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set(40);
+                SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(2.5);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
 
                 SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(false);
                 SwarmConfig.SENSING_DROPOUT_RATE.set(0.0);
