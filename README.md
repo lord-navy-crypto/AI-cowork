@@ -44,11 +44,11 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.9.2; current integration work: `swarm-ai-shadow-v0.10.0`
+Active stable line: `main` through v0.10.1; current integration work: v0.10.2 combat-handoff hardening
 
 The current playable system includes:
 
-- heterogeneous Zombie / Skeleton / Spider swarm agents with capability-aware tactical roles;
+- heterogeneous Zombie / Skeleton / Spider / Creeper swarm agents with capability-aware tactical roles;
 - local separation, cohesion, alignment, steering caps, and formation-slot hysteresis;
 - explicit neighbor-to-neighbor target communication with configurable radius, latency, deterministic packet loss, and experiment seeds;
 - truthful last-known target snapshots with confidence decay instead of hidden live tracking;
@@ -98,7 +98,7 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.9.2 is merged on `main`; v0.10.0 local Ollama AI Shadow Mode is under integration.**
+**Swarm Mobs v0.10.1 is merged on `main`; v0.10.2 combat-handoff hardening is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.
 
@@ -130,3 +130,10 @@ Skeletons remain heterogeneous `RANGED_SUPPORT` swarm members, but a bounded hig
 Creepers are now supported heterogeneous swarm members through a close-range breacher profile. They use swarm approach outside fuse range, then yield movement to a high-priority vanilla `SwellGoal` bridge inside the 3-block fuse envelope or once ignition/swell has begun.
 
 Dedicated Runtime GameTests gate both Skeleton bow combat and Creeper fuse handoff under swarm control.
+
+
+### v0.10.2 Combat-handoff hardening
+
+Creeper swarm approach now remains active all the way to the dedicated 3.0-block fuse handoff envelope instead of inheriting the generic 3.25-block melee release distance. This closes the pre-fuse boundary band where movement could otherwise yield before `SwellGoal` became eligible.
+
+Runtime GameTests now verify actual vanilla melee damage from both Zombies and Spiders after swarm movement yields, in addition to the existing Skeleton bow and Creeper fuse behavior checks.
