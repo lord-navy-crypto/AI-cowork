@@ -9,6 +9,7 @@ import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmPlannerContext;
+import dev.swarmmobs.ai.SwarmAiActiveState;
 import dev.swarmmobs.ai.SwarmAiShadowService;
 import dev.swarmmobs.ai.SwarmAiShadowState;
 import dev.swarmmobs.ai.ollama.OllamaStrategyProvider;
@@ -186,7 +187,16 @@ public final class SwarmCommands {
                 .then(Commands.literal("off")
                         .executes(context -> setAiEnabled(context.getSource(), false)))
                 .then(Commands.literal("shadow")
-                        .executes(context -> runAiShadow(context.getSource())));
+                        .executes(context -> runAiShadow(context.getSource())))
+                .then(Commands.literal("active")
+                        .then(Commands.literal("on")
+                                .executes(context -> setAiActiveEnabled(context.getSource(), true)))
+                        .then(Commands.literal("off")
+                                .executes(context -> setAiActiveEnabled(context.getSource(), false)))
+                        .then(Commands.literal("status")
+                                .executes(context -> aiActiveStatus(context.getSource())))
+                        .then(Commands.literal("apply")
+                                .executes(context -> runAiActive(context.getSource()))));
 
         root.then(experiment);
         root.then(ai);
@@ -196,12 +206,109 @@ public final class SwarmCommands {
 
     private static int setAiEnabled(CommandSourceStack source, boolean enabled) {
         SwarmConfig.EXTERNAL_AI_ENABLED.set(enabled);
+        if (!enabled) {
+            SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(false);
+            SwarmAiActiveState.clear();
+        }
         source.sendSuccess(
                 () -> Component.literal(
-                        "Swarm AI shadow mode: " + (enabled ? "ON" : "OFF")
-                                + ". Gameplay controller remains deterministic."
+                        "Swarm AI provider: " + (enabled ? "ON" : "OFF")
+                                + (enabled
+                                ? ". Shadow requests are available; active strategy remains separately opt-in."
+                                : ". Active strategy cleared; deterministic gameplay is fully restored.")
                 ),
                 true
+        );
+        return 1;
+    }
+
+    private static int setAiActiveEnabled(CommandSourceStack source, boolean enabled) {
+        SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(enabled);
+        if (enabled) {
+            SwarmConfig.EXTERNAL_AI_ENABLED.set(true);
+        } else {
+            SwarmAiActiveState.clear();
+        }
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm AI active strategy: " + (enabled ? "ON" : "OFF")
+                                + (enabled
+                                ? ". Use /swarmmobs ai active apply to request one bounded strategy."
+                                : ". Overlay cleared; deterministic multipliers restored.")
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int aiActiveStatus(CommandSourceStack source) {
+        var active = SwarmAiActiveState.snapshot(source.getLevel().getGameTime());
+        source.sendSuccess(
+                () -> Component.literal(String.format(
+                        java.util.Locale.ROOT,
+                        "AI active: enabled=%s, active=%s, mode=%s, provider=%s, formation=%.2f, separation=%.2f, cohesion=%.2f, searchRadius=%.2f, expiresTick=%d, pendingMode=%s, pendingEligibleTick=%d",
+                        SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get(),
+                        active.active(),
+                        active.decision().mode(),
+                        active.decision().providerId(),
+                        active.formationRadiusMultiplier(),
+                        active.separationMultiplier(),
+                        active.cohesionMultiplier(),
+                        active.searchRadiusMultiplier(),
+                        active.expiresTick(),
+                        active.pendingDecision() == null ? "none" : active.pendingDecision().mode(),
+                        active.pendingEligibleTick()
+                )),
+                false
+        );
+        return 1;
+    }
+
+    private static int runAiActive(CommandSourceStack source) {
+        if (!SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()) {
+            source.sendFailure(Component.literal(
+                    "Active AI strategy is OFF. Run /swarmmobs ai active on first."
+            ));
+            return 0;
+        }
+        if (SwarmAiShadowService.requestInFlight()) {
+            source.sendFailure(Component.literal("An AI strategy request is already in flight."));
+            return 0;
+        }
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Active AI request started. Only sanitized high-level multipliers/ASSAULT role bias may be applied."
+                ),
+                false
+        );
+
+        SwarmAiShadowService.requestActive(source.getLevel()).whenComplete((decision, error) ->
+                source.getServer().execute(() -> {
+                    if (error != null) {
+                        source.sendFailure(Component.literal(
+                                "Active AI request failed; current/baseline deterministic strategy remains valid: "
+                                        + error.getMessage()
+                        ));
+                    } else {
+                        source.sendSuccess(
+                                () -> Component.literal(String.format(
+                                        java.util.Locale.ROOT,
+                                        "Active AI candidate: mode=%s, formation=%.2f, separation=%.2f, cohesion=%.2f, searchRadius=%.2f, provider=%s. TTL=%d ticks, minHold=%d ticks.",
+                                        decision.mode(),
+                                        decision.formationRadiusMultiplier(),
+                                        decision.separationMultiplier(),
+                                        decision.cohesionMultiplier(),
+                                        decision.searchRadiusMultiplier(),
+                                        decision.providerId(),
+                                        SwarmConfig.EXTERNAL_AI_ACTIVE_TTL_TICKS.get(),
+                                        SwarmConfig.EXTERNAL_AI_ACTIVE_MIN_HOLD_TICKS.get()
+                                )),
+                                false
+                        );
+                    }
+                })
         );
         return 1;
     }
@@ -222,6 +329,7 @@ public final class SwarmCommands {
 
     private static int aiStatus(CommandSourceStack source) {
         var shadow = SwarmAiShadowState.snapshot();
+        var active = SwarmAiActiveState.snapshot(source.getLevel().getGameTime());
         source.sendSuccess(
                 () -> Component.literal(
                         "AI shadow: enabled=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
@@ -236,6 +344,10 @@ public final class SwarmCommands {
                                 + ", fallback=" + shadow.fallbackCount()
                                 + ", errors=" + shadow.errorCount()
                                 + ", rationale=" + shadow.lastDecision().rationale()
+                                + ", activeEnabled=" + SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()
+                                + ", active=" + active.active()
+                                + ", activeMode=" + active.decision().mode()
+                                + ", activeExpiresTick=" + active.expiresTick()
                 ),
                 false
         );
