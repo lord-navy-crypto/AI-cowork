@@ -10,8 +10,11 @@ import java.util.Map;
 
 public final class SwarmControlScreen extends Screen {
     private enum Page {
-        AI("AI Shadow"),
+        OVERVIEW("Overview"),
+        AI("AI"),
         EXPERIMENT("Experiment"),
+        LABOR("Labor"),
+        ENGINEERING("Engineering"),
         COORDINATION("Coordination"),
         SENSING("Sensing"),
         COMMUNICATION("Communication"),
@@ -26,7 +29,7 @@ public final class SwarmControlScreen extends Screen {
     }
 
     private final Map<String, String> values = new HashMap<>();
-    private Page page = Page.SENSING;
+    private Page page = Page.OVERVIEW;
 
     public SwarmControlScreen(String snapshot) {
         super(Component.literal("Swarm Mobs Control Panel"));
@@ -49,14 +52,17 @@ public final class SwarmControlScreen extends Screen {
 
     private void buildWidgets() {
         int center = width / 2;
-        int top = 42;
-        int tabWidth = 78;
-        int totalWidth = tabWidth * Page.values().length;
-        int startX = center - totalWidth / 2;
+        int top = 40;
+        int tabWidth = 112;
+        int tabsPerRow = 5;
+        int rowWidth = tabWidth * tabsPerRow;
+        int startX = center - rowWidth / 2;
 
         Page[] pages = Page.values();
         for (int i = 0; i < pages.length; i++) {
             Page target = pages[i];
+            int row = i / tabsPerRow;
+            int column = i % tabsPerRow;
             addRenderableWidget(
                     Button.builder(
                             Component.literal((page == target ? "§a" : "") + target.label),
@@ -65,7 +71,12 @@ public final class SwarmControlScreen extends Screen {
                                 clearWidgets();
                                 buildWidgets();
                             }
-                    ).bounds(startX + i * tabWidth, top, tabWidth - 4, 20).build()
+                    ).bounds(
+                            startX + column * tabWidth,
+                            top + row * 24,
+                            tabWidth - 4,
+                            20
+                    ).build()
             );
         }
 
@@ -84,8 +95,11 @@ public final class SwarmControlScreen extends Screen {
         );
 
         switch (page) {
+            case OVERVIEW -> buildOverview();
             case AI -> buildAi();
             case EXPERIMENT -> buildExperiment();
+            case LABOR -> buildLabor();
+            case ENGINEERING -> buildEngineering();
             case COORDINATION -> buildCoordination();
             case SENSING -> buildSensing();
             case COMMUNICATION -> buildCommunication();
@@ -94,14 +108,182 @@ public final class SwarmControlScreen extends Screen {
         }
     }
 
+    private void buildOverview() {
+        int leftX = width / 2 - 310;
+        int rightX = width / 2 + 10;
+        int y = 108;
+
+        addStatusRow(leftX, y, "Swarm agents",
+                Integer.toString((int) number("liveAgents")));
+        addStatusRow(rightX, y, "Master",
+                bool("master") ? "§aENABLED" : "§cDISABLED");
+        y += 28;
+
+        addStatusRow(leftX, y, "Species",
+                "Z " + (int) number("liveZombies")
+                        + "  S " + (int) number("liveSkeletons")
+                        + "  Sp " + (int) number("liveSpiders")
+                        + "  C " + (int) number("liveCreepers"));
+        addStatusRow(rightX, y, "AI",
+                bool("aiActive")
+                        ? "§aACTIVE " + values.getOrDefault("aiActiveMode", "BASELINE")
+                        : (bool("aiEnabled") ? "§eSHADOW READY" : "§7OFF"));
+        y += 28;
+
+        addStatusRow(leftX, y, "Tasks",
+                "ENG " + (int) number("taskEngineering")
+                        + "  MAT " + (int) number("taskMaterial")
+                        + "  FLK " + (int) number("taskFlank")
+                        + "  RNG " + (int) number("taskRanged"));
+        addStatusRow(rightX, y, "Frontline",
+                "BR " + (int) number("taskBreach")
+                        + "  SRCH " + (int) number("taskSearch")
+                        + "  RSV " + (int) number("taskReserve"));
+        y += 28;
+
+        addStatusRow(leftX, y, "Specialists",
+                "Engineer " + (int) number("specEngineer")
+                        + "  Carrier " + (int) number("specCarrier")
+                        + "  Scout " + (int) number("specScout"));
+        addStatusRow(rightX, y, "Combat specialists",
+                "Interceptor " + (int) number("specInterceptor")
+                        + "  Overwatch " + (int) number("specOverwatch")
+                        + "  Lead Breacher " + (int) number("specLeadBreacher"));
+        y += 34;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Refresh live swarm snapshot"),
+                        button -> SwarmControlClient.requestPanel()
+                ).bounds(leftX, y, 300, 20).build()
+        );
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Experiment snapshot"),
+                        button -> SwarmControlClient.sendAction("experiment_snapshot", 0.0)
+                ).bounds(rightX, y, 300, 20).build()
+        );
+    }
+
+    private void buildLabor() {
+        int leftX = width / 2 - 310;
+        int rightX = width / 2 + 10;
+        int y = 108;
+
+        addToggleRow(leftX, y, "Dynamic division of labor", bool("divisionEnabled"), "toggle_division");
+        addStatusRow(rightX, y, "Live task allocation",
+                "ENG " + (int) number("taskEngineering")
+                        + " / MAT " + (int) number("taskMaterial")
+                        + " / FLANK " + (int) number("taskFlank"));
+        y += 28;
+
+        addNumericRow(leftX, y, "Minimum specialization hold",
+                (int) number("specializationHoldTicks") + " ticks",
+                "specialization_hold_delta", 5.0);
+        addStatusRow(rightX, y, "Ranged / breach / reserve",
+                (int) number("taskRanged")
+                        + " / " + (int) number("taskBreach")
+                        + " / " + (int) number("taskReserve"));
+        y += 28;
+
+        addNumericRow(leftX, y, "Experience gain",
+                format(number("specializationExperienceGain")),
+                "specialization_gain_delta", 0.005);
+        addStatusRow(rightX, y, "Engineer / carrier / scout",
+                (int) number("specEngineer")
+                        + " / " + (int) number("specCarrier")
+                        + " / " + (int) number("specScout"));
+        y += 28;
+
+        addNumericRow(leftX, y, "Experience retention",
+                format(number("specializationExperienceDecay")),
+                "specialization_decay_delta", 0.001);
+        addStatusRow(rightX, y, "Interceptor / overwatch",
+                (int) number("specInterceptor")
+                        + " / " + (int) number("specOverwatch"));
+        y += 34;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Labor baseline"),
+                        button -> SwarmControlClient.sendAction("labor_baseline", 0.0)
+                ).bounds(leftX, y, 300, 20).build()
+        );
+        addStatusRow(rightX, y, "Design",
+                "Species capability -> demand -> bid -> temporary specialization");
+    }
+
+    private void buildEngineering() {
+        int leftX = width / 2 - 310;
+        int rightX = width / 2 + 10;
+        int y = 108;
+
+        addToggleRow(leftX, y, "Zombie engineering", bool("engineeringEnabled"), "toggle_engineering");
+        addStatusRow(rightX, y, "Escalation",
+                "PLAN -> DETOUR -> RECOVERY -> ENGINEERING");
+        y += 28;
+
+        addNumericRow(leftX, y, "Max break hardness",
+                format(number("engineeringMaxHardness")),
+                "engineering_hardness_delta", 0.25);
+        addStatusRow(rightX, y, "Live engineers / carriers",
+                (int) number("specEngineer") + " / " + (int) number("specCarrier"));
+        y += 28;
+
+        addNumericRow(leftX, y, "Max carried blocks",
+                Integer.toString((int) number("engineeringMaxCarry")),
+                "engineering_carry_delta", 1.0);
+        addStatusRow(rightX, y, "Blocks broken / placed",
+                (int) number("metricEngineeringBroken")
+                        + " / " + (int) number("metricEngineeringPlaced"));
+        y += 28;
+
+        addNumericRow(leftX, y, "Task radius",
+                format(number("engineeringTaskRadius")) + " blocks",
+                "engineering_radius_delta", 1.0);
+        addStatusRow(rightX, y, "Carried materials",
+                Integer.toString((int) number("metricEngineeringCarried")));
+        y += 28;
+
+        addNumericRow(leftX, y, "Task TTL",
+                (int) number("engineeringTaskTtl") + " ticks",
+                "engineering_ttl_delta", 10.0);
+        addStatusRow(rightX, y, "Requests / claimed / completed",
+                (int) number("metricEngineeringRequests")
+                        + " / " + (int) number("metricEngineeringClaimed")
+                        + " / " + (int) number("metricEngineeringCompleted"));
+        y += 28;
+
+        addNumericRow(leftX, y, "Material handoff radius",
+                format(number("engineeringHandoffRadius")) + " blocks",
+                "engineering_handoff_delta", 0.25);
+        addStatusRow(rightX, y, "Safety",
+                "HARD + mobGriefing + bounded hardness + no block entities");
+        y += 28;
+
+        addNumericRow(leftX, y, "Max bridge span",
+                Integer.toString((int) number("engineeringMaxBridgeSpan")),
+                "engineering_bridge_delta", 1.0);
+        y += 34;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Engineering baseline"),
+                        button -> SwarmControlClient.sendAction("engineering_baseline", 0.0)
+                ).bounds(leftX, y, 300, 20).build()
+        );
+        addStatusRow(rightX, y, "Recovery-aware",
+                "Engineering can escalate after failed navigation recovery");
+    }
+
     private void buildAi() {
         int leftX = width / 2 - 310;
         int rightX = width / 2 + 10;
-        int y = 82;
+        int y = 108;
 
         addToggleRow(
                 leftX, y,
-                "Local Ollama shadow",
+                "Local Ollama strategy service",
                 bool("aiEnabled"),
                 "ai_toggle"
         );
@@ -117,9 +299,25 @@ public final class SwarmControlScreen extends Screen {
         );
         y += 30;
 
+        addToggleRow(
+                leftX, y,
+                "Apply bounded AI strategy",
+                bool("aiActiveEnabled"),
+                "ai_active_toggle"
+        );
+        addStatusRow(
+                rightX, y,
+                "Active overlay",
+                bool("aiActive")
+                        ? "§a" + values.getOrDefault("aiActiveMode", "BASELINE")
+                                + " (" + (int) number("aiActiveExpiresIn") + " ticks)"
+                        : "§7DETERMINISTIC BASELINE"
+        );
+        y += 30;
+
         addRenderableWidget(
                 Button.builder(
-                        Component.literal("Run Shadow Recommendation"),
+                        Component.literal("Run Strategy Recommendation"),
                         button -> SwarmControlClient.sendAction("ai_shadow", 0.0)
                 ).bounds(leftX, y, 300, 20).build()
         );
@@ -194,7 +392,9 @@ public final class SwarmControlScreen extends Screen {
         addRenderableWidget(
                 Button.builder(
                         Component.literal(
-                                "Shadow only: recommendation is never applied to gameplay"
+                                bool("aiActiveEnabled")
+                                        ? "Active AI biases bounded high-level demand only"
+                                        : "Shadow mode: recommendations do not affect gameplay"
                         ),
                         button -> {
                         }
@@ -227,7 +427,7 @@ public final class SwarmControlScreen extends Screen {
     private void buildExperiment() {
         int leftX = width / 2 - 310;
         int rightX = width / 2 + 10;
-        int y = 82;
+        int y = 108;
 
         addRenderableWidget(
                 Button.builder(
@@ -398,7 +598,7 @@ public final class SwarmControlScreen extends Screen {
 
     private void buildCoordination() {
         int x = width / 2 - 150;
-        int y = 82;
+        int y = 108;
 
         addNumericRow(
                 x, y,
@@ -428,7 +628,7 @@ public final class SwarmControlScreen extends Screen {
 
     private void buildSensing() {
         int x = width / 2 - 150;
-        int y = 82;
+        int y = 108;
 
         addToggleRow(
                 x, y,
@@ -466,7 +666,7 @@ public final class SwarmControlScreen extends Screen {
 
     private void buildCommunication() {
         int x = width / 2 - 150;
-        int y = 82;
+        int y = 108;
 
         addToggleRow(
                 x, y,
@@ -513,7 +713,7 @@ public final class SwarmControlScreen extends Screen {
 
     private void buildSearch() {
         int x = width / 2 - 150;
-        int y = 82;
+        int y = 108;
 
         addNumericRow(
                 x, y,
@@ -570,8 +770,8 @@ public final class SwarmControlScreen extends Screen {
     private void buildNavigation() {
         int leftX = width / 2 - 310;
         int rightX = width / 2 + 10;
-        int leftY = 82;
-        int rightY = 82;
+        int leftY = 108;
+        int rightY = 108;
 
         addToggleRow(
                 leftX, leftY,
@@ -730,6 +930,21 @@ public final class SwarmControlScreen extends Screen {
         );
     }
 
+    private void addStatusRow(
+            int x,
+            int y,
+            String label,
+            String value
+    ) {
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(label + ": " + value),
+                        button -> {
+                        }
+                ).bounds(x, y, 300, 20).build()
+        );
+    }
+
     private void addToggleRow(
             int x,
             int y,
@@ -809,7 +1024,7 @@ public final class SwarmControlScreen extends Screen {
                 font,
                 Component.literal("Changes apply immediately; use baselines to restore known-good defaults."),
                 width / 2,
-                66,
+                91,
                 0x909090
         );
     }
