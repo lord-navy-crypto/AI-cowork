@@ -257,3 +257,40 @@ Next within v0.10:
 - verify Zombie handoff with actual player damage rather than only checking `SwarmApproachGoal.canUse()`;
 - verify Spider handoff with actual player damage;
 - keep species-specific vanilla combat as the final action layer while swarm logic owns long-range positioning.
+
+
+## v0.10.6 — bounded active local AI strategy
+
+The optional Ollama layer may now be promoted from shadow-only observation into an explicit, user-opt-in high-level strategy overlay.
+
+Design contract:
+- active AI remains OFF by default;
+- only sanitized `SwarmStrategyDecision` outputs are eligible;
+- AI may influence bounded formation, separation, cohesion, and search-radius multipliers;
+- only ASSAULT-role bias is permitted, and specialist roles (RANGED_SUPPORT / FLANKER / BREACHER) cannot be rewritten;
+- each active decision has a TTL;
+- different strategy modes respect a minimum hold interval before replacement;
+- provider errors or deterministic fallback decisions never overwrite gameplay state;
+- expiry or disable immediately restores deterministic multipliers;
+- per-agent coordinates, path nodes, attacks, collision, and vanilla combat handoff remain deterministic.
+
+This is intentionally an overlay above the deterministic planner rather than a replacement for it.
+
+## v0.11 — environment-task capability: Zombie engineering
+
+First bounded environment-manipulation capability:
+- HARD-difficulty swarm Zombies may invoke engineering only after the normal local planner reports no feasible route candidate;
+- one bounded obstacle directly on the current plan axis may be hand-broken;
+- break time scales with block hardness and is slower when a correct harvest tool would normally be required;
+- unbreakable blocks and BlockEntity blocks are rejected;
+- only suitable hand-harvestable solid BlockItems may be salvaged as temporary building material;
+- carried material is capped and transient;
+- a carried block may be placed as simple support under the next step to bridge a small gap;
+- engineering never overrides close-range vanilla melee handoff.
+
+Future v0.11 work:
+- runtime break/bridge scenario GameTests;
+- shared material-task requests between nearby Zombies;
+- explicit wall/cover construction policy rather than opportunistic placement;
+- engineering telemetry and experiment metrics;
+- coordination with AI strategy only at mission/task-selection level, never raw block coordinates.
