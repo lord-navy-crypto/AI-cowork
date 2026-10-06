@@ -49,6 +49,14 @@ public final class SwarmAgentState {
     private long recoveryCount;
     private long recoveryPlanningAttempts;
     private long recoveryPlanningFailures;
+    private SwarmPlannerContext plannerContext = SwarmPlannerContext.NONE;
+    private int plannerCandidateCount;
+    private int plannerBlockedCount;
+    private int plannerUnreachableCount;
+    private int plannerFeasibleCount;
+    private int plannerSelectedIndex = -1;
+    private double plannerSelectedScore;
+    private long plannerPathQueryCount;
     private long sensingAcceptedObservations;
     private long sensingDroppedObservations;
     private double lastSensingNoiseMagnitude;
@@ -202,6 +210,38 @@ public final class SwarmAgentState {
 
     public long recoveryPlanningFailures() {
         return recoveryPlanningFailures;
+    }
+
+    public SwarmPlannerContext plannerContext() {
+        return plannerContext;
+    }
+
+    public int plannerCandidateCount() {
+        return plannerCandidateCount;
+    }
+
+    public int plannerBlockedCount() {
+        return plannerBlockedCount;
+    }
+
+    public int plannerUnreachableCount() {
+        return plannerUnreachableCount;
+    }
+
+    public int plannerFeasibleCount() {
+        return plannerFeasibleCount;
+    }
+
+    public int plannerSelectedIndex() {
+        return plannerSelectedIndex;
+    }
+
+    public double plannerSelectedScore() {
+        return plannerSelectedScore;
+    }
+
+    public long plannerPathQueryCount() {
+        return plannerPathQueryCount;
     }
 
     public long sensingAcceptedObservations() {
@@ -492,7 +532,38 @@ public final class SwarmAgentState {
         }
     }
 
+    public void updatePlannerTelemetry(
+            SwarmPlannerContext context,
+            int candidateCount,
+            int blockedCount,
+            int unreachableCount,
+            int feasibleCount,
+            int selectedIndex,
+            double selectedScore,
+            long pathQueries
+    ) {
+        this.plannerContext = context == null ? SwarmPlannerContext.NONE : context;
+        this.plannerCandidateCount = Math.max(0, candidateCount);
+        this.plannerBlockedCount = Math.max(0, blockedCount);
+        this.plannerUnreachableCount = Math.max(0, unreachableCount);
+        this.plannerFeasibleCount = Math.max(0, feasibleCount);
+        this.plannerSelectedIndex = selectedIndex;
+        this.plannerSelectedScore = Double.isFinite(selectedScore) ? selectedScore : 0.0;
+        this.plannerPathQueryCount += Math.max(0L, pathQueries);
+    }
+
+    public void clearPlannerTelemetry() {
+        this.plannerContext = SwarmPlannerContext.NONE;
+        this.plannerCandidateCount = 0;
+        this.plannerBlockedCount = 0;
+        this.plannerUnreachableCount = 0;
+        this.plannerFeasibleCount = 0;
+        this.plannerSelectedIndex = -1;
+        this.plannerSelectedScore = 0.0;
+    }
+
     public void clearNavigationTelemetry() {
+        clearPlannerTelemetry();
         this.navigationMode = SwarmNavigationMode.PLAN;
         this.hasNavigationWaypoint = false;
         this.navigationWaypointX = 0.0;
