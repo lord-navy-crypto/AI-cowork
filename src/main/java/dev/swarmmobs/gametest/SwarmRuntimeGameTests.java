@@ -1418,6 +1418,7 @@ public final class SwarmRuntimeGameTests {
         Vec3 playerPosition = helper.absoluteVec(new Vec3(7.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
+        player.setInvulnerable(true);
 
         helper.runAfterDelay(48, () -> {
             java.util.List<Skeleton> skeletons = java.util.List.of(
