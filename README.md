@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.5.5; current integration work: `swarm-walkability-v0.5.6`
+Active stable line: `main` through v0.5.6; current integration work: `swarm-sensing-faults-v0.6.0`
 
 The current playable system includes:
 
@@ -60,6 +60,7 @@ The current playable system includes:
 - obstacle-detour hysteresis that holds a chosen bypass briefly, reducing left/right steering jitter near wall edges;
 - navigation-layer telemetry exposing the actual PLAN / OBSTACLE_DETOUR / RECOVERY waypoint and cumulative recovery counters;
 - walkability-aware local probes that reject unsupported detours near pits and ledges while allowing a configurable small drop;
+- optional deterministic direct-sensing dropout and bounded horizontal observation noise for reproducible fault-injection experiments;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -71,14 +72,18 @@ Development commands:
 /swarmmobs group
 /swarmmobs debug spawn <count>
 /swarmmobs debug particles on|off|toggle
+/swarmmobs debug sensing baseline
+/swarmmobs debug sensing drop <0..1>
+/swarmmobs debug sensing noise <blocks>
+/swarmmobs debug sensing seed <value>
 ```
 
-The development branch also includes a zero-dependency particle debugger. When enabled, vanilla particles show planned destinations, a small subset of local neighbor links, and the current target marker directly in the world.
+The repository roadmap is versioned in `ROADMAP.md`. The development branch also includes a zero-dependency particle debugger. When enabled, vanilla particles show planned destinations, a small subset of local neighbor links, and the current target marker directly in the world.
 
 The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.249 / Java 21, runs deterministic JUnit tests, and gates the swarm branch with real Minecraft GameTest-server runtime tests.
 
 ## Status
 
-**Swarm Mobs v0.5.5 is merged on `main`; v0.5.6 walkability-aware terrain probing is under integration.**
+**Swarm Mobs v0.5.6 is merged on `main`; v0.6.0 deterministic sensing-fault injection is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.
