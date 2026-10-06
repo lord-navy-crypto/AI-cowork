@@ -52,6 +52,26 @@ class SwarmTaskSaturationPolicyTest {
     }
 
     @Test
+    void additionalOversupplyFurtherSuppressesRecruitment() {
+        double justFull = SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmTaskType.FLANK,
+                0.9,
+                10,
+                3,
+                SwarmTaskType.RESERVE
+        );
+        double oversupplied = SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmTaskType.FLANK,
+                0.9,
+                10,
+                5,
+                SwarmTaskType.RESERVE
+        );
+
+        assertTrue(oversupplied < justFull);
+    }
+
+    @Test
     void incumbentGetsSofterPenaltyThanNewRecruit() {
         double incumbent = SwarmTaskSaturationPolicy.adjustedDemand(
                 SwarmTaskType.ENGINEERING,
