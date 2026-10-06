@@ -65,6 +65,10 @@ public final class SwarmConfig {
     public static final ModConfigSpec.IntValue COMMUNICATION_EXPERIMENT_SEED;
 
     public static final ModConfigSpec.BooleanValue EXTERNAL_AI_ENABLED;
+    public static final ModConfigSpec.ConfigValue<String> OLLAMA_BASE_URL;
+    public static final ModConfigSpec.ConfigValue<String> OLLAMA_MODEL;
+    public static final ModConfigSpec.IntValue OLLAMA_TIMEOUT_MS;
+    public static final ModConfigSpec.ConfigValue<String> OLLAMA_KEEP_ALIVE;
 
     public static final ModConfigSpec SPEC;
 
@@ -306,9 +310,27 @@ public final class SwarmConfig {
         BUILDER.pop();
 
         BUILDER.push("externalAi");
+
         EXTERNAL_AI_ENABLED = BUILDER
-                .comment("Reserved switch for a future external AI/LLM decision provider. v0.1 ignores it.")
+                .comment("Enable local Ollama shadow recommendations. Shadow mode never changes gameplay.")
                 .define("enabled", false);
+
+        OLLAMA_BASE_URL = BUILDER
+                .comment("Local Ollama base URL. v0.10 accepts loopback hosts only.")
+                .define("ollamaBaseUrl", "http://127.0.0.1:11434");
+
+        OLLAMA_MODEL = BUILDER
+                .comment("User-selected local Ollama model name. Empty means no model is selected.")
+                .define("ollamaModel", "");
+
+        OLLAMA_TIMEOUT_MS = BUILDER
+                .comment("Maximum time for one asynchronous Ollama request.")
+                .defineInRange("ollamaTimeoutMs", 5000, 250, 30000);
+
+        OLLAMA_KEEP_ALIVE = BUILDER
+                .comment("Ollama keep_alive value used for shadow strategy requests.")
+                .define("ollamaKeepAlive", "5m");
+
         BUILDER.pop();
 
         SPEC = BUILDER.build();
