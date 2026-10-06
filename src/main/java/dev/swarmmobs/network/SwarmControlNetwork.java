@@ -185,6 +185,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set(4);
                 SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(8.0);
                 SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set(40);
+                SwarmConfig.ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(2.5);
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
             }
@@ -381,6 +382,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set(4);
                 SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(8.0);
                 SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set(40);
+                SwarmConfig.ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(2.5);
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
 
@@ -404,6 +406,9 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.set(1.5);
                 SwarmConfig.NAV_WALKABILITY_ENABLED.set(true);
                 SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.set(1);
+                SwarmConfig.NAV_STUCK_WINDOW_TICKS.set(24);
+                SwarmConfig.NAV_STUCK_MIN_PROGRESS.set(0.75);
+                SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.set(2.0);
                 SwarmConfig.NAV_RECOVERY_DURATION_TICKS.set(18);
                 SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.set(1.0);
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
@@ -413,6 +418,10 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
                 SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.set(1.5);
+
+                SwarmConfig.EXTERNAL_AI_ENABLED.set(false);
+                SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(false);
+                SwarmAiActiveState.clear();
             }
 
             default -> {
