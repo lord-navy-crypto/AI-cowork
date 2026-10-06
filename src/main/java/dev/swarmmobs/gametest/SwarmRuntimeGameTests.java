@@ -618,10 +618,40 @@ public final class SwarmRuntimeGameTests {
                     0.0
             );
             zombie.setTarget(player);
+
+            SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null || !approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal was not eligible before forced recovery test");
+                return;
+            }
+
+            approachGoal.start();
         });
 
-        int recoveryCheckTick = 4 + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + 24;
+        int recoveryCheckTick = 4 + SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + 4;
         helper.runAfterDelay(recoveryCheckTick, () -> {
+            SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal disappeared during forced recovery test");
+                return;
+            }
+
+            approachGoal.tick();
+
             SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
 
             if (state.recoveryPlanningAttempts() <= 0L) {
