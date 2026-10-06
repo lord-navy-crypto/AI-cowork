@@ -421,6 +421,7 @@ public final class SwarmControlNetwork {
 
                 SwarmConfig.EXTERNAL_AI_ENABLED.set(false);
                 SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(false);
+                SwarmAiActiveState.clear();
             }
 
             default -> {
