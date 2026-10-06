@@ -29,7 +29,7 @@ public final class SwarmTaskDemandPolicy {
                     : 0.05;
             case FLANK -> signals.searchMode()
                     ? 0.20
-                    : (signals.dedicatedFlankCoverage() ? 0.35 : 0.85);
+                    : (signals.dedicatedFlankCoverage() ? 0.70 : 0.90);
             case BREACH -> signals.searchMode()
                     ? 0.15
                     : (signals.hasBreacher() ? 0.65 : 0.90);
