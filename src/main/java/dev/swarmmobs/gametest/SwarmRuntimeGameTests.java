@@ -1415,7 +1415,7 @@ public final class SwarmRuntimeGameTests {
 
         TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
         ServerPlayer player = playerHandle.player();
-        Vec3 playerPosition = helper.absoluteVec(new Vec3(7.0, 1.0, 2.0));
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
         player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
         player.setNoGravity(true);
         player.setInvulnerable(true);
@@ -1427,7 +1427,7 @@ public final class SwarmRuntimeGameTests {
         skeletonB.setTarget(player);
         skeletonC.setTarget(player);
 
-        helper.runAfterDelay(48, () -> {
+        helper.runAfterDelay(24, () -> {
             java.util.List<Skeleton> skeletons = java.util.List.of(
                     skeletonA,
                     skeletonB,
