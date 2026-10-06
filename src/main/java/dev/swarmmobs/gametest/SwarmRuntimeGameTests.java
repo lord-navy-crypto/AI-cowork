@@ -591,6 +591,12 @@ public final class SwarmRuntimeGameTests {
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_recovery_planner", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
     public static void immobileZombieTriggersValidatedRecoveryPlanner(GameTestHelper helper) {
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
         zombie.setNoGravity(true);
 
@@ -670,7 +676,14 @@ public final class SwarmRuntimeGameTests {
 
             if (state.recoveryCount() <= 0L) {
                 playerHandle.close();
-                helper.fail("Recovery planner never committed a feasible recovery waypoint");
+                helper.fail(
+                        "Recovery planner never committed a feasible recovery waypoint"
+                                + " candidates=" + state.plannerCandidateCount()
+                                + " blocked=" + state.plannerBlockedCount()
+                                + " unreachable=" + state.plannerUnreachableCount()
+                                + " feasible=" + state.plannerFeasibleCount()
+                                + " selected=" + state.plannerSelectedIndex()
+                );
                 return;
             }
 
