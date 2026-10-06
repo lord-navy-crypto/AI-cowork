@@ -11,6 +11,7 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
+import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.TargetPredictionPolicy;
@@ -243,6 +244,17 @@ public final class SwarmMobEvents {
                     prediction.offsetMagnitude()
             );
 
+            double effectiveFormationRadius =
+                    SwarmConfig.FORMATION_RADIUS.get() * profile.formationRadiusMultiplier();
+
+            // Keep ranged support outside the breacher ingress lane. When a Creeper
+            // is present locally, Skeletons widen their standoff instead of crowding
+            // the same approach corridor.
+            effectiveFormationRadius *= SwarmSupportSpacingPolicy.formationRadiusMultiplier(
+                    profile.archetype(),
+                    composition
+            );
+
             SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
                     tacticalRole,
                     assignedSlot,
@@ -253,7 +265,7 @@ public final class SwarmMobEvents {
                     neighborPositions,
                     neighborVelocities,
                     slots,
-                    SwarmConfig.FORMATION_RADIUS.get() * profile.formationRadiusMultiplier(),
+                    effectiveFormationRadius,
                     SwarmConfig.SEPARATION_RADIUS.get(),
                     SwarmConfig.SEPARATION_WEIGHT.get(),
                     SwarmConfig.COHESION_WEIGHT.get(),

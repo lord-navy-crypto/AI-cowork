@@ -24,6 +24,16 @@ class SwarmTacticalRolePolicyTest {
         assertEquals(SwarmRole.REAR_PRESSURE, SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.ASSAULT, 3));
     }
     @Test
+    void breacherAlwaysOwnsDirectPressureRole() {
+        for (int slot = 0; slot < 16; slot++) {
+            assertEquals(
+                    SwarmRole.CHASER,
+                    SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.BREACHER, slot)
+            );
+        }
+    }
+
+    @Test
     void flankerArchetypeAlternatesOnlyBetweenSideRoles() {
         for (int slot = 0; slot < 12; slot++) {
             SwarmRole role = SwarmTacticalRolePolicy.roleFor(SwarmAgentArchetype.FLANKER, slot);

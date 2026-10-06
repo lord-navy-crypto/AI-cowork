@@ -414,6 +414,69 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_skeleton_creeper_pair", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void skeletonSupportsCreeperBreacherFromDeeperStandoff(GameTestHelper helper) {
+        var skeleton = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 1));
+        var creeper = helper.spawn(EntityType.CREEPER, new BlockPos(1, 1, 3));
+        skeleton.setNoGravity(true);
+        creeper.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.runAfterDelay(30, () -> {
+            SwarmAgentState skeletonState = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+            SwarmAgentState creeperState = creeper.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(skeletonState.targetId())
+                    || !player.getUUID().equals(creeperState.targetId())) {
+                playerHandle.close();
+                helper.fail("Skeleton/Creeper pair did not converge on the same player target");
+                return;
+            }
+
+            if (skeletonState.role() != SwarmRole.RANGED_SUPPORT) {
+                playerHandle.close();
+                helper.fail("Skeleton did not retain ranged-support duty beside a breacher");
+                return;
+            }
+
+            if (creeperState.role() != SwarmRole.CHASER) {
+                playerHandle.close();
+                helper.fail("Creeper breacher was diverted away from direct-pressure duty");
+                return;
+            }
+
+            if (!skeletonState.hasDestination() || !creeperState.hasDestination()) {
+                playerHandle.close();
+                helper.fail("Skeleton/Creeper pair did not receive coordinated destinations");
+                return;
+            }
+
+            double skeletonStandoff = Math.hypot(
+                    skeletonState.destinationX() - player.getX(),
+                    skeletonState.destinationZ() - player.getZ()
+            );
+            double creeperStandoff = Math.hypot(
+                    creeperState.destinationX() - player.getX(),
+                    creeperState.destinationZ() - player.getZ()
+            );
+
+            if (skeletonStandoff <= creeperStandoff + 2.0) {
+                playerHandle.close();
+                helper.fail("Skeleton support did not form a deeper layer behind Creeper breacher");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_skeleton_bow_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 170)
     public static void skeletonKeepsVanillaBowAttackInsideRangedEnvelope(GameTestHelper helper) {
         for (int x = 0; x <= 4; x++) {

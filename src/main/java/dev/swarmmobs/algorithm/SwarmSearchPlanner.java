@@ -59,6 +59,7 @@ public final class SwarmSearchPlanner {
             case ASSAULT -> 0.55;
             case RANGED_SUPPORT -> 1.25;
             case FLANKER -> 1.0;
+            case BREACHER -> 0.45;
         };
 
         double searchRadius = baseRadius * archetypeMultiplier;
@@ -76,6 +77,7 @@ public final class SwarmSearchPlanner {
             case ASSAULT -> 1.0;
             case RANGED_SUPPORT -> 1.0;
             case FLANKER -> -1.0;
+            case BREACHER -> 1.0;
         };
 
         double angle = baseAngle + direction * phase * ANGLE_STEP;

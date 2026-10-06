@@ -26,9 +26,9 @@ public record SwarmAgentProfile(
 
     public static SwarmAgentProfile breacher() {
         return new SwarmAgentProfile(
-                SwarmAgentArchetype.ASSAULT,
+                SwarmAgentArchetype.BREACHER,
                 0.85,
-                1.05,
+                1.08,
                 0.0
         );
     }
