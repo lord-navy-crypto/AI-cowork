@@ -24,6 +24,10 @@ public final class SwarmAgentState {
     private long pendingFormationSlotSinceTick = Long.MIN_VALUE;
     private long formationSlotSwitchCount;
     private SwarmRole role = SwarmRole.CHASER;
+    private boolean roleInitialized;
+    private SwarmRole pendingRole;
+    private long pendingRoleSinceTick = Long.MIN_VALUE;
+    private long roleReassignmentCount;
     private SwarmBehaviorMode behaviorMode = SwarmBehaviorMode.ENGAGE;
     private double searchRadius;
     private boolean hasPrediction;
@@ -104,6 +108,14 @@ public final class SwarmAgentState {
 
     public SwarmRole role() {
         return role;
+    }
+
+    public SwarmRole pendingRole() {
+        return pendingRole;
+    }
+
+    public long roleReassignmentCount() {
+        return roleReassignmentCount;
     }
 
     public SwarmBehaviorMode behaviorMode() {
@@ -368,6 +380,52 @@ public final class SwarmAgentState {
         }
 
         return formationSlot;
+    }
+
+    public SwarmRole stabilizeRole(
+            SwarmRole candidateRole,
+            long gameTick,
+            int hysteresisTicks
+    ) {
+        SwarmRole candidate = candidateRole == null ? SwarmRole.CHASER : candidateRole;
+        int hold = Math.max(0, hysteresisTicks);
+
+        if (!roleInitialized) {
+            role = candidate;
+            roleInitialized = true;
+            pendingRole = null;
+            pendingRoleSinceTick = Long.MIN_VALUE;
+            return role;
+        }
+
+        if (candidate == role) {
+            pendingRole = null;
+            pendingRoleSinceTick = Long.MIN_VALUE;
+            return role;
+        }
+
+        if (hold == 0) {
+            role = candidate;
+            roleReassignmentCount++;
+            pendingRole = null;
+            pendingRoleSinceTick = Long.MIN_VALUE;
+            return role;
+        }
+
+        if (pendingRole != candidate) {
+            pendingRole = candidate;
+            pendingRoleSinceTick = gameTick;
+            return role;
+        }
+
+        if (gameTick - pendingRoleSinceTick >= hold) {
+            role = candidate;
+            roleReassignmentCount++;
+            pendingRole = null;
+            pendingRoleSinceTick = Long.MIN_VALUE;
+        }
+
+        return role;
     }
 
     public void clearLocalPlan(int neighborCount) {
