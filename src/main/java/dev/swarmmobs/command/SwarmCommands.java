@@ -192,6 +192,7 @@ public final class SwarmCommands {
                                 + ", navPathEvidenceEnabled=" + SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
                                 + ", navPathNodePenalty=" + SwarmConfig.NAV_PATH_NODE_PENALTY.get()
                                 + ", navPathResidualPenalty=" + SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()
+                                + ", navPathMaxResidualDistance=" + SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get()
                                 + ", sensingImperfectionEnabled=" + SwarmConfig.SENSING_IMPERFECTION_ENABLED.get()
                                 + ", sensingDropoutRate=" + SwarmConfig.SENSING_DROPOUT_RATE.get()
                                 + ", sensingMaxHorizontalNoise=" + SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.get()
