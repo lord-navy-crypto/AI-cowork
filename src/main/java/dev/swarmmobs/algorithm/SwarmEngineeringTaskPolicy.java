@@ -26,7 +26,8 @@ public final class SwarmEngineeringTaskPolicy {
             SwarmRole role,
             int carriedBlocks,
             boolean requester,
-            boolean meleeBusy
+            boolean meleeBusy,
+            boolean pathReachable
     ) {}
 
     public static UUID chooseClaimant(
@@ -58,7 +59,8 @@ public final class SwarmEngineeringTaskPolicy {
                 || candidate.entityId() == null
                 || !Double.isFinite(candidate.distanceSqr())
                 || candidate.distanceSqr() < 0.0
-                || candidate.meleeBusy()) {
+                || candidate.meleeBusy()
+                || !candidate.pathReachable()) {
             return false;
         }
 
