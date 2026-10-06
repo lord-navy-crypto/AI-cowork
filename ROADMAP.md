@@ -294,3 +294,36 @@ Future v0.11 work:
 - explicit wall/cover construction policy rather than opportunistic placement;
 - engineering telemetry and experiment metrics;
 - coordination with AI strategy only at mission/task-selection level, never raw block coordinates.
+
+
+### v0.11.2 — shared local engineering tasks
+
+Zombie engineering now participates in local swarm task allocation rather than acting only as an individual fallback.
+
+Current behavior:
+- a genuinely blocked Zombie may publish a transient BREAK or BRIDGE request;
+- requests remain local to the configured engineering-task radius;
+- the requester deterministically chooses exactly one claimant;
+- claimant scoring considers distance, tactical role, carried material, and close-combat occupancy;
+- BRIDGE work requires carried material;
+- CHASER/front-line pressure is preserved when a comparably suitable rear-pressure helper exists;
+- helper Zombies can accept a neighbor task and navigate into work range before operating;
+- requests and claims expire through a bounded TTL;
+- completed work clears the requester-side task;
+- exact block interaction remains inside the deterministic engineering goal;
+- vanilla close-range combat handoff remains authoritative.
+
+Observability now includes:
+- engineeringRequestsPublished;
+- engineeringTasksClaimed;
+- engineeringTasksCompleted;
+- engineeringBlocksBroken;
+- engineeringBlocksPlaced;
+- carriedEngineeringBlocks.
+
+Next within v0.11:
+- claimant reachability/path-evidence scoring before accepting a remote task;
+- material handoff between nearby Zombies;
+- multi-block bridge plans with bounded length;
+- explicit cover/wall construction policies;
+- AI strategy may choose engineering mission emphasis, but never exact block coordinates.
