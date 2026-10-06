@@ -10,11 +10,13 @@ displayName="${mod_name}"
 displayURL="https://github.com/lord-navy-crypto/SWARM-MOBS"
 authors="lord-navy-crypto"
 description='''
-Swarm Mobs experiments with local sensing, shared target memory, role assignment,
-formation-aware movement, and later fault-tolerant communication for Minecraft mobs.
+Swarm Mobs implements heterogeneous local swarm intelligence for Zombies, Skeletons,
+Spiders, and Creepers, including shared target memory, dynamic division of labor,
+formation-aware movement, bounded Zombie engineering, and specialist combat roles.
 
-The first development milestone focuses on algorithmic zombie swarm cooperation.
-External AI/LLM control is deliberately disabled by default and reserved for later work.
+Optional local Ollama integration is disabled by default. When explicitly enabled,
+active AI may bias bounded high-level task demand but does not directly control
+per-tick movement, attacks, paths, or block coordinates.
 '''
 
 [[dependencies.${mod_id}]]

@@ -27,6 +27,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -190,11 +191,6 @@ public final class SwarmRuntimeGameTests {
                 Blocks.STONE.defaultBlockState()
         );
         helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
-        helper.getLevel().setBlockAndUpdate(
-                bridgeSupport.east(),
-                Blocks.STONE.defaultBlockState()
-        );
-        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
 
         if (!engineer.canUse()) {
             server.setDifficulty(previousDifficulty, true);
@@ -220,6 +216,80 @@ public final class SwarmRuntimeGameTests {
         }
 
         server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_gamerule", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
+    public static void zombieEngineeringRespectsMobGriefing(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        boolean previousMobGriefing = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+
+        server.setDifficulty(Difficulty.HARD, true);
+        helper.getLevel().getGameRules()
+                .getRule(GameRules.RULE_MOBGRIEFING)
+                .set(false, server);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null) {
+            restoreEngineeringGameRules(server, helper, previousDifficulty, previousMobGriefing);
+            helper.fail("Zombie did not expose SwarmZombieEngineerGoal");
+            return;
+        }
+
+        if (engineer.canUse()) {
+            restoreEngineeringGameRules(server, helper, previousDifficulty, previousMobGriefing);
+            helper.fail("Zombie engineering ignored mobGriefing=false");
+            return;
+        }
+
+        if (!helper.getLevel().getBlockState(obstacle).is(Blocks.DIRT)) {
+            restoreEngineeringGameRules(server, helper, previousDifficulty, previousMobGriefing);
+            helper.fail("Zombie engineering mutated terrain while mobGriefing was disabled");
+            return;
+        }
+
+        restoreEngineeringGameRules(server, helper, previousDifficulty, previousMobGriefing);
         helper.succeed();
     }
 
@@ -741,6 +811,18 @@ public final class SwarmRuntimeGameTests {
             playerHandle.close();
             helper.succeed();
         });
+    }
+
+    private static void restoreEngineeringGameRules(
+            net.minecraft.server.MinecraftServer server,
+            GameTestHelper helper,
+            Difficulty difficulty,
+            boolean mobGriefing
+    ) {
+        server.setDifficulty(difficulty, true);
+        helper.getLevel().getGameRules()
+                .getRule(GameRules.RULE_MOBGRIEFING)
+                .set(mobGriefing, server);
     }
 
     private static TestPlayerHandle createTickingTestPlayer(GameTestHelper helper, GameType gameType) {
