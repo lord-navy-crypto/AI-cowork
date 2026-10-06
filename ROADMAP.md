@@ -184,8 +184,17 @@ Current v0.9.1 extension:
 - tactical role reassignment count;
 - live Experiment-page metric display and command-line snapshot output.
 
+Current v0.9.2 extension:
+- per-agent SEARCH episode lifecycle telemetry;
+- same-target direct reacquisition success counting;
+- SEARCH failure counting when target memory expires;
+- reacquisition latency in ticks, aggregated run-relative;
+- search success rate over completed episodes;
+- active SEARCH episode count;
+- command and Experiment-panel exposure;
+- Runtime GameTest that enters SEARCH, restores line of sight, and verifies direct reacquisition metrics.
+
 Next within v0.9:
-- reacquisition time and search success rate;
 - coverage efficiency;
 - normalized communication overhead per agent/time;
 - role imbalance;
