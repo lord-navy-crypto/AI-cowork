@@ -236,6 +236,7 @@ public final class SwarmMobEvents {
                     );
 
             boolean combatBusy = mob.getTarget() != null
+                    && mob.hasLineOfSight(mob.getTarget())
                     && mob.distanceToSqr(mob.getTarget())
                     <= SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get()
                     * SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
