@@ -17,7 +17,8 @@ public record SwarmEngineeringTask(
 ) {
     public enum Type {
         BREAK,
-        BRIDGE
+        BRIDGE,
+        STEP
     }
 
     public boolean active(long gameTick) {
