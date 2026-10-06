@@ -173,14 +173,23 @@ Current v0.9.0 implementation:
 - command-line preset and seed controls;
 - automatic CUSTOM state when parameters are manually tuned after applying a preset.
 
+Current v0.9.1 extension:
+- Experiment Start / Reset / Snapshot lifecycle;
+- run-relative metric baselines without clearing existing agent telemetry;
+- aggregate communication accepted/delivered/dropped deltas;
+- observed communication drop ratio;
+- obstacle-detour and recovery counts;
+- recovery-planning attempts, failures, and failure ratio;
+- PathNavigation evidence query count;
+- tactical role reassignment count;
+- live Experiment-page metric display and command-line snapshot output.
+
 Next within v0.9:
-- reacquisition time;
-- search success rate;
+- reacquisition time and search success rate;
 - coverage efficiency;
-- communication overhead;
+- normalized communication overhead per agent/time;
 - role imbalance;
-- obstacle-detour/recovery rate;
-- metric snapshots and experiment reset/export workflow.
+- exportable metric snapshots.
 
 ### v1.0 deterministic research baseline
 A stable non-AI swarm system that can be evaluated under imperfect sensing, imperfect communication, heterogeneous agents, target loss, and complex terrain.
