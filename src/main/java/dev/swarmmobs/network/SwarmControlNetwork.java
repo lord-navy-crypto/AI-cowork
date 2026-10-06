@@ -1,6 +1,8 @@
 package dev.swarmmobs.network;
 
 import dev.swarmmobs.client.SwarmControlClient;
+import dev.swarmmobs.ai.SwarmAiShadowService;
+import dev.swarmmobs.ai.SwarmAiShadowState;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.experiment.SwarmExperimentManager;
 import dev.swarmmobs.experiment.SwarmExperimentMetrics;
@@ -57,12 +59,28 @@ public final class SwarmControlNetwork {
     }
 
     private static void applyAction(String action, double value, ServerPlayer player) {
-        if (!action.startsWith("preset_") && !action.equals("experiment_seed_delta")) {
+        if (!action.startsWith("preset_")
+                && !action.startsWith("ai_")
+                && !action.equals("experiment_seed_delta")) {
             SwarmExperimentManager.markCustom();
         }
 
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
+
+            case "ai_toggle" ->
+                    SwarmConfig.EXTERNAL_AI_ENABLED.set(!SwarmConfig.EXTERNAL_AI_ENABLED.get());
+            case "ai_shadow" -> SwarmAiShadowService.request(player.serverLevel())
+                    .whenComplete((decision, error) ->
+                            player.getServer().execute(() -> {
+                                if (player.isAlive()) {
+                                    sendSnapshot(player);
+                                }
+                            })
+                    );
+            case "ai_refresh" -> {
+                // Snapshot is returned by the normal server-authoritative refresh below.
+            }
 
             case "preset_baseline" -> SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
             case "preset_noisy_sensing" -> SwarmExperimentManager.apply(SwarmExperimentPreset.NOISY_SENSING);
@@ -315,7 +333,26 @@ public final class SwarmControlNetwork {
 
     private static String snapshotData(net.minecraft.server.level.ServerLevel level) {
         var metrics = SwarmExperimentMetrics.snapshot(level);
+        var ai = SwarmAiShadowState.snapshot();
+        var decision = ai.lastDecision();
+
         return String.join(";",
+                pair("aiEnabled", SwarmConfig.EXTERNAL_AI_ENABLED.get()),
+                pair("aiModel", SwarmConfig.OLLAMA_MODEL.get()),
+                pair("aiStatus", ai.status().name()),
+                pair("aiInFlight", SwarmAiShadowService.requestInFlight()),
+                pair("aiMode", decision.mode().name()),
+                pair("aiProvider", decision.providerId()),
+                pair("aiLatencyMs", (int) Math.min(Integer.MAX_VALUE, ai.lastLatencyMs())),
+                pair("aiSuccessCount", (int) Math.min(Integer.MAX_VALUE, ai.successCount())),
+                pair("aiFallbackCount", (int) Math.min(Integer.MAX_VALUE, ai.fallbackCount())),
+                pair("aiErrorCount", (int) Math.min(Integer.MAX_VALUE, ai.errorCount())),
+                pair("aiFormationMultiplier", decision.formationRadiusMultiplier()),
+                pair("aiSeparationMultiplier", decision.separationMultiplier()),
+                pair("aiCohesionMultiplier", decision.cohesionMultiplier()),
+                pair("aiSearchRadiusMultiplier", decision.searchRadiusMultiplier()),
+                pair("aiRationale", decision.rationale()),
+                pair("aiLastError", ai.lastError()),
                 pair("master", SwarmConfig.ENABLED.get()),
                 "activePreset=" + SwarmExperimentManager.activePreset().name(),
                 pair("experimentSeed", SwarmExperimentManager.experimentSeed()),
@@ -387,6 +424,15 @@ public final class SwarmControlNetwork {
 
     private static String pair(String key, double value) {
         return key + "=" + String.format(Locale.ROOT, "%.4f", value);
+    }
+
+    private static String pair(String key, String value) {
+        String safe = value == null ? "" : value
+                .replace(';', ',')
+                .replace('=', '~')
+                .replace('\n', ' ')
+                .replace('\r', ' ');
+        return key + "=" + safe;
     }
 
     private static double clamp(double value, double min, double max) {
