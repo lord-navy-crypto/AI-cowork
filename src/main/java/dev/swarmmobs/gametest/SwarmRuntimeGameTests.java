@@ -18,7 +18,10 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -400,6 +403,61 @@ public final class SwarmRuntimeGameTests {
                     .anyMatch(wrapped -> wrapped.getGoal() instanceof SwarmApproachGoal);
             if (!hasApproachGoal) {
                 helper.fail("Skeleton did not receive the heterogeneous SwarmApproachGoal");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_skeleton_bow_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
+    public static void skeletonKeepsVanillaBowAttackInsideRangedEnvelope(GameTestHelper helper) {
+        var skeleton = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 2));
+        skeleton.setNoGravity(true);
+        skeleton.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        skeleton.reassessWeaponGoal();
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        float startingHealth = player.getHealth();
+
+        helper.runAfterDelay(20, () -> {
+            SwarmAgentState state = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Skeleton did not establish direct swarm observation before bow-handoff check");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = skeleton.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Skeleton did not retain SwarmApproachGoal");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield inside vanilla skeleton bow range");
+            }
+        });
+
+        helper.runAfterDelay(90, () -> {
+            if (player.getHealth() >= startingHealth) {
+                playerHandle.close();
+                helper.fail("Skeleton never damaged target after swarm ranged handoff; vanilla bow AI appears starved");
                 return;
             }
 
