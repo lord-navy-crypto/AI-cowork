@@ -6,8 +6,9 @@ import net.minecraft.world.entity.PathfinderMob;
 /**
  * Capability mapping for supported heterogeneous swarm members.
  *
- * The first heterogeneous milestone intentionally supports only vanilla Zombies
- * and Skeletons. More species can be added here without changing the planner API.
+ * Supported vanilla swarm members currently include Zombies, Skeletons,
+ * Spiders, and Creepers. Species-specific combat handoff remains outside the
+ * capability mapping so movement coordination does not replace vanilla combat.
  */
 public final class SwarmAgentProfiles {
 
@@ -16,7 +17,10 @@ public final class SwarmAgentProfiles {
     }
 
     public static boolean isSupportedType(EntityType<?> type) {
-        return type == EntityType.ZOMBIE || type == EntityType.SKELETON || type == EntityType.SPIDER;
+        return type == EntityType.ZOMBIE
+                || type == EntityType.SKELETON
+                || type == EntityType.SPIDER
+                || type == EntityType.CREEPER;
     }
 
     public static SwarmAgentProfile profile(PathfinderMob mob) {
@@ -25,6 +29,9 @@ public final class SwarmAgentProfiles {
         }
         if (mob.getType() == EntityType.SPIDER) {
             return SwarmAgentProfile.flanker();
+        }
+        if (mob.getType() == EntityType.CREEPER) {
+            return SwarmAgentProfile.breacher();
         }
         return SwarmAgentProfile.assault();
     }
