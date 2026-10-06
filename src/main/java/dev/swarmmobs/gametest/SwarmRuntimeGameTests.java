@@ -213,6 +213,130 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_shared_zombie_engineering", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void blockedZombieDelegatesEngineeringToSingleLocalHelper(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie requester = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        Zombie helperZombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 3));
+        requester.setNoGravity(true);
+        helperZombie.setNoGravity(true);
+
+        UUID sharedTarget = UUID.randomUUID();
+        SwarmAgentState requesterState = requester.getData(SwarmAttachments.AGENT_STATE.get());
+        SwarmAgentState helperState = helperZombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+        requesterState.rememberTarget(sharedTarget, helper.getTick(), false);
+        helperState.rememberTarget(sharedTarget, helper.getTick(), false);
+
+        requesterState.updateLocalPlan(
+                1,
+                0,
+                SwarmRole.CHASER,
+                requester.getX() + 4.0,
+                requester.getZ(),
+                0.0,
+                0.0
+        );
+        requesterState.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        helperState.updateLocalPlan(
+                1,
+                3,
+                SwarmRole.REAR_PRESSURE,
+                helperZombie.getX() + 4.0,
+                helperZombie.getZ(),
+                0.0,
+                0.0
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                requester.getX() + 0.9,
+                requester.getY(),
+                requester.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal requesterGoal = requester.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+        SwarmZombieEngineerGoal helperGoal = helperZombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (requesterGoal == null || helperGoal == null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Shared engineering test Zombies did not expose engineer goals");
+            return;
+        }
+
+        if (requesterGoal.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Blocked requester incorrectly kept task instead of delegating to better helper");
+            return;
+        }
+
+        var request = requesterState.engineeringRequest(helper.getLevel().getGameTime());
+        if (request == null || !helperZombie.getUUID().equals(request.claimantId())) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Engineering request did not claim the selected helper Zombie");
+            return;
+        }
+
+        if (!helperGoal.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Claimed helper did not accept neighbor engineering request");
+            return;
+        }
+
+        helperGoal.start();
+        for (int i = 0; i < 20; i++) {
+            helperGoal.tick();
+        }
+        helperGoal.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Claimed helper did not complete shared break task");
+            return;
+        }
+
+        if (helperState.engineeringBlocksBroken() != 1L
+                || helperState.engineeringTasksClaimed() != 1L
+                || helperState.engineeringTasksCompleted() != 1L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Shared engineering claimant telemetry did not record helper completion");
+            return;
+        }
+
+        if (requesterState.engineeringRequest(helper.getLevel().getGameTime()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Completed shared engineering request was not cleared");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
     public static void swarmApproachGoalYieldsNearMeleeRange(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
