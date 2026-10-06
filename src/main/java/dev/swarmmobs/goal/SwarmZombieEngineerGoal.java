@@ -233,11 +233,11 @@ public final class SwarmZombieEngineerGoal extends Goal {
         double radius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
         List<SwarmEngineeringTaskPolicy.Candidate> candidates = new ArrayList<>();
 
-        List<Zombie> localZombies = level.getEntitiesOfClass(
+        List<Zombie> localZombies = new ArrayList<>(level.getEntitiesOfClass(
                 Zombie.class,
                 zombie.getBoundingBox().inflate(radius),
                 peer -> peer.isAlive() && SwarmAgentProfiles.isSupported(peer)
-        );
+        ));
 
         if (!localZombies.contains(zombie)) {
             localZombies.add(zombie);
