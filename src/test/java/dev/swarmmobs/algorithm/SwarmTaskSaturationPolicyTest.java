@@ -31,6 +31,7 @@ class SwarmTaskSaturationPolicyTest {
     @Test
     void unsatisfiedTaskKeepsFullDemand() {
         assertEquals(0.9, SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.ASSAULT,
                 SwarmTaskType.FLANK,
                 0.9,
                 10,
@@ -42,6 +43,7 @@ class SwarmTaskSaturationPolicyTest {
     @Test
     void saturatedTaskStronglyDiscouragesNewRecruit() {
         double adjusted = SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.ASSAULT,
                 SwarmTaskType.ENGINEERING,
                 1.0,
                 10,
@@ -55,6 +57,7 @@ class SwarmTaskSaturationPolicyTest {
     @Test
     void additionalOversupplyFurtherSuppressesRecruitment() {
         double justFull = SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.ASSAULT,
                 SwarmTaskType.FLANK,
                 0.9,
                 10,
@@ -62,6 +65,7 @@ class SwarmTaskSaturationPolicyTest {
                 SwarmTaskType.RESERVE
         );
         double oversupplied = SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.ASSAULT,
                 SwarmTaskType.FLANK,
                 0.9,
                 10,
@@ -75,6 +79,7 @@ class SwarmTaskSaturationPolicyTest {
     @Test
     void incumbentGetsSofterPenaltyThanNewRecruit() {
         double incumbent = SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.ASSAULT,
                 SwarmTaskType.ENGINEERING,
                 1.0,
                 10,
@@ -82,6 +87,7 @@ class SwarmTaskSaturationPolicyTest {
                 SwarmTaskType.ENGINEERING
         );
         double recruit = SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.ASSAULT,
                 SwarmTaskType.ENGINEERING,
                 1.0,
                 10,
@@ -126,6 +132,7 @@ class SwarmTaskSaturationPolicyTest {
     @Test
     void reserveDemandIsNeverSaturationSuppressed() {
         assertEquals(0.3, SwarmTaskSaturationPolicy.adjustedDemand(
+                SwarmAgentArchetype.ASSAULT,
                 SwarmTaskType.RESERVE,
                 0.3,
                 20,
