@@ -10,6 +10,7 @@ import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
+import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -549,11 +550,38 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
-            Vec3 nearPosition = helper.absoluteVec(new Vec3(3.5, 1.0, 2.0));
-            player.setPos(nearPosition.x, nearPosition.y, nearPosition.z);
+            // Exercise the boundary that used to be vulnerable to a dead zone:
+            // outside the 3.0-block fuse envelope but inside the generic 3.25
+            // melee release distance. Creeper swarm movement must still own MOVE.
+            player.setPos(
+                    creeper.getX() + SwarmCreeperSwellGoal.HANDOFF_DISTANCE + 0.10,
+                    creeper.getY(),
+                    creeper.getZ()
+            );
         });
 
-        helper.runAfterDelay(34, () -> {
+        helper.runAfterDelay(26, () -> {
+            SwarmApproachGoal approachGoal = creeper.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null || !approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("Creeper swarm approach yielded in the pre-fuse boundary band");
+                return;
+            }
+
+            player.setPos(
+                    creeper.getX() + 2.0,
+                    creeper.getY(),
+                    creeper.getZ()
+            );
+        });
+
+        helper.runAfterDelay(42, () -> {
             SwarmAgentState state = creeper.getData(SwarmAttachments.AGENT_STATE.get());
 
             SwarmApproachGoal approachGoal = creeper.goalSelector.getAvailableGoals().stream()
@@ -588,6 +616,109 @@ public final class SwarmRuntimeGameTests {
             }
 
             creeper.discard();
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void zombieActuallyAttacksAfterSwarmMeleeHandoff(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        player.setPos(zombie.getX() + 1.25, zombie.getY(), zombie.getZ());
+        player.setNoGravity(true);
+        float initialHealth = player.getHealth();
+
+        helper.runAfterDelay(20, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Zombie did not establish direct swarm observation before melee handoff");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Zombie lost SwarmApproachGoal registration");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield inside Zombie melee range");
+            }
+        });
+
+        helper.runAfterDelay(70, () -> {
+            if (player.getHealth() >= initialHealth) {
+                playerHandle.close();
+                helper.fail("Zombie never landed a vanilla melee attack after swarm handoff");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_spider_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void spiderActuallyAttacksAfterSwarmMeleeHandoff(GameTestHelper helper) {
+        var spider = helper.spawn(EntityType.SPIDER, new BlockPos(1, 1, 2));
+        spider.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        player.setPos(spider.getX() + 1.25, spider.getY(), spider.getZ());
+        player.setNoGravity(true);
+        float initialHealth = player.getHealth();
+
+        helper.runAfterDelay(20, () -> {
+            SwarmAgentState state = spider.getData(SwarmAttachments.AGENT_STATE.get());
+            if (!player.getUUID().equals(state.targetId()) || !state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Spider did not establish direct swarm observation before melee handoff");
+                return;
+            }
+
+            SwarmApproachGoal approachGoal = spider.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+
+            if (approachGoal == null) {
+                playerHandle.close();
+                helper.fail("Spider lost SwarmApproachGoal registration");
+                return;
+            }
+
+            if (approachGoal.canUse()) {
+                playerHandle.close();
+                helper.fail("SwarmApproachGoal did not yield inside Spider melee range");
+            }
+        });
+
+        helper.runAfterDelay(70, () -> {
+            if (player.getHealth() >= initialHealth) {
+                playerHandle.close();
+                helper.fail("Spider never landed a vanilla melee attack after swarm handoff");
+                return;
+            }
+
             playerHandle.close();
             helper.succeed();
         });

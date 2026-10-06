@@ -248,3 +248,12 @@ Next within v0.10:
 - keep swarm approach outside Creeper fuse range;
 - yield to priority-0 `SwellGoal` inside the fuse envelope or after ignition begins;
 - Runtime GameTests gate both handoffs so future swarm movement changes cannot silently starve vanilla combat again.
+
+
+## v0.10.2 — combat-handoff hardening
+
+- make Creeper release distance species-specific so swarm MOVE remains active until the 3.0-block fuse envelope;
+- add a Runtime GameTest for the former 3.0–3.25 block pre-fuse boundary band;
+- verify Zombie handoff with actual player damage rather than only checking `SwarmApproachGoal.canUse()`;
+- verify Spider handoff with actual player damage;
+- keep species-specific vanilla combat as the final action layer while swarm logic owns long-range positioning.

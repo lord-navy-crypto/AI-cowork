@@ -119,7 +119,12 @@ public final class SwarmApproachGoal extends Goal {
             ) > tolerance * tolerance;
         }
 
-        double release = SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
+        // Creepers are not melee attackers: keep swarm movement active until the
+        // exact fuse handoff boundary. Using the generic melee release distance
+        // here creates a dead zone where MOVE can yield before SwellGoal is eligible.
+        double release = mob instanceof Creeper
+                ? SwarmCreeperSwellGoal.HANDOFF_DISTANCE
+                : SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
 
         if (state.directObservation()
                 && mob.getTarget() instanceof Player target
