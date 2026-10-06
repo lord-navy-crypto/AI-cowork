@@ -123,8 +123,10 @@ The in-game control panel includes an **AI Shadow** page showing the last recomm
 See `docs/OLLAMA_SHADOW.md` for architecture and safety boundaries.
 
 
-### v0.10.1 Skeleton ranged handoff fix
+### v0.10.1 Species combat handoff fix
 
-Skeletons remain heterogeneous `RANGED_SUPPORT` swarm members, but the swarm movement goal now yields when a directly observed target with line of sight enters the vanilla bow engagement envelope. This restores vanilla bow draw/aim/fire behavior while retaining swarm repositioning outside that envelope.
+Skeletons remain heterogeneous `RANGED_SUPPORT` swarm members, but a bounded high-priority bow bridge now owns ranged combat only when a directly observed target with line of sight enters the 15-block bow envelope. Outside that envelope, swarm movement still controls repositioning.
 
-A dedicated Runtime GameTest now fails if a bow-equipped Skeleton cannot damage a visible player while swarm control is enabled.
+Creepers are now supported heterogeneous swarm members through a close-range breacher profile. They use swarm approach outside fuse range, then yield movement to a high-priority vanilla `SwellGoal` bridge inside the 3-block fuse envelope or once ignition/swell has begun.
+
+Dedicated Runtime GameTests gate both Skeleton bow combat and Creeper fuse handoff under swarm control.
