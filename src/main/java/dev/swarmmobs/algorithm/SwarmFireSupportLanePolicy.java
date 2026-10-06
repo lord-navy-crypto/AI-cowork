@@ -29,20 +29,15 @@ public final class SwarmFireSupportLanePolicy {
             return baseDestination;
         }
 
-        SwarmCombatPlanner.Vec2 forward = targetForward.normalized();
-        if (forward.length() < EPS) {
-            forward = new SwarmCombatPlanner.Vec2(0.0, 1.0);
-        }
-        SwarmCombatPlanner.Vec2 right = new SwarmCombatPlanner.Vec2(forward.z(), -forward.x());
-
-        double breacherLateral = 0.0;
+        double centroidX = 0.0;
+        double centroidZ = 0.0;
         int samples = 0;
         for (SwarmCombatPlanner.Vec2 breacher : breacherPositions) {
             if (breacher == null) {
                 continue;
             }
-            SwarmCombatPlanner.Vec2 relative = breacher.subtract(target);
-            breacherLateral += relative.x() * right.x() + relative.z() * right.z();
+            centroidX += breacher.x();
+            centroidZ += breacher.z();
             samples++;
         }
 
@@ -50,23 +45,27 @@ public final class SwarmFireSupportLanePolicy {
             return baseDestination;
         }
 
-        breacherLateral /= samples;
+        SwarmCombatPlanner.Vec2 breacherCentroid =
+                new SwarmCombatPlanner.Vec2(centroidX / samples, centroidZ / samples);
 
-        double desiredSign;
-        if (Math.abs(breacherLateral) >= 0.35) {
-            desiredSign = breacherLateral > 0.0 ? -1.0 : 1.0;
-        } else {
-            desiredSign = Math.floorMod(formationSlot, 2) == 0 ? 1.0 : -1.0;
+        // Prefer the real target-to-breacher ingress axis. Player facing is only
+        // a fallback when the breacher is effectively on top of the target.
+        SwarmCombatPlanner.Vec2 ingress = breacherCentroid.subtract(target).normalized();
+        if (ingress.length() < EPS) {
+            ingress = targetForward.normalized();
         }
+        if (ingress.length() < EPS) {
+            ingress = new SwarmCombatPlanner.Vec2(0.0, 1.0);
+        }
+
+        SwarmCombatPlanner.Vec2 right = new SwarmCombatPlanner.Vec2(ingress.z(), -ingress.x());
+        double desiredSign = Math.floorMod(formationSlot, 2) == 0 ? 1.0 : -1.0;
 
         SwarmCombatPlanner.Vec2 destinationRelative = baseDestination.subtract(target);
         double currentLateral =
                 destinationRelative.x() * right.x() + destinationRelative.z() * right.z();
 
-        double desiredMagnitude = Math.max(
-                MIN_LATERAL_OFFSET,
-                Math.abs(breacherLateral) + BREACHER_CLEARANCE
-        );
+        double desiredMagnitude = MIN_LATERAL_OFFSET + BREACHER_CLEARANCE;
         double desiredLateral = desiredSign * desiredMagnitude;
         double lateralCorrection = desiredLateral - currentLateral;
 
