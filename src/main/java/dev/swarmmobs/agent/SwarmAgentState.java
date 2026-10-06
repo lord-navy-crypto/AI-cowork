@@ -57,6 +57,11 @@ public final class SwarmAgentState {
     private int plannerSelectedIndex = -1;
     private double plannerSelectedScore;
     private long plannerPathQueryCount;
+    private long searchEpisodeCount;
+    private long searchReacquisitionCount;
+    private long completedSearchTicks;
+    private long activeSearchStartTick = Long.MIN_VALUE;
+    private long lastReacquisitionTicks;
     private long sensingAcceptedObservations;
     private long sensingDroppedObservations;
     private double lastSensingNoiseMagnitude;
