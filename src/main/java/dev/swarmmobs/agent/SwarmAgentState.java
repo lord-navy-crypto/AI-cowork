@@ -43,6 +43,9 @@ public final class SwarmAgentState {
     private double navigationWaypointZ;
     private long obstacleDetourCount;
     private long recoveryCount;
+    private long sensingAcceptedObservations;
+    private long sensingDroppedObservations;
+    private double lastSensingNoiseMagnitude;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -179,6 +182,18 @@ public final class SwarmAgentState {
         return recoveryCount;
     }
 
+    public long sensingAcceptedObservations() {
+        return sensingAcceptedObservations;
+    }
+
+    public long sensingDroppedObservations() {
+        return sensingDroppedObservations;
+    }
+
+    public double lastSensingNoiseMagnitude() {
+        return lastSensingNoiseMagnitude;
+    }
+
     public int pendingTargetMessageCount() {
         return pendingTargetMessages.size();
     }
@@ -261,6 +276,16 @@ public final class SwarmAgentState {
 
     public void recordCommunicationDrop() {
         communicationDroppedMessages++;
+    }
+
+    public void recordSensingAccepted(double noiseMagnitude) {
+        sensingAcceptedObservations++;
+        lastSensingNoiseMagnitude = Math.max(0.0, noiseMagnitude);
+    }
+
+    public void recordSensingDrop() {
+        sensingDroppedObservations++;
+        lastSensingNoiseMagnitude = 0.0;
     }
 
     public void clearPendingTargetMessages() {

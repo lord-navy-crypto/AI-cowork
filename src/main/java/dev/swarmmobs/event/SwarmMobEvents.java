@@ -11,6 +11,7 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
+import dev.swarmmobs.algorithm.SwarmSensingPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.TargetPredictionPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
@@ -385,19 +386,48 @@ public final class SwarmMobEvents {
         if (direct != null) {
             Vec3 look = direct.getLookAngle();
             Vec3 velocity = direct.getDeltaMovement();
-            TargetObservation observation = new TargetObservation(
-                    direct.getUUID(),
-                    gameTick,
-                    direct.getX(),
-                    direct.getY(),
-                    direct.getZ(),
-                    look.x,
-                    look.z,
-                    velocity.x,
-                    velocity.z
-            );
-            state.rememberTarget(observation, true);
-            return new TargetSelection(observation, direct, true);
+
+            SwarmSensingPolicy.Sample sensingSample;
+            if (SwarmConfig.SENSING_IMPERFECTION_ENABLED.get()) {
+                sensingSample = SwarmSensingPolicy.samplePosition(
+                        self.getUUID(),
+                        direct.getUUID(),
+                        gameTick,
+                        direct.getX(),
+                        direct.getY(),
+                        direct.getZ(),
+                        SwarmConfig.SENSING_DROPOUT_RATE.get(),
+                        SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.get(),
+                        SwarmConfig.SENSING_EXPERIMENT_SEED.get()
+                );
+            } else {
+                sensingSample = new SwarmSensingPolicy.Sample(
+                        true,
+                        direct.getX(),
+                        direct.getY(),
+                        direct.getZ(),
+                        0.0
+                );
+            }
+
+            if (sensingSample.observed()) {
+                TargetObservation observation = new TargetObservation(
+                        direct.getUUID(),
+                        gameTick,
+                        sensingSample.measuredX(),
+                        sensingSample.measuredY(),
+                        sensingSample.measuredZ(),
+                        look.x,
+                        look.z,
+                        velocity.x,
+                        velocity.z
+                );
+                state.recordSensingAccepted(sensingSample.horizontalNoiseMagnitude());
+                state.rememberTarget(observation, true);
+                return new TargetSelection(observation, direct, true);
+            }
+
+            state.recordSensingDrop();
         }
 
         if (state.targetObservation() != null) {
