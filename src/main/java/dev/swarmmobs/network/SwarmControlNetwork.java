@@ -71,6 +71,9 @@ public final class SwarmControlNetwork {
             case "preset_navigation_stress" -> SwarmExperimentManager.apply(SwarmExperimentPreset.NAVIGATION_STRESS);
             case "experiment_start" -> SwarmExperimentMetrics.start(player.serverLevel());
             case "experiment_reset" -> SwarmExperimentMetrics.reset(player.serverLevel());
+            case "experiment_snapshot" -> {
+                // Snapshot is returned by the normal server-authoritative refresh below.
+            }
 
             case "experiment_seed_delta" -> {
                 long next = (long) SwarmExperimentManager.experimentSeed() + Math.round(value);
