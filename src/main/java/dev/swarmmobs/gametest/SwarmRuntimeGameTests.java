@@ -7,6 +7,7 @@ import dev.swarmmobs.SwarmMobs;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmRole;
+import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
@@ -19,6 +20,7 @@ import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -75,6 +77,141 @@ public final class SwarmRuntimeGameTests {
             helper.succeed();
         });
     }
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void zombieBreaksSoftObstacleAndReusesItAsBridgeSupport(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not expose SwarmZombieEngineerGoal");
+            return;
+        }
+
+        if (!engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie engineering did not activate for a blocked HARD-mode route");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 20; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not hand-break the soft obstacle");
+            return;
+        }
+        if (state.engineeringBlocksBroken() != 1L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie engineering break telemetry did not increment");
+            return;
+        }
+        if (state.carriedEngineeringBlockCount() != 1) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not salvage the hand-harvestable obstacle as building material");
+            return;
+        }
+
+        zombie.setPos(zombie.getX(), zombie.getY() + 1.0, zombie.getZ());
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos bridgeSupport = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY() - 1.0,
+                zombie.getZ()
+        );
+        helper.getLevel().removeBlock(bridgeSupport, false);
+
+        if (!engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie engineering did not select bridge support with carried material");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 8; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (helper.getLevel().getBlockState(bridgeSupport).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not place salvaged material as bridge support");
+            return;
+        }
+        if (state.engineeringBlocksPlaced() != 1L || state.carriedEngineeringBlockCount() != 0) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie bridge placement telemetry/inventory did not update");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)
     public static void swarmApproachGoalYieldsNearMeleeRange(GameTestHelper helper) {
