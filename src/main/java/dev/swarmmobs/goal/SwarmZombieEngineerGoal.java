@@ -5,6 +5,7 @@ import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmBridgeSpanPolicy;
+import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringTaskPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmZombieEngineeringPolicy;
@@ -197,14 +198,18 @@ public final class SwarmZombieEngineerGoal extends Goal {
     }
 
     private boolean requesterEligible(SwarmAgentState state) {
-        if (!state.hasDestination()
-                || state.targetId() == null
-                || state.plannerContext() == SwarmPlannerContext.NONE
-                || state.plannerFeasibleCount() > 0) {
+        if (!state.hasDestination() || state.targetId() == null) {
             return false;
         }
 
-        return !meleeBusy(zombie);
+        boolean engineeringPressure = SwarmEngineeringEscalationPolicy.shouldEscalate(
+                state.plannerContext(),
+                state.plannerBlockedCount(),
+                state.plannerUnreachableCount(),
+                state.plannerFeasibleCount()
+        );
+
+        return engineeringPressure && !meleeBusy(zombie);
     }
 
     private SwarmEngineeringTask findAssignedTask(

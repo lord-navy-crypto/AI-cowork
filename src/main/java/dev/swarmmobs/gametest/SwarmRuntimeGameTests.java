@@ -220,6 +220,80 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_recovery", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void recoveryCanEscalateToZombieEngineeringWithOneFallbackCandidate(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.RECOVERY,
+                6,
+                3,
+                2,
+                1,
+                5,
+                0.25,
+                6L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie did not expose SwarmZombieEngineerGoal");
+            return;
+        }
+
+        if (!engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("RECOVERY did not escalate to engineering while one fallback candidate remained");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 20; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Recovery-escalated Zombie engineer did not break the blocking soft obstacle");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_gamerule", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void zombieEngineeringRespectsMobGriefing(GameTestHelper helper) {
         var server = helper.getLevel().getServer();

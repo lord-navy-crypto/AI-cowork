@@ -14,6 +14,7 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
+import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
 import dev.swarmmobs.algorithm.SwarmTaskDemandPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
@@ -214,9 +215,12 @@ public final class SwarmMobEvents {
                 && confidence < SwarmConfig.SEARCH_CONFIDENCE_THRESHOLD.get();
 
         if (SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()) {
-            boolean routeBlocked = state.plannerContext() != dev.swarmmobs.agent.SwarmPlannerContext.NONE
-                    && state.plannerFeasibleCount() == 0
-                    && (state.plannerBlockedCount() > 0 || state.plannerUnreachableCount() > 0);
+            boolean routeBlocked = SwarmEngineeringEscalationPolicy.shouldEscalate(
+                    state.plannerContext(),
+                    state.plannerBlockedCount(),
+                    state.plannerUnreachableCount(),
+                    state.plannerFeasibleCount()
+            );
 
             SwarmTaskDemandPolicy.Signals demandSignals =
                     new SwarmTaskDemandPolicy.Signals(
