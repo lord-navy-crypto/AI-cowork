@@ -21,6 +21,23 @@ public final class SwarmFireSupportLanePolicy {
             int formationSlot,
             List<SwarmCombatPlanner.Vec2> breacherPositions
     ) {
+        double preferredSign = Math.floorMod(formationSlot, 2) == 0 ? 1.0 : -1.0;
+        return applyWithPreferredSign(
+                baseDestination,
+                target,
+                targetForward,
+                preferredSign,
+                breacherPositions
+        );
+    }
+
+    public static SwarmCombatPlanner.Vec2 applyWithPreferredSign(
+            SwarmCombatPlanner.Vec2 baseDestination,
+            SwarmCombatPlanner.Vec2 target,
+            SwarmCombatPlanner.Vec2 targetForward,
+            double preferredSign,
+            List<SwarmCombatPlanner.Vec2> breacherPositions
+    ) {
         if (baseDestination == null
                 || target == null
                 || targetForward == null
@@ -59,7 +76,7 @@ public final class SwarmFireSupportLanePolicy {
         }
 
         SwarmCombatPlanner.Vec2 right = new SwarmCombatPlanner.Vec2(ingress.z(), -ingress.x());
-        double desiredSign = Math.floorMod(formationSlot, 2) == 0 ? 1.0 : -1.0;
+        double desiredSign = preferredSign >= 0.0 ? 1.0 : -1.0;
 
         SwarmCombatPlanner.Vec2 destinationRelative = baseDestination.subtract(target);
         double currentLateral =
@@ -70,6 +87,20 @@ public final class SwarmFireSupportLanePolicy {
         double lateralCorrection = desiredLateral - currentLateral;
 
         return baseDestination.add(right.scale(lateralCorrection));
+    }
+
+    public static double choosePreferredSign(
+            int formationSlot,
+            boolean positiveLaneClear,
+            boolean negativeLaneClear
+    ) {
+        if (positiveLaneClear && !negativeLaneClear) {
+            return 1.0;
+        }
+        if (!positiveLaneClear && negativeLaneClear) {
+            return -1.0;
+        }
+        return Math.floorMod(formationSlot, 2) == 0 ? 1.0 : -1.0;
     }
 
     private SwarmFireSupportLanePolicy() {}
