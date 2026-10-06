@@ -62,6 +62,11 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS;
     public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN;
 
+    public static final ModConfigSpec.BooleanValue DIVISION_OF_LABOR_ENABLED;
+    public static final ModConfigSpec.IntValue SPECIALIZATION_MIN_HOLD_TICKS;
+    public static final ModConfigSpec.DoubleValue SPECIALIZATION_EXPERIENCE_GAIN;
+    public static final ModConfigSpec.DoubleValue SPECIALIZATION_EXPERIENCE_DECAY;
+
     public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
     public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
     public static final ModConfigSpec.DoubleValue SENSING_MAX_HORIZONTAL_NOISE;
@@ -306,6 +311,26 @@ public final class SwarmConfig {
         ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN = BUILDER
                 .comment("Maximum consecutive unsupported blocks a local Zombie team may commit to bridging.")
                 .defineInRange("zombieEngineeringMaxBridgeSpan", 4, 1, 8);
+
+        BUILDER.pop();
+
+        BUILDER.push("divisionOfLabor");
+
+        DIVISION_OF_LABOR_ENABLED = BUILDER
+                .comment("Enable dynamic local task demand, bidding, and within-species specialization.")
+                .define("enabled", true);
+
+        SPECIALIZATION_MIN_HOLD_TICKS = BUILDER
+                .comment("Minimum time a dynamic specialization is held before switching to another task.")
+                .defineInRange("minHoldTicks", 30, 0, 400);
+
+        SPECIALIZATION_EXPERIENCE_GAIN = BUILDER
+                .comment("Experience reinforcement added to the active task on each planning update.")
+                .defineInRange("experienceGain", 0.025, 0.0, 0.25);
+
+        SPECIALIZATION_EXPERIENCE_DECAY = BUILDER
+                .comment("Multiplicative experience retention per planning update; values below 1 slowly forget inactive specialization.")
+                .defineInRange("experienceDecay", 0.995, 0.90, 1.0);
 
         BUILDER.pop();
 
