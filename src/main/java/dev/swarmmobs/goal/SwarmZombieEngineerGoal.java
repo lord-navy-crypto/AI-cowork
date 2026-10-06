@@ -5,6 +5,7 @@ import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmEngineeringTaskPolicy;
+import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmZombieEngineeringPolicy;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -243,6 +244,18 @@ public final class SwarmZombieEngineerGoal extends Goal {
             localZombies.add(zombie);
         }
 
+        localZombies.sort(Comparator.comparingDouble(
+                candidate -> distanceToPositionSqr(candidate, position)
+        ));
+
+        int candidateLimit = Math.max(1, SwarmConfig.MAX_NEIGHBORS.get()) + 1;
+        if (localZombies.size() > candidateLimit) {
+            localZombies = new ArrayList<>(localZombies.subList(0, candidateLimit));
+            if (!localZombies.contains(zombie)) {
+                localZombies.set(localZombies.size() - 1, zombie);
+            }
+        }
+
         for (Zombie candidate : localZombies) {
             SwarmAgentState candidateState =
                     candidate.getData(SwarmAttachments.AGENT_STATE.get());
@@ -255,21 +268,64 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 }
             }
 
-            double dx = candidate.getX() - (position.getX() + 0.5);
-            double dy = candidate.getY() - (position.getY() + 0.5);
-            double dz = candidate.getZ() - (position.getZ() + 0.5);
+            double distanceSqr = distanceToPositionSqr(candidate, position);
+            boolean pathReachable = engineeringPathReachable(
+                    candidate,
+                    position,
+                    distanceSqr
+            );
 
             candidates.add(new SwarmEngineeringTaskPolicy.Candidate(
                     candidate.getUUID(),
-                    dx * dx + dy * dy + dz * dz,
+                    distanceSqr,
                     candidateState.role(),
                     candidateState.carriedEngineeringBlockCount(),
                     candidate == zombie,
-                    meleeBusy(candidate)
+                    meleeBusy(candidate),
+                    pathReachable
             ));
         }
 
         return SwarmEngineeringTaskPolicy.chooseClaimant(type, candidates);
+    }
+
+    private boolean engineeringPathReachable(
+            Zombie candidate,
+            BlockPos taskPosition,
+            double distanceSqr
+    ) {
+        if (candidate == zombie || distanceSqr <= WORK_RANGE * WORK_RANGE) {
+            return true;
+        }
+
+        if (!SwarmConfig.ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED.get()) {
+            return true;
+        }
+
+        var path = candidate.getNavigation().createPath(taskPosition, 1);
+        double residualDistance = path == null
+                ? Double.POSITIVE_INFINITY
+                : path.getDistToTarget();
+
+        return SwarmPathEvidencePolicy.acceptable(
+                path != null,
+                path != null && path.canReach(),
+                residualDistance,
+                Math.max(
+                        WORK_RANGE,
+                        SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get()
+                )
+        );
+    }
+
+    private static double distanceToPositionSqr(
+            Zombie candidate,
+            BlockPos position
+    ) {
+        double dx = candidate.getX() - (position.getX() + 0.5);
+        double dy = candidate.getY() - (position.getY() + 0.5);
+        double dz = candidate.getZ() - (position.getZ() + 0.5);
+        return dx * dx + dy * dy + dz * dz;
     }
 
     private boolean configureFromTask(
