@@ -1541,11 +1541,25 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
-            if ((spiderAState.role() != SwarmRole.FLANK_LEFT
-                    && spiderAState.role() != SwarmRole.FLANK_RIGHT)
-                    || (spiderBState.role() != SwarmRole.FLANK_LEFT
-                    && spiderBState.role() != SwarmRole.FLANK_RIGHT)) {
-                helper.fail("Dedicated Spider agents did not remain in flank roles");
+            boolean spiderAFlanking = spiderAState.role() == SwarmRole.FLANK_LEFT
+                    || spiderAState.role() == SwarmRole.FLANK_RIGHT;
+            boolean spiderBFlanking = spiderBState.role() == SwarmRole.FLANK_LEFT
+                    || spiderBState.role() == SwarmRole.FLANK_RIGHT;
+            boolean spiderAInterceptor =
+                    spiderAState.specialization() == dev.swarmmobs.agent.SwarmSpecialization.INTERCEPTOR
+                            && spiderAState.role() == SwarmRole.CHASER;
+            boolean spiderBInterceptor =
+                    spiderBState.specialization() == dev.swarmmobs.agent.SwarmSpecialization.INTERCEPTOR
+                            && spiderBState.role() == SwarmRole.CHASER;
+
+            if (!(spiderAFlanking || spiderBFlanking)) {
+                helper.fail("Dynamic Spider team lost all dedicated flank coverage");
+                return;
+            }
+
+            if ((!spiderAFlanking && !spiderAInterceptor)
+                    || (!spiderBFlanking && !spiderBInterceptor)) {
+                helper.fail("Spider specialization left both flank and interceptor responsibilities");
                 return;
             }
 
