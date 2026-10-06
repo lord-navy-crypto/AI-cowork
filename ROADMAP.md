@@ -344,3 +344,44 @@ Current contract:
 - every individual placement remains validated by the deterministic engineering goal.
 
 This intentionally avoids an atomic "build an arbitrary structure" action. The swarm commits only when a bounded short bridge is plausibly finishable, then proves progress one block at a time.
+
+
+### v0.12 — dynamic division of labor
+
+The heterogeneous swarm now gains a second layer above species capability: dynamic within-species specialization.
+
+Architecture:
+- species/archetype still defines hard capability boundaries;
+- local task demand signals describe what the swarm currently needs;
+- each agent has deterministic per-task response thresholds, inspired by response-threshold models of social-insect task allocation;
+- demand must exceed an individual threshold before that task is considered;
+- capability-aware utility bidding then includes experience, distance/cost, combat occupancy, and switching cost;
+- a generic deterministic task allocator provides stable UUID tie-breaking for unique claimant workflows;
+- existing Zombie engineering claimant selection now uses that shared allocator;
+- specialization has a minimum hold time to avoid task thrashing;
+- active-task experience is reinforced while inactive experience slowly decays.
+
+Initial task vocabulary:
+- SEARCH
+- FLANK
+- BREACH
+- RANGED_SUPPORT
+- ENGINEERING
+- MATERIAL
+- RESERVE
+
+Initial specialization vocabulary:
+- Zombie/ASSAULT: VANGUARD, ENGINEER, CARRIER, SCOUT, flank support, RESERVE
+- Skeleton/RANGED_SUPPORT: SUPPRESSOR, CROSSFIRE_LEFT, CROSSFIRE_RIGHT, OVERWATCH
+- Spider/FLANKER: SCOUT, FLANKER_LEFT, FLANKER_RIGHT, INTERCEPTOR
+- Creeper/BREACHER: LEAD_BREACHER, RESERVE_BREACHER
+
+Runtime integration:
+- specialization maps back onto the existing low-level SwarmRole system instead of replacing CombatPlanner;
+- Overwatch increases ranged standoff, Suppressor closes it, and Crossfire retains ranged-support geometry;
+- Engineer/Carrier/Reserve Zombies are biased behind Vanguard pressure;
+- Interceptor Spiders can leave pure flank geometry for pursuit;
+- reserve Creepers remain behind the lead breacher;
+- active Ollama strategy may bias task demand (for example ENCIRCLE raises FLANK demand), but it still cannot choose a specific agent or exact coordinate.
+
+This layer is intentionally decentralized and reproducible: no random per-tick role lottery and no LLM per-agent commands.
