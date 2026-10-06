@@ -27,7 +27,8 @@ public final class SwarmEngineeringTaskPolicy {
             int carriedBlocks,
             boolean requester,
             boolean meleeBusy,
-            boolean pathReachable
+            boolean pathReachable,
+            boolean materialAvailable
     ) {}
 
     public static UUID chooseClaimant(
@@ -65,7 +66,7 @@ public final class SwarmEngineeringTaskPolicy {
         }
 
         return type != SwarmEngineeringTask.Type.BRIDGE
-                || candidate.carriedBlocks() > 0;
+                || candidate.materialAvailable();
     }
 
     public static double score(
