@@ -2,6 +2,7 @@ package dev.swarmmobs.agent;
 
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -68,6 +69,10 @@ public final class SwarmAgentState {
     private long searchEpisodesFailed;
     private long searchReacquisitionTicksTotal;
     private long lastSearchReacquisitionTicks;
+    private BlockState carriedEngineeringBlock;
+    private int carriedEngineeringBlockCount;
+    private long engineeringBlocksBroken;
+    private long engineeringBlocksPlaced;
 
     private final List<TargetMessage> pendingTargetMessages = new ArrayList<>();
     private final LinkedHashMap<MessageSourceTargetKey, Long> latestDeliveredObservationBySource =
@@ -286,6 +291,56 @@ public final class SwarmAgentState {
 
     public double lastSensingNoiseMagnitude() {
         return lastSensingNoiseMagnitude;
+    }
+
+    public BlockState carriedEngineeringBlock() {
+        return carriedEngineeringBlock;
+    }
+
+    public int carriedEngineeringBlockCount() {
+        return carriedEngineeringBlockCount;
+    }
+
+    public long engineeringBlocksBroken() {
+        return engineeringBlocksBroken;
+    }
+
+    public long engineeringBlocksPlaced() {
+        return engineeringBlocksPlaced;
+    }
+
+    public boolean canCarryEngineeringBlock(BlockState state, int maxCount) {
+        if (state == null || maxCount <= 0) {
+            return false;
+        }
+        return carriedEngineeringBlockCount == 0
+                || (carriedEngineeringBlock != null
+                && carriedEngineeringBlock.is(state.getBlock())
+                && carriedEngineeringBlockCount < maxCount);
+    }
+
+    public boolean salvageEngineeringBlock(BlockState state, int maxCount) {
+        if (!canCarryEngineeringBlock(state, maxCount)) {
+            return false;
+        }
+        if (carriedEngineeringBlockCount == 0) {
+            carriedEngineeringBlock = state;
+        }
+        carriedEngineeringBlockCount++;
+        engineeringBlocksBroken++;
+        return true;
+    }
+
+    public boolean consumeEngineeringBlock() {
+        if (carriedEngineeringBlockCount <= 0 || carriedEngineeringBlock == null) {
+            return false;
+        }
+        carriedEngineeringBlockCount--;
+        engineeringBlocksPlaced++;
+        if (carriedEngineeringBlockCount == 0) {
+            carriedEngineeringBlock = null;
+        }
+        return true;
     }
 
     public int pendingTargetMessageCount() {
