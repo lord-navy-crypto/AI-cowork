@@ -139,10 +139,17 @@ Current implementation:
 - local swarm-congestion penalty to reduce same-side crowding;
 - live Navigation-page tuning for local-planner weights.
 
+Current v0.8.1 extension:
+- optional Minecraft PathNavigation path creation for each terrain-feasible local candidate;
+- reject candidates whose generated path cannot reach the candidate target;
+- penalize longer node sequences and residual path distance;
+- bound the extra pathfinding work to at most four candidates and only after a confirmed front obstruction;
+- live Navigation-page controls for path evidence and path penalties.
+
 Next within v0.8:
-- Minecraft PathNavigation reachability/path-cost evidence;
 - improved recovery candidate validation;
-- explicit planner score/candidate telemetry.
+- explicit planner score/candidate telemetry;
+- performance telemetry for path-evidence query counts.
 
 ### v0.9 — experiment and evaluation layer
 - reacquisition time;
