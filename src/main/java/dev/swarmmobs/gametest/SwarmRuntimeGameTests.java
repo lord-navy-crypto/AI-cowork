@@ -645,8 +645,7 @@ public final class SwarmRuntimeGameTests {
 
         TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
         ServerPlayer player = playerHandle.player();
-        Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
-        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setPos(zombie.getX() + 1.0, zombie.getY(), zombie.getZ());
         player.setNoGravity(true);
         float startingHealth = player.getHealth();
 
@@ -699,8 +698,7 @@ public final class SwarmRuntimeGameTests {
 
         TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
         ServerPlayer player = playerHandle.player();
-        Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 2.0));
-        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setPos(spider.getX() + 1.0, spider.getY(), spider.getZ());
         player.setNoGravity(true);
         float startingHealth = player.getHealth();
 
