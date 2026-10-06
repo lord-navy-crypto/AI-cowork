@@ -3,11 +3,15 @@ package dev.swarmmobs.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmPlannerContext;
+import dev.swarmmobs.ai.SwarmAiShadowService;
+import dev.swarmmobs.ai.SwarmAiShadowState;
+import dev.swarmmobs.ai.ollama.OllamaStrategyProvider;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
@@ -165,9 +169,153 @@ public final class SwarmCommands {
                 .then(Commands.literal("snapshot")
                         .executes(context -> snapshotExperiment(context.getSource())));
 
+        var ai = Commands.literal("ai")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("status")
+                        .executes(context -> aiStatus(context.getSource())))
+                .then(Commands.literal("models")
+                        .executes(context -> aiModels(context.getSource())))
+                .then(Commands.literal("model")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(context -> aiModel(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+                .then(Commands.literal("on")
+                        .executes(context -> setAiEnabled(context.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(context -> setAiEnabled(context.getSource(), false)))
+                .then(Commands.literal("shadow")
+                        .executes(context -> runAiShadow(context.getSource())));
+
         root.then(experiment);
+        root.then(ai);
         root.then(debug);
         dispatcher.register(root);
+    }
+
+    private static int setAiEnabled(CommandSourceStack source, boolean enabled) {
+        SwarmConfig.EXTERNAL_AI_ENABLED.set(enabled);
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm AI shadow mode: " + (enabled ? "ON" : "OFF")
+                                + ". Gameplay controller remains deterministic."
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int aiModel(CommandSourceStack source, String model) {
+        String selected = model == null ? "" : model.trim();
+        SwarmConfig.OLLAMA_MODEL.set(selected);
+        source.sendSuccess(
+                () -> Component.literal(
+                        selected.isBlank()
+                                ? "Swarm AI model cleared."
+                                : "Swarm AI model=" + selected
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int aiStatus(CommandSourceStack source) {
+        var shadow = SwarmAiShadowState.snapshot();
+        source.sendSuccess(
+                () -> Component.literal(
+                        "AI shadow: enabled=" + SwarmConfig.EXTERNAL_AI_ENABLED.get()
+                                + ", model=" + SwarmConfig.OLLAMA_MODEL.get()
+                                + ", endpoint=" + SwarmConfig.OLLAMA_BASE_URL.get()
+                                + ", requestInFlight=" + SwarmAiShadowService.requestInFlight()
+                                + ", state=" + shadow.status()
+                                + ", lastMode=" + shadow.lastDecision().mode()
+                                + ", provider=" + shadow.lastDecision().providerId()
+                                + ", latencyMs=" + shadow.lastLatencyMs()
+                                + ", success=" + shadow.successCount()
+                                + ", fallback=" + shadow.fallbackCount()
+                                + ", errors=" + shadow.errorCount()
+                                + ", rationale=" + shadow.lastDecision().rationale()
+                ),
+                false
+        );
+
+        OllamaStrategyProvider.INSTANCE.status().whenComplete((status, error) ->
+                source.getServer().execute(() -> {
+                    if (error != null) {
+                        source.sendFailure(Component.literal("Ollama status failed: " + error.getMessage()));
+                    } else {
+                        source.sendSuccess(
+                                () -> Component.literal(
+                                        "Ollama: available=" + status.available()
+                                                + ", model=" + status.model()
+                                                + ", " + status.message()
+                                ),
+                                false
+                        );
+                    }
+                })
+        );
+        return 1;
+    }
+
+    private static int aiModels(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal("Querying local Ollama models asynchronously..."), false);
+        OllamaStrategyProvider.INSTANCE.listModels().whenComplete((models, error) ->
+                source.getServer().execute(() -> {
+                    if (error != null) {
+                        source.sendFailure(Component.literal("Ollama model query failed: " + error.getMessage()));
+                    } else {
+                        source.sendSuccess(
+                                () -> Component.literal(
+                                        models.isEmpty()
+                                                ? "Ollama reported no local models."
+                                                : "Ollama models: " + String.join(", ", models)
+                                ),
+                                false
+                        );
+                    }
+                })
+        );
+        return 1;
+    }
+
+    private static int runAiShadow(CommandSourceStack source) {
+        if (SwarmAiShadowService.requestInFlight()) {
+            source.sendFailure(Component.literal("A shadow AI request is already in flight."));
+            return 0;
+        }
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "AI shadow request started. Recommendation will be recorded only; gameplay is unchanged."
+                ),
+                false
+        );
+
+        SwarmAiShadowService.request(source.getLevel()).whenComplete((decision, error) ->
+                source.getServer().execute(() -> {
+                    if (error != null) {
+                        source.sendFailure(Component.literal("AI shadow request failed: " + error.getMessage()));
+                    } else {
+                        source.sendSuccess(
+                                () -> Component.literal(String.format(
+                                        java.util.Locale.ROOT,
+                                        "AI shadow recommendation: mode=%s, formation=%.2f, separation=%.2f, cohesion=%.2f, searchRadius=%.2f, provider=%s, rationale=%s",
+                                        decision.mode(),
+                                        decision.formationRadiusMultiplier(),
+                                        decision.separationMultiplier(),
+                                        decision.cohesionMultiplier(),
+                                        decision.searchRadiusMultiplier(),
+                                        decision.providerId(),
+                                        decision.rationale()
+                                )),
+                                false
+                        );
+                    }
+                })
+        );
+        return 1;
     }
 
     private static int applyExperimentPreset(CommandSourceStack source, SwarmExperimentPreset preset) {
