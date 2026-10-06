@@ -423,6 +423,11 @@ public final class SwarmRuntimeGameTests {
                 requester.getZ()
         );
         helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
 
         SwarmZombieEngineerGoal requesterGoal = requester.goalSelector.getAvailableGoals().stream()
                 .map(wrapped -> wrapped.getGoal())
