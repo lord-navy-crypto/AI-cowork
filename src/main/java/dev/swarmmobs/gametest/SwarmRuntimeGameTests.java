@@ -590,6 +590,12 @@ public final class SwarmRuntimeGameTests {
 
             helper.setBlock(new BlockPos(2, 1, 2), Blocks.AIR);
             helper.setBlock(new BlockPos(2, 2, 2), Blocks.AIR);
+            Vec3 reacquisitionPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+            player.setPos(
+                    reacquisitionPosition.x,
+                    reacquisitionPosition.y,
+                    reacquisitionPosition.z
+            );
         });
 
         helper.runAfterDelay(searchCheckTick + 18, () -> {
