@@ -220,6 +220,86 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_execution_lease", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 160)
+    public static void claimedLongBreakOutlivesEngineeringAdvertisementTtl(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.STONE.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Long-break engineering fixture could not start");
+            return;
+        }
+
+        engineer.start();
+
+        int afterAdvertisementExpiry =
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.get() + 5;
+
+        helper.runAfterDelay(afterAdvertisementExpiry, () -> {
+            if (!engineer.canContinueToUse()) {
+                server.setDifficulty(previousDifficulty, true);
+                helper.fail("Claimed long break was aborted when advertisement TTL expired");
+                return;
+            }
+
+            for (int i = 0; i < 170; i++) {
+                engineer.tick();
+            }
+            engineer.stop();
+
+            if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+                server.setDifficulty(previousDifficulty, true);
+                helper.fail("Long-break engineering lease did not allow STONE removal");
+                return;
+            }
+
+            server.setDifficulty(previousDifficulty, true);
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_recovery", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
     public static void recoveryCanEscalateToZombieEngineeringWithOneFallbackCandidate(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
