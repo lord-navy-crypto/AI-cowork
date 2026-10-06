@@ -82,4 +82,46 @@ class SwarmAgentNavigationTelemetryTest {
         assertEquals(3L, state.recoveryPlanningAttempts());
         assertEquals(2L, state.recoveryPlanningFailures());
     }
+    @Test
+    void plannerTelemetryTracksCandidateDecisionAndCumulativeQueries() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                1,
+                1,
+                2,
+                3,
+                1.75,
+                3
+        );
+
+        assertEquals(SwarmPlannerContext.OBSTACLE_DETOUR, state.plannerContext());
+        assertEquals(4, state.plannerCandidateCount());
+        assertEquals(1, state.plannerBlockedCount());
+        assertEquals(1, state.plannerUnreachableCount());
+        assertEquals(2, state.plannerFeasibleCount());
+        assertEquals(3, state.plannerSelectedIndex());
+        assertEquals(1.75, state.plannerSelectedScore(), 1.0e-9);
+        assertEquals(3L, state.plannerPathQueryCount());
+
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.RECOVERY,
+                6,
+                2,
+                0,
+                4,
+                1,
+                0.5,
+                4
+        );
+
+        assertEquals(SwarmPlannerContext.RECOVERY, state.plannerContext());
+        assertEquals(7L, state.plannerPathQueryCount());
+
+        state.clearNavigationTelemetry();
+        assertEquals(SwarmPlannerContext.NONE, state.plannerContext());
+        assertEquals(7L, state.plannerPathQueryCount());
+    }
 }
