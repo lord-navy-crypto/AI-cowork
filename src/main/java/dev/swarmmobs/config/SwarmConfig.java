@@ -44,6 +44,10 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue NAV_OBSTACLE_ARRIVAL_TOLERANCE;
     public static final ModConfigSpec.BooleanValue NAV_WALKABILITY_ENABLED;
     public static final ModConfigSpec.IntValue NAV_MAX_PROBE_DROP_BLOCKS;
+    public static final ModConfigSpec.DoubleValue NAV_LOCAL_PROGRESS_WEIGHT;
+    public static final ModConfigSpec.DoubleValue NAV_LOCAL_LATERAL_PENALTY;
+    public static final ModConfigSpec.DoubleValue NAV_LOCAL_CONGESTION_PENALTY;
+    public static final ModConfigSpec.DoubleValue NAV_LOCAL_CONGESTION_RADIUS;
 
     public static final ModConfigSpec.BooleanValue SENSING_IMPERFECTION_ENABLED;
     public static final ModConfigSpec.DoubleValue SENSING_DROPOUT_RATE;
@@ -218,6 +222,22 @@ public final class SwarmConfig {
         NAV_MAX_PROBE_DROP_BLOCKS = BUILDER
                 .comment("Maximum vertical drop, in blocks, accepted when checking local probe ground support.")
                 .defineInRange("navMaxProbeDropBlocks", 1, 0, 4);
+
+        NAV_LOCAL_PROGRESS_WEIGHT = BUILDER
+                .comment("Weight rewarding short-horizon progress toward the swarm destination.")
+                .defineInRange("navLocalProgressWeight", 1.0, 0.0, 4.0);
+
+        NAV_LOCAL_LATERAL_PENALTY = BUILDER
+                .comment("Penalty applied to excessive sideways detours.")
+                .defineInRange("navLocalLateralPenalty", 0.20, 0.0, 4.0);
+
+        NAV_LOCAL_CONGESTION_PENALTY = BUILDER
+                .comment("Penalty applied to local planner candidates crowded by nearby swarm agents.")
+                .defineInRange("navLocalCongestionPenalty", 0.75, 0.0, 4.0);
+
+        NAV_LOCAL_CONGESTION_RADIUS = BUILDER
+                .comment("Radius, in blocks, used to estimate crowding around local navigation candidates.")
+                .defineInRange("navLocalCongestionRadius", 2.5, 0.5, 8.0);
 
         BUILDER.pop();
 

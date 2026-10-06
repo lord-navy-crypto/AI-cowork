@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.6.1; current integration work: `swarm-role-reassignment-v0.7.0`
+Active stable line: `main` through v0.7.0; current integration work: `swarm-local-planner-v0.8.0`
 
 The current playable system includes:
 
@@ -63,6 +63,7 @@ The current playable system includes:
 - optional deterministic direct-sensing dropout and bounded horizontal observation noise for reproducible fault-injection experiments;
 - a server-authoritative in-game control panel for live Sensing, Communication, Coordination, Search/Prediction, and Navigation tuning;
 - bounded tactical-role reassignment hysteresis with pending-role and reassignment telemetry;
+- multi-candidate local navigation scoring that combines terrain feasibility, forward progress, lateral cost, and nearby swarm congestion;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -87,6 +88,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.6.1 is merged on `main`; v0.7.0 role reassignment stability is under integration.**
+**Swarm Mobs v0.7.0 is merged on `main`; v0.8.0 terrain-aware local candidate planning is under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.

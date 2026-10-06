@@ -315,6 +315,42 @@ public final class SwarmControlScreen extends Screen {
                 "nav_recovery_duration_delta",
                 3.0
         );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Progress weight",
+                format(number("navProgressWeight")),
+                "nav_progress_weight_delta",
+                0.10
+        );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Lateral penalty",
+                format(number("navLateralPenalty")),
+                "nav_lateral_penalty_delta",
+                0.10
+        );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Congestion penalty",
+                format(number("navCongestionPenalty")),
+                "nav_congestion_penalty_delta",
+                0.10
+        );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Congestion radius",
+                format(number("navCongestionRadius")) + " blocks",
+                "nav_congestion_radius_delta",
+                0.25
+        );
         y += 34;
 
         addRenderableWidget(

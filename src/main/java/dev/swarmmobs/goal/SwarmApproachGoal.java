@@ -7,6 +7,7 @@ import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
+import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
@@ -22,7 +23,9 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 
 /**
  * Owns movement while a supported swarm member is repositioning.
@@ -250,23 +253,64 @@ public final class SwarmApproachGoal extends Goal {
         Vec2 left = new Vec2(-forward.z(), forward.x());
 
         Vec2 frontProbe = self.add(forward.scale(Math.min(distance, lookahead)));
-        Vec2 leftProbe = frontProbe.add(left.scale(lateralDistance));
-        Vec2 rightProbe = frontProbe.add(left.scale(-lateralDistance));
-
         boolean frontBlocked = isProbeBlocked(level, frontProbe.x(), frontProbe.z());
-        boolean leftBlocked = isProbeBlocked(level, leftProbe.x(), leftProbe.z());
-        boolean rightBlocked = isProbeBlocked(level, rightProbe.x(), rightProbe.z());
+        if (!frontBlocked) {
+            return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
+        }
 
-        return SwarmObstacleAvoidancePolicy.chooseWaypoint(
+        double[] lateralScales = {0.75, -0.75, 1.50, -1.50};
+        List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
+
+        for (double scale : lateralScales) {
+            double lateralOffset = lateralDistance * scale;
+            Vec2 candidate = frontProbe.add(left.scale(lateralOffset));
+            boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
+            double congestion = localCongestion(level, candidate);
+
+            candidates.add(new SwarmLocalPlannerPolicy.Candidate(
+                    candidate,
+                    blocked,
+                    lateralOffset,
+                    congestion
+            ));
+        }
+
+        SwarmLocalPlannerPolicy.Choice choice = SwarmLocalPlannerPolicy.choose(
                 self,
                 destination,
-                mob.getId(),
-                frontBlocked,
-                leftBlocked,
-                rightBlocked,
-                lookahead,
-                lateralDistance
+                candidates,
+                SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get(),
+                SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get(),
+                SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get()
         );
+
+        if (!choice.active()) {
+            return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
+        }
+
+        Vec2 lateralDelta = choice.waypoint().subtract(frontProbe);
+        double lateralProjection = lateralDelta.x() * left.x() + lateralDelta.z() * left.z();
+        int side = lateralProjection >= 0.0 ? 1 : -1;
+        return new SwarmObstacleAvoidancePolicy.Avoidance(choice.waypoint(), true, side);
+    }
+
+    private double localCongestion(ServerLevel level, Vec2 candidate) {
+        double radius = SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get();
+        double radiusSqr = radius * radius;
+
+        return level.getEntitiesOfClass(
+                        PathfinderMob.class,
+                        mob.getBoundingBox().inflate(radius + SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.get()),
+                        peer -> peer != mob
+                                && peer.isAlive()
+                                && SwarmAgentProfiles.isSupported(peer)
+                ).stream()
+                .filter(peer -> {
+                    double dx = peer.getX() - candidate.x();
+                    double dz = peer.getZ() - candidate.z();
+                    return dx * dx + dz * dz <= radiusSqr;
+                })
+                .count();
     }
 
     private boolean isProbeBlocked(ServerLevel level, double x, double z) {
