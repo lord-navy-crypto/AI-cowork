@@ -471,6 +471,23 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
+            double ingressX = creeper.getX() - player.getX();
+            double ingressZ = creeper.getZ() - player.getZ();
+            double ingressLength = Math.hypot(ingressX, ingressZ);
+            if (ingressLength > 0.5) {
+                double supportX = skeletonState.destinationX() - player.getX();
+                double supportZ = skeletonState.destinationZ() - player.getZ();
+                double lateralClearance = Math.abs(
+                        supportX * ingressZ - supportZ * ingressX
+                ) / ingressLength;
+
+                if (lateralClearance < 2.5) {
+                    playerHandle.close();
+                    helper.fail("Skeleton support destination remained too close to Creeper ingress axis");
+                    return;
+                }
+            }
+
             playerHandle.close();
             helper.succeed();
         });
