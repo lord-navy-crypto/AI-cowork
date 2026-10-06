@@ -694,8 +694,10 @@ public final class SwarmZombieEngineerGoal extends Goal {
         if (candidate.getTarget() == null) {
             return false;
         }
+
         double release = SwarmConfig.RELEASE_TO_VANILLA_DISTANCE.get();
-        return candidate.distanceToSqr(candidate.getTarget()) <= release * release;
+        return candidate.distanceToSqr(candidate.getTarget()) <= release * release
+                && candidate.hasLineOfSight(candidate.getTarget());
     }
 
     private void tickBreak() {
