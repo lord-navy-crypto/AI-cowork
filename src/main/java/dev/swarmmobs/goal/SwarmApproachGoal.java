@@ -9,6 +9,7 @@ import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
+import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmRecoveryCandidatePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
@@ -284,12 +285,19 @@ public final class SwarmApproachGoal extends Goal {
                         0
                 );
 
-                pathReachable = path != null && path.canReach();
-                if (!pathReachable) unreachableCount++;
                 if (path != null) {
                     pathNodeCount = path.getNodeCount();
                     pathResidualDistance = path.getDistToTarget();
+                } else {
+                    pathResidualDistance = Double.POSITIVE_INFINITY;
                 }
+                pathReachable = SwarmPathEvidencePolicy.acceptable(
+                        path != null,
+                        path != null && path.canReach(),
+                        pathResidualDistance,
+                        SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get()
+                );
+                if (!pathReachable) unreachableCount++;
             }
 
             candidates.add(new SwarmLocalPlannerPolicy.Candidate(
@@ -425,12 +433,19 @@ public final class SwarmApproachGoal extends Goal {
                         BlockPos.containing(candidate.x(), mob.getY(), candidate.z()),
                         0
                 );
-                pathReachable = path != null && path.canReach();
-                if (!pathReachable) unreachableCount++;
                 if (path != null) {
                     pathNodeCount = path.getNodeCount();
                     pathResidualDistance = path.getDistToTarget();
+                } else {
+                    pathResidualDistance = Double.POSITIVE_INFINITY;
                 }
+                pathReachable = SwarmPathEvidencePolicy.acceptable(
+                        path != null,
+                        path != null && path.canReach(),
+                        pathResidualDistance,
+                        SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.get()
+                );
+                if (!pathReachable) unreachableCount++;
             }
 
             candidates.add(new SwarmLocalPlannerPolicy.Candidate(
