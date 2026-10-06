@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.8.1; current integration work: `swarm-recovery-planner-v0.8.2`
+Active stable line: `main` through v0.8.2; current integration work: `swarm-planner-telemetry-v0.8.3`
 
 The current playable system includes:
 
@@ -66,6 +66,7 @@ The current playable system includes:
 - multi-candidate local navigation scoring that combines terrain feasibility, forward progress, lateral cost, and nearby swarm congestion;
 - optional Minecraft PathNavigation reachability/path-cost evidence for local detour candidates;
 - multi-direction stuck recovery planning that validates six escape candidates with terrain, congestion, and path evidence before committing;
+- explainable local-planner telemetry for candidate counts, blocked/unreachable filtering, selected index/score, and cumulative PathNavigation query count;
 - runtime telemetry, particle debugging, JUnit coverage, and Minecraft GameTest-server integration tests;
 - external AI remains reserved and disabled while deterministic baselines are developed.
 
@@ -90,6 +91,6 @@ The GitHub Actions pipeline compiles against Minecraft 1.21.1 / NeoForge 21.1.24
 
 ## Status
 
-**Swarm Mobs v0.8.1 is merged on `main`; v0.8.2 validated multi-candidate stuck recovery is under integration.**
+**Swarm Mobs v0.8.2 is merged on `main`; v0.8.3 explainable planner telemetry and forced recovery Runtime GameTest are under integration.**
 
 The old AI CoWork implementation is no longer developed on `main`. Use the archive branch above if historical AI CoWork source is needed.
