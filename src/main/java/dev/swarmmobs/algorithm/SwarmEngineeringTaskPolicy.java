@@ -3,7 +3,6 @@ package dev.swarmmobs.algorithm;
 import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmRole;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,16 +38,15 @@ public final class SwarmEngineeringTaskPolicy {
             return null;
         }
 
-        return candidates.stream()
-                .filter(candidate -> eligible(type, candidate))
-                .min(
-                        Comparator.comparingDouble(
-                                        (Candidate candidate) -> score(type, candidate)
-                                )
-                                .thenComparing(candidate -> candidate.entityId().toString())
-                )
-                .map(Candidate::entityId)
-                .orElse(null);
+        return SwarmTaskAllocator.winner(
+                candidates.stream()
+                        .map(candidate -> new SwarmTaskAllocator.Offer(
+                                candidate.entityId(),
+                                -score(type, candidate),
+                                eligible(type, candidate)
+                        ))
+                        .toList()
+        );
     }
 
     public static boolean eligible(
