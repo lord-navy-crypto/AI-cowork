@@ -3,7 +3,6 @@ package dev.swarmmobs.algorithm;
 import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmTaskType;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,15 +63,18 @@ public final class SwarmTaskBidPolicy {
             return null;
         }
 
-        return candidates.stream()
-                .map(candidate -> bid(candidate, task, demand))
-                .filter(bid -> Double.isFinite(bid.utility()))
-                .max(
-                        Comparator.comparingDouble(Bid::utility)
-                                .thenComparing(bid -> bid.entityId().toString(), Comparator.reverseOrder())
-                )
-                .map(Bid::entityId)
-                .orElse(null);
+        return SwarmTaskAllocator.winner(
+                candidates.stream()
+                        .map(candidate -> {
+                            Bid bid = bid(candidate, task, demand);
+                            return new SwarmTaskAllocator.Offer(
+                                    bid.entityId(),
+                                    bid.utility(),
+                                    Double.isFinite(bid.utility())
+                            );
+                        })
+                        .toList()
+        );
     }
 
     public static double responseThreshold(
