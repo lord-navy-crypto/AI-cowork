@@ -1,6 +1,15 @@
 package dev.swarmmobs.network;
 
 import dev.swarmmobs.client.SwarmControlClient;
+import dev.swarmmobs.agent.SwarmAgentProfiles;
+import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.agent.SwarmSpecialization;
+import dev.swarmmobs.agent.SwarmTaskType;
+import dev.swarmmobs.ai.SwarmAiActiveState;
+import dev.swarmmobs.data.SwarmAttachments;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.EntityType;
+import java.util.EnumMap;
 import dev.swarmmobs.ai.SwarmAiShadowService;
 import dev.swarmmobs.ai.SwarmAiShadowState;
 import dev.swarmmobs.config.SwarmConfig;
@@ -113,6 +122,75 @@ public final class SwarmControlNetwork {
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
             }
+
+            case "toggle_division" ->
+                    SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(!SwarmConfig.DIVISION_OF_LABOR_ENABLED.get());
+            case "specialization_hold_delta" -> SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.set((int) clamp(
+                    SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.get() + value,
+                    0.0,
+                    400.0
+            ));
+            case "specialization_gain_delta" -> SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.set(clamp(
+                    SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.get() + value,
+                    0.0,
+                    0.25
+            ));
+            case "specialization_decay_delta" -> SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.set(clamp(
+                    SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.get() + value,
+                    0.90,
+                    1.0
+            ));
+            case "labor_baseline" -> {
+                SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(true);
+                SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.set(30);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.set(0.025);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.set(0.995);
+            }
+
+            case "toggle_engineering" ->
+                    SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(!SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.get());
+            case "engineering_hardness_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.set(clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.get() + value,
+                    0.0,
+                    10.0
+            ));
+            case "engineering_carry_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set((int) clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get() + value,
+                    0.0,
+                    16.0
+            ));
+            case "engineering_radius_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get() + value,
+                    2.0,
+                    24.0
+            ));
+            case "engineering_ttl_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set((int) clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.get() + value,
+                    10.0,
+                    400.0
+            ));
+            case "engineering_handoff_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.get() + value,
+                    0.5,
+                    6.0
+            ));
+            case "engineering_bridge_delta" -> SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set((int) clamp(
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.get() + value,
+                    1.0,
+                    8.0
+            ));
+            case "engineering_baseline" -> {
+                SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.set(2.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set(4);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(8.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set(40);
+                SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(2.5);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
+            }
+
+            case "ai_active_toggle" ->
+                    SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(!SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get());
 
             case "toggle_sensing" ->
                     SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(!SwarmConfig.SENSING_IMPERFECTION_ENABLED.get());
@@ -293,6 +371,18 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ENABLED.set(true);
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
+                SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(true);
+                SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.set(30);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.set(0.025);
+                SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.set(0.995);
+
+                SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.set(2.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set(4);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(8.0);
+                SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set(40);
+                SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(2.5);
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
 
                 SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(false);
                 SwarmConfig.SENSING_DROPOUT_RATE.set(0.0);
@@ -335,6 +425,35 @@ public final class SwarmControlNetwork {
         var metrics = SwarmExperimentMetrics.snapshot(level);
         var ai = SwarmAiShadowState.snapshot();
         var decision = ai.lastDecision();
+        var activeAi = SwarmAiActiveState.snapshot(level.getGameTime());
+
+        int zombies = 0;
+        int skeletons = 0;
+        int spiders = 0;
+        int creepers = 0;
+        EnumMap<SwarmTaskType, Integer> taskCounts = new EnumMap<>(SwarmTaskType.class);
+        EnumMap<SwarmSpecialization, Integer> specializationCounts =
+                new EnumMap<>(SwarmSpecialization.class);
+
+        for (var entity : level.getAllEntities()) {
+            if (!(entity instanceof PathfinderMob mob) || !SwarmAgentProfiles.isSupported(mob)) {
+                continue;
+            }
+
+            if (mob.getType() == EntityType.ZOMBIE) {
+                zombies++;
+            } else if (mob.getType() == EntityType.SKELETON) {
+                skeletons++;
+            } else if (mob.getType() == EntityType.SPIDER) {
+                spiders++;
+            } else if (mob.getType() == EntityType.CREEPER) {
+                creepers++;
+            }
+
+            SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
+            taskCounts.merge(state.currentTask(), 1, Integer::sum);
+            specializationCounts.merge(state.specialization(), 1, Integer::sum);
+        }
 
         return String.join(";",
                 pair("aiEnabled", SwarmConfig.EXTERNAL_AI_ENABLED.get()),
@@ -354,6 +473,47 @@ public final class SwarmControlNetwork {
                 pair("aiRationale", decision.rationale()),
                 pair("aiLastError", ai.lastError()),
                 pair("master", SwarmConfig.ENABLED.get()),
+                pair("liveAgents", zombies + skeletons + spiders + creepers),
+                pair("liveZombies", zombies),
+                pair("liveSkeletons", skeletons),
+                pair("liveSpiders", spiders),
+                pair("liveCreepers", creepers),
+                pair("taskSearch", taskCounts.getOrDefault(SwarmTaskType.SEARCH, 0)),
+                pair("taskFlank", taskCounts.getOrDefault(SwarmTaskType.FLANK, 0)),
+                pair("taskBreach", taskCounts.getOrDefault(SwarmTaskType.BREACH, 0)),
+                pair("taskRanged", taskCounts.getOrDefault(SwarmTaskType.RANGED_SUPPORT, 0)),
+                pair("taskEngineering", taskCounts.getOrDefault(SwarmTaskType.ENGINEERING, 0)),
+                pair("taskMaterial", taskCounts.getOrDefault(SwarmTaskType.MATERIAL, 0)),
+                pair("taskReserve", taskCounts.getOrDefault(SwarmTaskType.RESERVE, 0)),
+                pair("specEngineer", specializationCounts.getOrDefault(SwarmSpecialization.ENGINEER, 0)),
+                pair("specCarrier", specializationCounts.getOrDefault(SwarmSpecialization.CARRIER, 0)),
+                pair("specScout", specializationCounts.getOrDefault(SwarmSpecialization.SCOUT, 0)),
+                pair("specInterceptor", specializationCounts.getOrDefault(SwarmSpecialization.INTERCEPTOR, 0)),
+                pair("specOverwatch", specializationCounts.getOrDefault(SwarmSpecialization.OVERWATCH, 0)),
+                pair("specLeadBreacher", specializationCounts.getOrDefault(SwarmSpecialization.LEAD_BREACHER, 0)),
+                pair("divisionEnabled", SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()),
+                pair("specializationHoldTicks", SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.get()),
+                pair("specializationExperienceGain", SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.get()),
+                pair("specializationExperienceDecay", SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.get()),
+                pair("engineeringEnabled", SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.get()),
+                pair("engineeringMaxHardness", SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.get()),
+                pair("engineeringMaxCarry", SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()),
+                pair("engineeringTaskRadius", SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get()),
+                pair("engineeringTaskTtl", SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.get()),
+                pair("engineeringHandoffRadius", SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.get()),
+                pair("engineeringMaxBridgeSpan", SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.get()),
+                pair("metricEngineeringBroken", (int) Math.min(Integer.MAX_VALUE, metrics.engineeringBlocksBroken())),
+                pair("metricEngineeringPlaced", (int) Math.min(Integer.MAX_VALUE, metrics.engineeringBlocksPlaced())),
+                pair("metricEngineeringCarried", metrics.carriedEngineeringBlocks()),
+                pair("metricEngineeringRequests", (int) Math.min(Integer.MAX_VALUE, metrics.engineeringRequestsPublished())),
+                pair("metricEngineeringClaimed", (int) Math.min(Integer.MAX_VALUE, metrics.engineeringTasksClaimed())),
+                pair("metricEngineeringCompleted", (int) Math.min(Integer.MAX_VALUE, metrics.engineeringTasksCompleted())),
+                pair("aiActiveEnabled", SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()),
+                pair("aiActive", activeAi.active()),
+                pair("aiActiveMode", activeAi.decision().mode().name()),
+                pair("aiActiveExpiresIn", activeAi.active()
+                        ? (int) Math.max(0L, activeAi.expiresTick() - level.getGameTime())
+                        : 0),
                 "activePreset=" + SwarmExperimentManager.activePreset().name(),
                 pair("experimentSeed", SwarmExperimentManager.experimentSeed()),
                 pair("experimentActive", metrics.active()),
