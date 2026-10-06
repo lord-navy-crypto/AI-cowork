@@ -23,10 +23,12 @@ import dev.swarmmobs.debug.SwarmDebugParticles;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
+import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Skeleton;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
@@ -58,6 +60,8 @@ public final class SwarmMobEvents {
             mob.goalSelector.addGoal(0, new SwarmSkeletonBowGoal(skeleton));
         } else if (mob instanceof Creeper creeper) {
             mob.goalSelector.addGoal(0, new SwarmCreeperSwellGoal(creeper));
+        } else if (mob instanceof Zombie zombie) {
+            mob.goalSelector.addGoal(0, new SwarmZombieEngineerGoal(zombie));
         }
 
         mob.goalSelector.addGoal(1, new SwarmApproachGoal(mob));
