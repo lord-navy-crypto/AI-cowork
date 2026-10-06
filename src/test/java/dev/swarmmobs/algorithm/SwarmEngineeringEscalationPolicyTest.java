@@ -38,6 +38,16 @@ class SwarmEngineeringEscalationPolicyTest {
     }
 
     @Test
+    void recoveryMayEscalateWithSeveralFallbacksWhenObstacleEvidencePersists() {
+        assertTrue(SwarmEngineeringEscalationPolicy.shouldEscalate(
+                SwarmPlannerContext.RECOVERY,
+                2,
+                1,
+                3
+        ));
+    }
+
+    @Test
     void recoveryWithoutObstacleEvidenceDoesNotInventEngineeringWork() {
         assertFalse(SwarmEngineeringEscalationPolicy.shouldEscalate(
                 SwarmPlannerContext.RECOVERY,
