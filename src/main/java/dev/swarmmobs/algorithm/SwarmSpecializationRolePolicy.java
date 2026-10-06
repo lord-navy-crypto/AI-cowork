@@ -15,7 +15,8 @@ public final class SwarmSpecializationRolePolicy {
         }
 
         return switch (specialization) {
-            case VANGUARD, LEAD_BREACHER, INTERCEPTOR -> SwarmRole.CHASER;
+            case VANGUARD, LEAD_BREACHER -> SwarmRole.CHASER;
+            case INTERCEPTOR -> fallback;
             case ENGINEER, CARRIER, RESERVE, RESERVE_BREACHER -> SwarmRole.REAR_PRESSURE;
             case FLANKER_LEFT -> SwarmRole.FLANK_LEFT;
             case FLANKER_RIGHT -> SwarmRole.FLANK_RIGHT;
