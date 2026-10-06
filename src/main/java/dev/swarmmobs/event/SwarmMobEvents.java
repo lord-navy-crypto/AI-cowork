@@ -270,6 +270,7 @@ public final class SwarmMobEvents {
                             );
                         }
                         return SwarmTaskSaturationPolicy.adjustedDemand(
+                                profile.archetype(),
                                 task,
                                 demand,
                                 localGroupSize,
