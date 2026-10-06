@@ -351,6 +351,32 @@ public final class SwarmControlScreen extends Screen {
                 "nav_congestion_radius_delta",
                 0.25
         );
+        y += 28;
+
+        addToggleRow(
+                x, y,
+                "Path evidence",
+                bool("navPathEvidenceEnabled"),
+                "toggle_path_evidence"
+        );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Path node penalty",
+                format(number("navPathNodePenalty")),
+                "nav_path_node_penalty_delta",
+                0.05
+        );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Path residual penalty",
+                format(number("navPathResidualPenalty")),
+                "nav_path_residual_penalty_delta",
+                0.05
+        );
         y += 34;
 
         addRenderableWidget(
