@@ -529,6 +529,8 @@ public final class SwarmRuntimeGameTests {
 
         helper.getLevel().removeBlock(firstSupport, false);
         helper.getLevel().removeBlock(secondSupport, false);
+        helper.getLevel().removeBlock(firstSupport.below(), false);
+        helper.getLevel().removeBlock(secondSupport.below(), false);
         helper.getLevel().setBlockAndUpdate(
                 landingSupport,
                 Blocks.STONE.defaultBlockState()
