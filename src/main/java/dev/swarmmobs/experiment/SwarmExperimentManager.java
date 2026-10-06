@@ -14,6 +14,10 @@ public final class SwarmExperimentManager {
         return experimentSeed;
     }
 
+    public static void markCustom() {
+        activePreset = SwarmExperimentPreset.CUSTOM;
+    }
+
     public static void setExperimentSeed(int seed) {
         experimentSeed = seed;
         SwarmConfig.SENSING_EXPERIMENT_SEED.set(seed);
@@ -24,6 +28,9 @@ public final class SwarmExperimentManager {
         SwarmExperimentPreset selected = preset == null
                 ? SwarmExperimentPreset.BASELINE
                 : preset;
+        if (selected == SwarmExperimentPreset.CUSTOM) {
+            throw new IllegalArgumentException("CUSTOM cannot be applied as a preset");
+        }
         var settings = SwarmExperimentPresetPolicy.settings(selected);
 
         // Restore the known-good coordination/search/local-planning baseline first.
