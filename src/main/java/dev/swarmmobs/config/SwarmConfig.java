@@ -303,6 +303,10 @@ public final class SwarmConfig {
                 .comment("Maximum distance for a one-block engineering material handoff between nearby Zombies.")
                 .defineInRange("zombieEngineeringMaterialHandoffRadius", 2.5, 0.5, 6.0);
 
+        ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN = BUILDER
+                .comment("Maximum consecutive unsupported blocks a local Zombie team may commit to bridging.")
+                .defineInRange("zombieEngineeringMaxBridgeSpan", 4, 1, 8);
+
         BUILDER.pop();
 
         BUILDER.push("sensing");
