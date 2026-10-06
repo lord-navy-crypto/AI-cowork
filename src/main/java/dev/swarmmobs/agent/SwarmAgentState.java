@@ -47,6 +47,8 @@ public final class SwarmAgentState {
     private double navigationWaypointZ;
     private long obstacleDetourCount;
     private long recoveryCount;
+    private long recoveryPlanningAttempts;
+    private long recoveryPlanningFailures;
     private long sensingAcceptedObservations;
     private long sensingDroppedObservations;
     private double lastSensingNoiseMagnitude;
@@ -192,6 +194,14 @@ public final class SwarmAgentState {
 
     public long recoveryCount() {
         return recoveryCount;
+    }
+
+    public long recoveryPlanningAttempts() {
+        return recoveryPlanningAttempts;
+    }
+
+    public long recoveryPlanningFailures() {
+        return recoveryPlanningFailures;
     }
 
     public long sensingAcceptedObservations() {
@@ -473,6 +483,13 @@ public final class SwarmAgentState {
         this.navigationWaypointX = waypointX;
         this.navigationWaypointZ = waypointZ;
         this.hasNavigationWaypoint = Double.isFinite(waypointX) && Double.isFinite(waypointZ);
+    }
+
+    public void recordRecoveryPlanning(boolean success) {
+        recoveryPlanningAttempts++;
+        if (!success) {
+            recoveryPlanningFailures++;
+        }
     }
 
     public void clearNavigationTelemetry() {

@@ -174,6 +174,21 @@ public final class SwarmControlNetwork {
                     3.0,
                     100.0
             ));
+            case "nav_stuck_window_delta" -> SwarmConfig.NAV_STUCK_WINDOW_TICKS.set((int) clamp(
+                    SwarmConfig.NAV_STUCK_WINDOW_TICKS.get() + value,
+                    6.0,
+                    200.0
+            ));
+            case "nav_stuck_progress_delta" -> SwarmConfig.NAV_STUCK_MIN_PROGRESS.set(clamp(
+                    SwarmConfig.NAV_STUCK_MIN_PROGRESS.get() + value,
+                    0.05,
+                    4.0
+            ));
+            case "nav_recovery_distance_delta" -> SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.set(clamp(
+                    SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get() + value,
+                    0.25,
+                    6.0
+            ));
             case "nav_progress_weight_delta" -> SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.set(clamp(
                     SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get() + value,
                     0.0,
@@ -212,6 +227,9 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.set(1.5);
                 SwarmConfig.NAV_WALKABILITY_ENABLED.set(true);
                 SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.set(1);
+                SwarmConfig.NAV_STUCK_WINDOW_TICKS.set(24);
+                SwarmConfig.NAV_STUCK_MIN_PROGRESS.set(0.75);
+                SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.set(2.0);
                 SwarmConfig.NAV_RECOVERY_DURATION_TICKS.set(18);
                 SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.set(1.0);
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
@@ -289,6 +307,9 @@ public final class SwarmControlNetwork {
                 pair("navLateral", SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.get()),
                 pair("walkabilityEnabled", SwarmConfig.NAV_WALKABILITY_ENABLED.get()),
                 pair("navMaxDrop", SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.get()),
+                pair("stuckWindow", SwarmConfig.NAV_STUCK_WINDOW_TICKS.get()),
+                pair("stuckMinProgress", SwarmConfig.NAV_STUCK_MIN_PROGRESS.get()),
+                pair("recoveryDistance", SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()),
                 pair("recoveryDuration", SwarmConfig.NAV_RECOVERY_DURATION_TICKS.get()),
                 pair("navProgressWeight", SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get()),
                 pair("navLateralPenalty", SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get()),

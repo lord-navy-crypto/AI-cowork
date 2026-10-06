@@ -71,4 +71,15 @@ class SwarmAgentNavigationTelemetryTest {
         assertFalse(state.hasNavigationWaypoint());
         assertEquals(1L, state.recoveryCount());
     }
+    @Test
+    void recoveryPlanningCountersTrackSuccessAndFailure() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        state.recordRecoveryPlanning(true);
+        state.recordRecoveryPlanning(false);
+        state.recordRecoveryPlanning(false);
+
+        assertEquals(3L, state.recoveryPlanningAttempts());
+        assertEquals(2L, state.recoveryPlanningFailures());
+    }
 }

@@ -9,6 +9,7 @@ import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
+import dev.swarmmobs.algorithm.SwarmRecoveryCandidatePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
 import dev.swarmmobs.algorithm.SwarmTerrainSupportPolicy;
@@ -370,6 +371,73 @@ public final class SwarmApproachGoal extends Goal {
         );
     }
 
+    private SwarmNavigationRecoveryPolicy.Recovery chooseRecoveryWaypoint(
+            ServerLevel level,
+            Vec2 self,
+            Vec2 destination
+    ) {
+        List<SwarmRecoveryCandidatePolicy.RecoveryCandidate> generated =
+                SwarmRecoveryCandidatePolicy.generate(
+                        self,
+                        destination,
+                        SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()
+                );
+
+        if (generated.isEmpty()) {
+            return new SwarmNavigationRecoveryPolicy.Recovery(destination, false);
+        }
+
+        List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
+        for (var recoveryCandidate : generated) {
+            Vec2 candidate = recoveryCandidate.waypoint();
+            boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
+            double congestion = localCongestion(level, candidate);
+
+            boolean pathReachable = true;
+            int pathNodeCount = 0;
+            double pathResidualDistance = 0.0;
+
+            if (!blocked && SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()) {
+                var path = mob.getNavigation().createPath(
+                        BlockPos.containing(candidate.x(), mob.getY(), candidate.z()),
+                        0
+                );
+                pathReachable = path != null && path.canReach();
+                if (path != null) {
+                    pathNodeCount = path.getNodeCount();
+                    pathResidualDistance = path.getDistToTarget();
+                }
+            }
+
+            candidates.add(new SwarmLocalPlannerPolicy.Candidate(
+                    candidate,
+                    blocked,
+                    recoveryCandidate.lateralOffset(),
+                    congestion,
+                    pathReachable,
+                    pathNodeCount,
+                    pathResidualDistance
+            ));
+        }
+
+        SwarmLocalPlannerPolicy.Choice choice = SwarmLocalPlannerPolicy.choose(
+                self,
+                destination,
+                candidates,
+                SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.get(),
+                SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get(),
+                SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get(),
+                SwarmConfig.NAV_PATH_NODE_PENALTY.get(),
+                SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()
+        );
+
+        if (!choice.active()) {
+            return new SwarmNavigationRecoveryPolicy.Recovery(destination, false);
+        }
+
+        return new SwarmNavigationRecoveryPolicy.Recovery(choice.waypoint(), true);
+    }
+
     private void updateRecoveryState() {
         if (!(mob.level() instanceof ServerLevel level)) {
             return;
@@ -412,12 +480,12 @@ public final class SwarmApproachGoal extends Goal {
 
         if (moved < SwarmConfig.NAV_STUCK_MIN_PROGRESS.get()
                 && remaining > Math.max(1.5, SwarmConfig.NAV_STUCK_MIN_PROGRESS.get() * 2.0)) {
-            var recovery = SwarmNavigationRecoveryPolicy.recoveryWaypoint(
+            var recovery = chooseRecoveryWaypoint(
+                    level,
                     new Vec2(mob.getX(), mob.getZ()),
-                    new Vec2(state.destinationX(), state.destinationZ()),
-                    mob.getId(),
-                    SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.get()
+                    new Vec2(state.destinationX(), state.destinationZ())
             );
+            state.recordRecoveryPlanning(recovery.active());
 
             if (recovery.active()) {
                 obstacleDetourActive = false;
