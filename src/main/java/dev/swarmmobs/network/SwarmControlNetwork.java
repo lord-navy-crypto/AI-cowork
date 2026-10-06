@@ -57,6 +57,21 @@ public final class SwarmControlNetwork {
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
 
+            case "formation_hysteresis_delta" -> SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set((int) clamp(
+                    SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get() + value,
+                    0.0,
+                    200.0
+            ));
+            case "role_hysteresis_delta" -> SwarmConfig.ROLE_HYSTERESIS_TICKS.set((int) clamp(
+                    SwarmConfig.ROLE_HYSTERESIS_TICKS.get() + value,
+                    0.0,
+                    200.0
+            ));
+            case "coord_baseline" -> {
+                SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
+                SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
+            }
+
             case "toggle_sensing" ->
                     SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(!SwarmConfig.SENSING_IMPERFECTION_ENABLED.get());
             case "sensing_drop_delta" -> {
@@ -170,6 +185,8 @@ public final class SwarmControlNetwork {
 
             case "baseline_all" -> {
                 SwarmConfig.ENABLED.set(true);
+                SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
+                SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
 
                 SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(false);
                 SwarmConfig.SENSING_DROPOUT_RATE.set(0.0);
@@ -203,6 +220,8 @@ public final class SwarmControlNetwork {
     private static String snapshotData() {
         return String.join(";",
                 pair("master", SwarmConfig.ENABLED.get()),
+                pair("formationHysteresis", SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()),
+                pair("roleHysteresis", SwarmConfig.ROLE_HYSTERESIS_TICKS.get()),
 
                 pair("sensingEnabled", SwarmConfig.SENSING_IMPERFECTION_ENABLED.get()),
                 pair("sensingDrop", SwarmConfig.SENSING_DROPOUT_RATE.get()),

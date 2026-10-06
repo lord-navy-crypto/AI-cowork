@@ -141,10 +141,16 @@ public final class SwarmMobEvents {
                         .toList()
         );
 
-        SwarmRole tacticalRole = SwarmAgentProfiles.tacticalRole(
+        SwarmRole candidateRole = SwarmAgentProfiles.tacticalRole(
                 profile.archetype(),
                 assignedSlot,
                 composition
+        );
+
+        SwarmRole tacticalRole = state.stabilizeRole(
+                candidateRole,
+                gameTick,
+                SwarmConfig.ROLE_HYSTERESIS_TICKS.get()
         );
 
         double confidence = state.targetConfidence(

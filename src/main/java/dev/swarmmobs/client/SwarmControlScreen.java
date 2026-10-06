@@ -10,6 +10,7 @@ import java.util.Map;
 
 public final class SwarmControlScreen extends Screen {
     private enum Page {
+        COORDINATION("Coordination"),
         SENSING("Sensing"),
         COMMUNICATION("Communication"),
         SEARCH("Search & Prediction"),
@@ -47,7 +48,7 @@ public final class SwarmControlScreen extends Screen {
     private void buildWidgets() {
         int center = width / 2;
         int top = 42;
-        int tabWidth = 105;
+        int tabWidth = 90;
         int totalWidth = tabWidth * Page.values().length;
         int startX = center - totalWidth / 2;
 
@@ -81,11 +82,42 @@ public final class SwarmControlScreen extends Screen {
         );
 
         switch (page) {
+            case COORDINATION -> buildCoordination();
             case SENSING -> buildSensing();
             case COMMUNICATION -> buildCommunication();
             case SEARCH -> buildSearch();
             case NAVIGATION -> buildNavigation();
         }
+    }
+
+    private void buildCoordination() {
+        int x = width / 2 - 150;
+        int y = 82;
+
+        addNumericRow(
+                x, y,
+                "Formation lane hysteresis",
+                Integer.toString((int) number("formationHysteresis")) + " ticks",
+                "formation_hysteresis_delta",
+                2.0
+        );
+        y += 28;
+
+        addNumericRow(
+                x, y,
+                "Role reassignment hysteresis",
+                Integer.toString((int) number("roleHysteresis")) + " ticks",
+                "role_hysteresis_delta",
+                2.0
+        );
+        y += 34;
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Coordination baseline"),
+                        button -> SwarmControlClient.sendAction("coord_baseline", 0.0)
+                ).bounds(x, y, 300, 20).build()
+        );
     }
 
     private void buildSensing() {

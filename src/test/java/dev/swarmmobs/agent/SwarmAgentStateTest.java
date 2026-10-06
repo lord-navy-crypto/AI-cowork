@@ -179,6 +179,41 @@ class SwarmAgentStateTest {
 
 
     @Test
+    void transientRoleCandidateDoesNotImmediatelyReassignResponsibility() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        assertEquals(SwarmRole.CHASER, state.stabilizeRole(SwarmRole.CHASER, 100L, 12));
+        assertEquals(SwarmRole.CHASER, state.stabilizeRole(SwarmRole.FLANK_LEFT, 106L, 12));
+        assertEquals(SwarmRole.FLANK_LEFT, state.pendingRole());
+        assertEquals(0L, state.roleReassignmentCount());
+
+        assertEquals(SwarmRole.CHASER, state.stabilizeRole(SwarmRole.CHASER, 110L, 12));
+        assertNull(state.pendingRole());
+        assertEquals(0L, state.roleReassignmentCount());
+    }
+
+    @Test
+    void persistentRoleCandidateReassignsAfterHysteresisWindow() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        assertEquals(SwarmRole.CHASER, state.stabilizeRole(SwarmRole.CHASER, 100L, 12));
+        assertEquals(SwarmRole.CHASER, state.stabilizeRole(SwarmRole.REAR_PRESSURE, 104L, 12));
+        assertEquals(SwarmRole.CHASER, state.stabilizeRole(SwarmRole.REAR_PRESSURE, 115L, 12));
+        assertEquals(SwarmRole.REAR_PRESSURE, state.stabilizeRole(SwarmRole.REAR_PRESSURE, 116L, 12));
+        assertEquals(1L, state.roleReassignmentCount());
+        assertNull(state.pendingRole());
+    }
+
+    @Test
+    void zeroRoleHysteresisAllowsImmediateReassignment() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        assertEquals(SwarmRole.CHASER, state.stabilizeRole(SwarmRole.CHASER, 10L, 0));
+        assertEquals(SwarmRole.FLANK_RIGHT, state.stabilizeRole(SwarmRole.FLANK_RIGHT, 11L, 0));
+        assertEquals(1L, state.roleReassignmentCount());
+    }
+
+    @Test
     void targetConfidenceDecaysWithObservationAge() {
         SwarmAgentState state = new SwarmAgentState();
         UUID target = UUID.randomUUID();

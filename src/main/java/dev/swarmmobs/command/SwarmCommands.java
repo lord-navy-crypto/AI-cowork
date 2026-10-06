@@ -160,6 +160,7 @@ public final class SwarmCommands {
                                 + ", targetRadius=" + SwarmConfig.TARGET_RADIUS.get()
                                 + ", formationRadius=" + SwarmConfig.FORMATION_RADIUS.get()
                                 + ", formationSlotHysteresisTicks=" + SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()
+                                + ", roleHysteresisTicks=" + SwarmConfig.ROLE_HYSTERESIS_TICKS.get()
                                 + ", alignmentWeight=" + SwarmConfig.ALIGNMENT_WEIGHT.get()
                                 + ", maxSteeringCorrection=" + SwarmConfig.MAX_STEERING_CORRECTION.get()
                                 + ", staleTargetMinSpeedFactor=" + SwarmConfig.STALE_TARGET_MIN_SPEED_FACTOR.get()
@@ -251,6 +252,8 @@ public final class SwarmCommands {
                         "Agent #" + nearest.getId()
                                 + " archetype=" + SwarmAgentProfiles.profile(nearest).archetype()
                                 + " role=" + state.role()
+                                + " pendingRole=" + (state.pendingRole() == null ? "none" : state.pendingRole())
+                                + " roleReassignments=" + state.roleReassignmentCount()
                                 + " mode=" + state.behaviorMode()
                                 + " searchRadius=" + String.format(java.util.Locale.ROOT, "%.2f", state.searchRadius())
                                 + " slot=" + state.formationSlot()
@@ -362,6 +365,8 @@ public final class SwarmCommands {
         long sensingAccepted = 0L;
         long sensingDropped = 0L;
         double sensingNoiseSum = 0.0;
+        int pendingRoleCount = 0;
+        long roleReassignments = 0L;
 
         for (PathfinderMob agent : agents) {
             SwarmAgentState state = agent.getData(SwarmAttachments.AGENT_STATE.get());
@@ -406,6 +411,10 @@ public final class SwarmCommands {
             sensingAccepted += state.sensingAcceptedObservations();
             sensingDropped += state.sensingDroppedObservations();
             sensingNoiseSum += state.lastSensingNoiseMagnitude();
+            if (state.pendingRole() != null) {
+                pendingRoleCount++;
+            }
+            roleReassignments += state.roleReassignmentCount();
         }
 
         int total = agents.size();
@@ -419,7 +428,7 @@ public final class SwarmCommands {
 
         String summary = String.format(
                 java.util.Locale.ROOT,
-                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, archetypes={%s}, roles={%s}",
+                "Swarm group: agents=%d, targetKnown=%d, direct=%d, engage=%d, search=%d, avgSearchRadius=%.2f, predictionActive=%d, avgPredictionOffset=%.3f, avgNeighbors=%.2f, avgSeparation=%.3f, avgCohesion=%.3f, avgAlignment=%.3f, avgSteering=%.3f, avgTargetConfidence=%.3f, pendingMessages=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, navPlan=%d, navDetour=%d, navRecovery=%d, obstacleDetours=%d, recoveries=%d, sensingAccepted=%d, sensingDropped=%d, avgLastSensingNoise=%.3f, pendingRoles=%d, roleReassignments=%d, archetypes={%s}, roles={%s}",
                 total,
                 withTarget,
                 direct,
@@ -446,6 +455,8 @@ public final class SwarmCommands {
                 sensingAccepted,
                 sensingDropped,
                 sensingNoiseSum / total,
+                pendingRoleCount,
+                roleReassignments,
                 archetypeSummary,
                 roleSummary
         );
