@@ -14,6 +14,7 @@ import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.debug.SwarmDebugState;
 import dev.swarmmobs.network.SwarmControlNetwork;
 import dev.swarmmobs.experiment.SwarmExperimentManager;
+import dev.swarmmobs.experiment.SwarmExperimentMetrics;
 import dev.swarmmobs.experiment.SwarmExperimentPreset;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -156,7 +157,13 @@ public final class SwarmCommands {
                                 .executes(context -> setExperimentSeed(
                                         context.getSource(),
                                         IntegerArgumentType.getInteger(context, "value")
-                                ))));
+                                ))))
+                .then(Commands.literal("start")
+                        .executes(context -> startExperiment(context.getSource())))
+                .then(Commands.literal("reset")
+                        .executes(context -> resetExperiment(context.getSource())))
+                .then(Commands.literal("snapshot")
+                        .executes(context -> snapshotExperiment(context.getSource())));
 
         root.then(experiment);
         root.then(debug);
@@ -180,6 +187,50 @@ public final class SwarmCommands {
         source.sendSuccess(
                 () -> Component.literal("Swarm experiment seed=" + seed),
                 true
+        );
+        return 1;
+    }
+
+    private static int startExperiment(CommandSourceStack source) {
+        SwarmExperimentMetrics.start(source.getLevel());
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Swarm experiment run started: preset=" + SwarmExperimentManager.activePreset()
+                                + ", seed=" + SwarmExperimentManager.experimentSeed()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int resetExperiment(CommandSourceStack source) {
+        SwarmExperimentMetrics.reset(source.getLevel());
+        source.sendSuccess(() -> Component.literal("Swarm experiment measurement baseline reset."), true);
+        return 1;
+    }
+
+    private static int snapshotExperiment(CommandSourceStack source) {
+        var metrics = SwarmExperimentMetrics.snapshot(source.getLevel());
+        source.sendSuccess(
+                () -> Component.literal(String.format(
+                        java.util.Locale.ROOT,
+                        "Experiment snapshot: active=%s, elapsedTicks=%d, agents=%d, commAccepted=%d, commDelivered=%d, commDropped=%d, observedCommDropRate=%.3f, detours=%d, recoveries=%d, recoveryAttempts=%d, recoveryFailures=%d, recoveryFailureRate=%.3f, pathQueries=%d, roleReassignments=%d",
+                        metrics.active(),
+                        metrics.elapsedTicks(),
+                        metrics.agentCount(),
+                        metrics.communicationAccepted(),
+                        metrics.communicationDelivered(),
+                        metrics.communicationDropped(),
+                        metrics.communicationDropRate(),
+                        metrics.obstacleDetours(),
+                        metrics.recoveries(),
+                        metrics.recoveryPlanningAttempts(),
+                        metrics.recoveryPlanningFailures(),
+                        metrics.recoveryFailureRate(),
+                        metrics.pathQueries(),
+                        metrics.roleReassignments()
+                )),
+                false
         );
         return 1;
     }

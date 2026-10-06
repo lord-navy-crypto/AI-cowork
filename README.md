@@ -44,7 +44,7 @@ The system should make these stages observable and tunable so the repository can
 
 ## Current development status
 
-Active stable line: `main` through v0.8.3; current integration work: `swarm-experiment-presets-v0.9.0`
+Active stable line: `main` through v0.9.0; current integration work: `swarm-experiment-snapshot-v0.9.1`
 
 The current playable system includes:
 
@@ -77,6 +77,9 @@ Development commands:
 /swarmmobs panel
 /swarmmobs experiment baseline|noisy_sensing|lossy_comms|combined_faults|navigation_stress
 /swarmmobs experiment seed <value>
+/swarmmobs experiment start
+/swarmmobs experiment reset
+/swarmmobs experiment snapshot
 /swarmmobs inspect
 /swarmmobs group
 /swarmmobs debug spawn <count>
