@@ -445,6 +445,19 @@ public final class SwarmControlNetwork {
         var ai = SwarmAiShadowState.snapshot();
         var decision = ai.lastDecision();
         var activeAi = SwarmAiActiveState.snapshot(level.getGameTime());
+        boolean masterEnabled = SwarmConfig.ENABLED.get();
+        boolean exposeDynamicAssignments =
+                SwarmControlEffectiveStatePolicy.exposeDynamicAssignments(
+                        masterEnabled,
+                        SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
+                );
+        boolean effectiveActiveAi =
+                SwarmControlEffectiveStatePolicy.exposeActiveAi(
+                        masterEnabled,
+                        SwarmConfig.EXTERNAL_AI_ENABLED.get(),
+                        SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get(),
+                        activeAi.active()
+                );
 
         int zombies = 0;
         int skeletons = 0;
@@ -469,9 +482,16 @@ public final class SwarmControlNetwork {
                 creepers++;
             }
 
-            SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
-            taskCounts.merge(state.currentTask(), 1, Integer::sum);
-            specializationCounts.merge(state.specialization(), 1, Integer::sum);
+            if (exposeDynamicAssignments) {
+                SwarmAgentState state =
+                        mob.getData(SwarmAttachments.AGENT_STATE.get());
+                taskCounts.merge(state.currentTask(), 1, Integer::sum);
+                specializationCounts.merge(
+                        state.specialization(),
+                        1,
+                        Integer::sum
+                );
+            }
         }
 
         return String.join(";",
@@ -491,7 +511,7 @@ public final class SwarmControlNetwork {
                 pair("aiSearchRadiusMultiplier", decision.searchRadiusMultiplier()),
                 pair("aiRationale", decision.rationale()),
                 pair("aiLastError", ai.lastError()),
-                pair("master", SwarmConfig.ENABLED.get()),
+                pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
                 pair("liveZombies", zombies),
                 pair("liveSkeletons", skeletons),
@@ -528,10 +548,15 @@ public final class SwarmControlNetwork {
                 pair("metricEngineeringClaimed", (int) Math.min(Integer.MAX_VALUE, metrics.engineeringTasksClaimed())),
                 pair("metricEngineeringCompleted", (int) Math.min(Integer.MAX_VALUE, metrics.engineeringTasksCompleted())),
                 pair("aiActiveEnabled", SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()),
-                pair("aiActive", activeAi.active()),
-                pair("aiActiveMode", activeAi.decision().mode().name()),
-                pair("aiActiveExpiresIn", activeAi.active()
-                        ? (int) Math.max(0L, activeAi.expiresTick() - level.getGameTime())
+                pair("aiActive", effectiveActiveAi),
+                pair("aiActiveMode", effectiveActiveAi
+                        ? activeAi.decision().mode().name()
+                        : "BASELINE"),
+                pair("aiActiveExpiresIn", effectiveActiveAi
+                        ? (int) Math.max(
+                                0L,
+                                activeAi.expiresTick() - level.getGameTime()
+                        )
                         : 0),
                 "activePreset=" + SwarmExperimentManager.activePreset().name(),
                 pair("experimentSeed", SwarmExperimentManager.experimentSeed()),
