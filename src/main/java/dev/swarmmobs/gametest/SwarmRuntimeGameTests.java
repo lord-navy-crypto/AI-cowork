@@ -1564,6 +1564,73 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_true_neighbor_radius", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
+    public static void diagonalPeerOutsideTrueNeighborRadiusIsExcluded(GameTestHelper helper) {
+        double previousRadius = SwarmConfig.NEIGHBOR_RADIUS.get();
+        SwarmConfig.NEIGHBOR_RADIUS.set(2.0);
+
+        Zombie self = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+        Zombie diagonal = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 3));
+        self.setNoGravity(true);
+        diagonal.setNoGravity(true);
+
+        if (self.distanceTo(diagonal) <= 2.0) {
+            SwarmConfig.NEIGHBOR_RADIUS.set(previousRadius);
+            helper.fail("Neighbor-radius fixture did not place peer outside true radius");
+            return;
+        }
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = self.getData(SwarmAttachments.AGENT_STATE.get());
+            if (state.neighborCount() != 0) {
+                SwarmConfig.NEIGHBOR_RADIUS.set(previousRadius);
+                helper.fail("AABB-corner peer incorrectly counted inside true neighbor radius");
+                return;
+            }
+
+            SwarmConfig.NEIGHBOR_RADIUS.set(previousRadius);
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_true_target_radius", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void diagonalPlayerOutsideTrueTargetRadiusIsNotDirectlyObserved(GameTestHelper helper) {
+        double previousRadius = SwarmConfig.TARGET_RADIUS.get();
+        SwarmConfig.TARGET_RADIUS.set(2.0);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 3.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        if (zombie.distanceTo(player) <= 2.0) {
+            playerHandle.close();
+            SwarmConfig.TARGET_RADIUS.set(previousRadius);
+            helper.fail("Target-radius fixture did not place player outside true radius");
+            return;
+        }
+
+        helper.runAfterDelay(24, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            if (state.targetId() != null || state.directObservation()) {
+                playerHandle.close();
+                SwarmConfig.TARGET_RADIUS.set(previousRadius);
+                helper.fail("AABB-corner player incorrectly acquired outside true target radius");
+                return;
+            }
+
+            playerHandle.close();
+            SwarmConfig.TARGET_RADIUS.set(previousRadius);
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_perception", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void visiblePlayerIsAcquiredThroughPerceptionLayer(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
