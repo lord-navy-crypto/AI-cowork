@@ -511,6 +511,16 @@ public final class SwarmAgentState {
         }
     }
 
+    public void clearClaimedEngineeringTaskIfMatches(SwarmEngineeringTask task) {
+        if (task == null || claimedEngineeringTask == null) {
+            return;
+        }
+        if (claimedEngineeringTask.requesterId().equals(task.requesterId())
+                && claimedEngineeringTask.createdTick() == task.createdTick()) {
+            claimedEngineeringTask = null;
+        }
+    }
+
     public void clearEngineeringCoordination() {
         engineeringRequest = null;
         claimedEngineeringTask = null;
