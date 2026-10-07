@@ -83,6 +83,51 @@ public final class SwarmRuntimeGameTests {
         });
     }
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_vanilla_target_bridge", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void vanillaPlayerTargetBehindWallSeedsIndirectSwarmTarget(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.setBlock(new BlockPos(2, 1, 2), Blocks.STONE);
+        helper.setBlock(new BlockPos(2, 2, 2), Blocks.STONE);
+        zombie.setTarget(player);
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (zombie.hasLineOfSight(player)) {
+                playerHandle.close();
+                helper.fail("Wall fixture unexpectedly left direct line of sight");
+                return;
+            }
+            if (!player.getUUID().equals(state.targetId())) {
+                playerHandle.close();
+                helper.fail("Vanilla target behind wall did not seed swarm target memory");
+                return;
+            }
+            if (state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Occluded vanilla target was incorrectly marked direct");
+                return;
+            }
+            if (!state.hasDestination()) {
+                playerHandle.close();
+                helper.fail("Indirect vanilla target did not produce a swarm destination");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
     public static void zombieBreaksSoftObstacleAndReusesItAsBridgeSupport(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
