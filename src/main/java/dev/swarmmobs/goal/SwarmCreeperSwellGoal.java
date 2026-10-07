@@ -2,6 +2,7 @@ package dev.swarmmobs.goal;
 
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.SwarmCreeperHandoffPolicy;
+import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import net.minecraft.world.entity.ai.goal.SwellGoal;
 import net.minecraft.world.entity.monster.Creeper;
@@ -34,6 +35,10 @@ public final class SwarmCreeperSwellGoal extends SwellGoal {
         SwarmAgentState state = creeper.getData(SwarmAttachments.AGENT_STATE.get());
         if (creeper.isIgnited() || creeper.getSwellDir() > 0) {
             return true;
+        }
+
+        if (!SwarmConfig.ENABLED.get()) {
+            return false;
         }
 
         if (!(creeper.getTarget() instanceof Player target)

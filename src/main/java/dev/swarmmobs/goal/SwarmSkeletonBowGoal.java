@@ -2,6 +2,7 @@ package dev.swarmmobs.goal;
 
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.SwarmRangedHandoffPolicy;
+import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import net.minecraft.world.entity.ai.goal.RangedBowAttackGoal;
 import net.minecraft.world.entity.monster.Skeleton;
@@ -33,6 +34,10 @@ public final class SwarmSkeletonBowGoal extends RangedBowAttackGoal<Skeleton> {
     }
 
     private boolean handoffActive() {
+        if (!SwarmConfig.ENABLED.get()) {
+            return false;
+        }
+
         SwarmAgentState state = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
         if (!(skeleton.getTarget() instanceof Player target)
                 || !target.isAlive()
