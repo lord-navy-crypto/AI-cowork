@@ -26,6 +26,7 @@ import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.TargetPredictionPolicy;
 import dev.swarmmobs.algorithm.TargetRelayPolicy;
 import dev.swarmmobs.ai.SwarmAiActiveState;
+import dev.swarmmobs.ai.SwarmAiControlPolicy;
 import dev.swarmmobs.ai.SwarmAiRoleBiasPolicy;
 import dev.swarmmobs.ai.SwarmAiTaskDemandPolicy;
 import dev.swarmmobs.config.SwarmConfig;
@@ -176,8 +177,10 @@ public final class SwarmMobEvents {
         );
 
         SwarmAiActiveState.Snapshot activeStrategy =
-                SwarmConfig.EXTERNAL_AI_ENABLED.get()
-                        && SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()
+                SwarmAiControlPolicy.mayApplyActiveStrategy(
+                        SwarmConfig.EXTERNAL_AI_ENABLED.get(),
+                        SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()
+                )
                         ? SwarmAiActiveState.snapshot(gameTick)
                         : null;
 
