@@ -22,9 +22,12 @@ public final class SwarmClothControlScreen {
     public static Screen create(Screen parent, String snapshot) {
         Map<String, String> values = parseSnapshot(snapshot);
 
+        boolean canEdit = bool(values, "canEdit");
+
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
                 .setTitle(Component.literal("Swarm Mobs Command Center"))
+                .setEditable(canEdit)
                 .setDoesConfirmSave(true)
                 .setAlwaysShowTabs(true)
                 .setShouldListSmoothScroll(true)
@@ -49,7 +52,9 @@ public final class SwarmClothControlScreen {
             ConfigEntryBuilder entries,
             Map<String, String> values
     ) {
-        status(category, entries, "Server-authoritative live controls. Changes are sent to the server when you Save.");
+        status(category, entries, bool(values, "canEdit")
+                ? "Server-authoritative live controls. Changes are sent to the server when you Save."
+                : "Read-only view. Server operator permission is required to change Swarm settings.");
         status(category, entries,
                 "Agents: " + integer(values, "liveAgents")
                         + "  |  Zombies " + integer(values, "liveZombies")
@@ -109,19 +114,12 @@ public final class SwarmClothControlScreen {
             ConfigEntryBuilder entries,
             Map<String, String> values
     ) {
-        toggle(category, entries, values,
-                "Local Ollama strategy service",
-                "aiEnabled",
-                "ai_toggle",
-                false,
-                "Master switch for local AI strategy recommendations.");
-
-        toggle(category, entries, values,
-                "Apply bounded AI strategy",
-                "aiActiveEnabled",
-                "ai_active_toggle",
-                false,
-                "AI affects bounded high-level demand only; deterministic local control remains in charge.");
+        status(category, entries,
+                "Quick AI switches are intentionally kept on Overview to avoid duplicate toggle actions.");
+        status(category, entries,
+                "Local AI service: " + (bool(values, "aiEnabled") ? "ON" : "OFF")
+                        + "  | bounded active strategy: "
+                        + (bool(values, "aiActiveEnabled") ? "ON" : "OFF"));
 
         status(category, entries, "Model: " + text(values, "aiModel", "(not configured)"));
         status(category, entries,
@@ -148,10 +146,6 @@ public final class SwarmClothControlScreen {
             status(category, entries, "Last error: " + abbreviate(error, 180));
         }
 
-        action(category, entries,
-                "Run strategy recommendation",
-                "ai_shadow",
-                "Enable and Save to run one recommendation.");
     }
 
     private static void buildEngineering(
