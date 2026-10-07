@@ -62,8 +62,10 @@ public final class SwarmAiShadowService {
                     } else {
                         SwarmAiShadowState.complete(sequence, decision, latencyMs);
                         if (applyActive
-                                && SwarmConfig.EXTERNAL_AI_ENABLED.get()
-                                && SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()) {
+                                && SwarmAiControlPolicy.mayApplyActiveStrategy(
+                                        SwarmConfig.EXTERNAL_AI_ENABLED.get(),
+                                        SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()
+                                )) {
                             SwarmAiActiveState.consider(
                                     decision,
                                     level.getGameTime(),
