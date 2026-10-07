@@ -129,6 +129,50 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_sensing_dropout_vanilla_guard", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void directSensingDropoutIsNotBypassedByVanillaTarget(GameTestHelper helper) {
+        boolean previousImperfect = SwarmConfig.SENSING_IMPERFECTION_ENABLED.get();
+        double previousDropout = SwarmConfig.SENSING_DROPOUT_RATE.get();
+
+        SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(true);
+        SwarmConfig.SENSING_DROPOUT_RATE.set(1.0);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        zombie.setTarget(player);
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!zombie.hasLineOfSight(player)) {
+                SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(previousImperfect);
+                SwarmConfig.SENSING_DROPOUT_RATE.set(previousDropout);
+                playerHandle.close();
+                helper.fail("Dropout guard fixture unexpectedly lost direct LOS");
+                return;
+            }
+            if (state.targetId() != null || state.hasDestination()) {
+                SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(previousImperfect);
+                SwarmConfig.SENSING_DROPOUT_RATE.set(previousDropout);
+                playerHandle.close();
+                helper.fail("Vanilla target bypassed a forced direct sensing dropout");
+                return;
+            }
+
+            SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(previousImperfect);
+            SwarmConfig.SENSING_DROPOUT_RATE.set(previousDropout);
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
     public static void zombieBreaksSoftObstacleAndReusesItAsBridgeSupport(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
