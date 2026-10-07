@@ -14,6 +14,7 @@ import dev.swarmmobs.algorithm.SwarmZombieEngineeringPolicy;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -120,6 +121,15 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         if (!task.claimedBy(zombie.getUUID(), gameTick)) {
+            return false;
+        }
+
+        // Claimant selection may have completed a material handoff after the
+        // requester performed bridge preflight. Reconfigure from the claimant's
+        // current inventory so execution never uses stale pre-handoff state.
+        if (!configureFromTask(task, state)) {
+            state.clearEngineeringRequestIfMatches(task);
+            state.clearClaimedEngineeringTaskIfMatches(task);
             return false;
         }
 
@@ -366,11 +376,12 @@ public final class SwarmZombieEngineerGoal extends Goal {
             );
 
             boolean materialAvailable = type != SwarmEngineeringTask.Type.BRIDGE
-                    || candidateState.carriedEngineeringBlockCount() > 0
+                    || hasUsableBridgeMaterial(candidateState, position)
                     || findMaterialDonor(
                             candidate,
                             localZombies,
-                            requesterState.targetId()
+                            requesterState.targetId(),
+                            position
                     ) != null;
 
             candidates.add(new SwarmEngineeringTaskPolicy.Candidate(
@@ -401,14 +412,15 @@ public final class SwarmZombieEngineerGoal extends Goal {
         SwarmAgentState claimantState =
                 claimantZombie.getData(SwarmAttachments.AGENT_STATE.get());
 
-        if (claimantState.carriedEngineeringBlockCount() > 0) {
+        if (hasUsableBridgeMaterial(claimantState, position)) {
             return claimant;
         }
 
         Zombie donor = findMaterialDonor(
                 claimantZombie,
                 localZombies,
-                requesterState.targetId()
+                requesterState.targetId(),
+                position
         );
         if (donor == null) {
             return null;
@@ -467,7 +479,8 @@ public final class SwarmZombieEngineerGoal extends Goal {
     private Zombie findMaterialDonor(
             Zombie receiver,
             List<Zombie> localZombies,
-            UUID targetId
+            UUID targetId,
+            BlockPos supportPos
     ) {
         if (receiver == null || localZombies == null || localZombies.isEmpty()) {
             return null;
@@ -485,8 +498,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
                             donor.getData(SwarmAttachments.AGENT_STATE.get());
                     return targetId != null
                             && targetId.equals(donorState.targetId())
-                            && donorState.carriedEngineeringBlockCount() > 0
-                            && donorState.carriedEngineeringBlock() != null
+                            && hasUsableBridgeMaterial(donorState, supportPos)
                             && !meleeBusy(donor)
                             && receiverState.canCarryEngineeringBlock(
                                     donorState.carriedEngineeringBlock(),
@@ -520,9 +532,8 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 return false;
             }
 
-            BlockState carried = state.carriedEngineeringBlock().getBlock().defaultBlockState();
-            if (carried.getCollisionShape(zombie.level(), actionPos).isEmpty()
-                    || !carried.canSurvive(zombie.level(), actionPos)) {
+            BlockState carried = bridgePlacementState(state, actionPos);
+            if (carried == null) {
                 return false;
             }
 
@@ -596,7 +607,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
                     .isEmpty();
 
             if (shallowSupport) {
-                if (availableBridgeMaterials(state) < 1) {
+                if (availableBridgeMaterials(state, support) < 1) {
                     return Action.NONE;
                 }
             } else {
@@ -611,18 +622,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 }
             }
 
-            if (state.carriedEngineeringBlockCount() > 0
-                    && state.carriedEngineeringBlock() != null) {
-                BlockState carried = state.carriedEngineeringBlock()
-                        .getBlock()
-                        .defaultBlockState();
-                if (!carried.getCollisionShape(zombie.level(), support).isEmpty()
-                        && carried.canSurvive(zombie.level(), support)) {
-                    sourceState = carried;
-                }
-            } else {
-                sourceState = null;
-            }
+            sourceState = bridgePlacementState(state, support);
 
             actionPos = support;
             requiredTicks = 6;
@@ -697,7 +697,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
             break;
         }
 
-        int availableMaterials = availableBridgeMaterials(requesterState);
+        int availableMaterials = availableBridgeMaterials(requesterState, firstSupport);
 
         return SwarmBridgeSpanPolicy.evaluate(
                 gapLength,
@@ -707,7 +707,10 @@ public final class SwarmZombieEngineerGoal extends Goal {
         );
     }
 
-    private int availableBridgeMaterials(SwarmAgentState requesterState) {
+    private int availableBridgeMaterials(
+            SwarmAgentState requesterState,
+            BlockPos supportPos
+    ) {
         if (!(zombie.level() instanceof ServerLevel level)
                 || requesterState == null
                 || requesterState.targetId() == null) {
@@ -743,7 +746,8 @@ public final class SwarmZombieEngineerGoal extends Goal {
                     peer.getData(SwarmAttachments.AGENT_STATE.get());
 
             if (!requesterState.targetId().equals(peerState.targetId())
-                    || meleeBusy(peer)) {
+                    || meleeBusy(peer)
+                    || !hasUsableBridgeMaterial(peerState, supportPos)) {
                 continue;
             }
 
@@ -751,6 +755,43 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         return total;
+    }
+
+    private boolean hasUsableBridgeMaterial(
+            SwarmAgentState state,
+            BlockPos supportPos
+    ) {
+        return state != null
+                && state.carriedEngineeringBlockCount() > 0
+                && state.carriedEngineeringBlock() != null
+                && isUsableBridgeMaterial(state.carriedEngineeringBlock(), supportPos);
+    }
+
+    private BlockState bridgePlacementState(
+            SwarmAgentState state,
+            BlockPos supportPos
+    ) {
+        if (!hasUsableBridgeMaterial(state, supportPos)) {
+            return null;
+        }
+        return state.carriedEngineeringBlock().getBlock().defaultBlockState();
+    }
+
+    private boolean isUsableBridgeMaterial(
+            BlockState storedState,
+            BlockPos supportPos
+    ) {
+        if (storedState == null
+                || supportPos == null
+                || storedState.getBlock() instanceof FallingBlock
+                || !(storedState.getBlock().asItem() instanceof BlockItem)) {
+            return false;
+        }
+
+        BlockState placed = storedState.getBlock().defaultBlockState();
+        return !placed.getCollisionShape(zombie.level(), supportPos).isEmpty()
+                && placed.canSurvive(zombie.level(), supportPos)
+                && placed.isFaceSturdy(zombie.level(), supportPos, Direction.UP);
     }
 
     private boolean withinWorkRange() {
@@ -809,12 +850,12 @@ public final class SwarmZombieEngineerGoal extends Goal {
 
         boolean hasBlockItem = sourceState.getBlock().asItem() instanceof BlockItem;
         boolean hasCollision = !sourceState.getCollisionShape(zombie.level(), actionPos).isEmpty();
-        boolean salvage = !(sourceState.getBlock() instanceof FallingBlock)
-                && SwarmZombieEngineeringPolicy.canSalvageAsBuildingMaterial(
+        boolean salvage = SwarmZombieEngineeringPolicy.canSalvageAsBuildingMaterial(
                         sourceState.requiresCorrectToolForDrops(),
                         hasBlockItem,
                         hasCollision
-                );
+                )
+                && isUsableBridgeMaterial(sourceState, actionPos);
 
         boolean destroyed = zombie.level().destroyBlock(actionPos, false, zombie);
         zombie.level().destroyBlockProgress(zombie.getId(), actionPos, -1);
@@ -849,7 +890,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 || sourceState == null
                 || state.carriedEngineeringBlockCount() <= 0
                 || !zombie.level().getBlockState(actionPos).canBeReplaced()
-                || !sourceState.canSurvive(zombie.level(), actionPos)) {
+                || !isUsableBridgeMaterial(sourceState, actionPos)) {
             completed = true;
             succeeded = false;
             return;
