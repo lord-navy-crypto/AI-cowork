@@ -696,8 +696,8 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
-    @GameTest(batch = "swarm_runtime_zombie_engineering_target_loss", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
-    public static void engineeringAbortsWhenPursuitTargetIsLost(GameTestHelper helper) {
+    @GameTest(batch = "swarm_runtime_zombie_engineering_target_unknown", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void committedEngineeringSurvivesTemporaryTargetUncertainty(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
         Difficulty previousDifficulty = helper.getLevel().getDifficulty();
         server.setDifficulty(Difficulty.HARD, true);
@@ -743,31 +743,34 @@ public final class SwarmRuntimeGameTests {
 
         if (engineer == null || !engineer.canUse()) {
             server.setDifficulty(previousDifficulty, true);
-            helper.fail("Target-loss fixture could not start Zombie engineering");
+            helper.fail("Target-uncertainty fixture could not start Zombie engineering");
             return;
         }
 
         engineer.start();
         state.forgetTarget();
 
-        if (engineer.canContinueToUse()) {
+        if (!engineer.canContinueToUse()) {
             server.setDifficulty(previousDifficulty, true);
-            helper.fail("Zombie engineering continued after pursuit target was fully forgotten");
+            helper.fail("Temporary target uncertainty incorrectly aborted committed engineering");
             return;
         }
 
+        for (int i = 0; i < 24; i++) {
+            engineer.tick();
+        }
         engineer.stop();
 
-        if (!helper.getLevel().getBlockState(obstacle).is(Blocks.DIRT)) {
+        if (!helper.getLevel().getBlockState(obstacle).isAir()) {
             server.setDifficulty(previousDifficulty, true);
-            helper.fail("Targetless engineering still modified the old obstacle");
+            helper.fail("Committed engineering failed to finish during bounded target uncertainty");
             return;
         }
-        if (state.engineeringTasksCompleted() != 0L
+        if (state.engineeringTasksCompleted() != 1L
                 || state.claimedEngineeringTask(helper.getTick()) != null
                 || state.engineeringRequest(helper.getTick()) != null) {
             server.setDifficulty(previousDifficulty, true);
-            helper.fail("Targetless engineering left false completion or stale coordination");
+            helper.fail("Target-uncertainty completion left incorrect engineering coordination");
             return;
         }
 
