@@ -537,7 +537,26 @@ public final class SwarmRuntimeGameTests {
             return;
         }
 
+        engineer.stop();
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Aborted Zombie engineering left stale claim/request coordination");
+            return;
+        }
+
         SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+        if (!engineer.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie engineering could not restart cleanly after stale coordination was released");
+            return;
+        }
+        engineer.start();
+
         SwarmConfig.ENABLED.set(false);
         if (engineer.canContinueToUse()) {
             SwarmConfig.ENABLED.set(previousMaster);
@@ -548,6 +567,15 @@ public final class SwarmRuntimeGameTests {
         }
 
         engineer.stop();
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Swarm master OFF left stale engineering coordination");
+            return;
+        }
+
         SwarmConfig.ENABLED.set(previousMaster);
         SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
         server.setDifficulty(previousDifficulty, true);
