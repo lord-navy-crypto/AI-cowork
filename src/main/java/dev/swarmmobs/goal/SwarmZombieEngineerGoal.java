@@ -886,7 +886,12 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         BlockState current = zombie.level().getBlockState(actionPos);
-        if (!current.is(sourceState.getBlock())) {
+        // A break reservation is for the exact block state that was inspected.
+        // Continuing across an in-place state mutation (door/trapdoor toggle,
+        // slab/waterlogged/property change, etc.) would let stale work consume a
+        // newly changed world state. Exact equality intentionally cancels and
+        // forces a fresh engineering decision.
+        if (!current.equals(sourceState)) {
             completed = true;
             succeeded = false;
             return;
