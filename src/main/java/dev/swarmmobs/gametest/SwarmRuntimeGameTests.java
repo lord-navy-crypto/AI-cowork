@@ -33,6 +33,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
@@ -415,6 +416,84 @@ public final class SwarmRuntimeGameTests {
                 || state.engineeringRequest(helper.getTick()) != null) {
             server.setDifficulty(previousDifficulty, true);
             helper.fail("Failed break left stale engineering coordination");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_state_change", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void sameBlockStateMutationCancelsStaleBreak(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        var closed = Blocks.OAK_TRAPDOOR.defaultBlockState()
+                .setValue(BlockStateProperties.OPEN, false);
+        var opened = closed.setValue(BlockStateProperties.OPEN, true);
+        helper.getLevel().setBlockAndUpdate(obstacle, closed);
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("State-change break fixture could not start engineering");
+            return;
+        }
+
+        engineer.start();
+
+        // Same Block type, different BlockState: stale progress must not carry over.
+        helper.getLevel().setBlockAndUpdate(obstacle, opened);
+        engineer.tick();
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).equals(opened)) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Changed trapdoor state was mutated by stale break work");
+            return;
+        }
+        if (state.engineeringBlocksBroken() != 0L
+                || state.engineeringTasksCompleted() != 0L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("State-mutated obstacle was incorrectly reported as completed");
             return;
         }
 
