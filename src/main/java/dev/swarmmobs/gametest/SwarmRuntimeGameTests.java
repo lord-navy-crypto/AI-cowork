@@ -6,6 +6,7 @@ import java.util.UUID;
 import dev.swarmmobs.SwarmMobs;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
+import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.agent.SwarmPlannerContext;
@@ -395,6 +396,84 @@ public final class SwarmRuntimeGameTests {
             return;
         }
 
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_radius", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void diagonalAabbPeerOutsideTrueRadiusCannotClaimEngineeringTask(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        double previousRadius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
+
+        server.setDifficulty(Difficulty.HARD, true);
+        SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(2.0);
+
+        Zombie requester = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+        Zombie diagonalHelper = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 3));
+        requester.setNoGravity(true);
+        diagonalHelper.setNoGravity(true);
+
+        if (requester.distanceTo(diagonalHelper) <= 2.0) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Radius fixture did not place helper outside true 2-block radius");
+            return;
+        }
+
+        UUID sharedTarget = UUID.randomUUID();
+        SwarmAgentState requesterState = requester.getData(SwarmAttachments.AGENT_STATE.get());
+        SwarmAgentState helperState = diagonalHelper.getData(SwarmAttachments.AGENT_STATE.get());
+
+        requesterState.rememberTarget(sharedTarget, helper.getTick(), false);
+        helperState.rememberTarget(sharedTarget, helper.getTick(), false);
+
+        BlockPos obstacle = BlockPos.containing(
+                diagonalHelper.getX() + 0.9,
+                diagonalHelper.getY(),
+                diagonalHelper.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        requesterState.publishEngineeringRequest(
+                SwarmEngineeringTask.Type.BREAK,
+                requester.getUUID(),
+                diagonalHelper.getUUID(),
+                obstacle,
+                helper.getTick(),
+                40
+        );
+
+        SwarmZombieEngineerGoal helperGoal = diagonalHelper.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (helperGoal == null) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Diagonal helper did not expose engineering goal");
+            return;
+        }
+
+        if (helperGoal.canUse()) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("AABB-corner Zombie incorrectly claimed task outside true engineering radius");
+            return;
+        }
+
+        if (helperState.claimedEngineeringTask(helper.getTick()) != null) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Out-of-radius Zombie retained an engineering claim");
+            return;
+        }
+
+        SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
         server.setDifficulty(previousDifficulty, true);
         helper.succeed();
     }
