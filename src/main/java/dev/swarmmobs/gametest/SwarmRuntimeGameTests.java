@@ -541,16 +541,24 @@ public final class SwarmRuntimeGameTests {
                 .findFirst()
                 .orElse(null);
 
-        if (engineer == null || !engineer.canUse()) {
+        if (engineer == null) {
             playerHandle.close();
             server.setDifficulty(previousDifficulty, true);
-            helper.fail("Long-break engineering fixture could not start");
+            helper.fail("Long-break engineering fixture did not expose engineer goal");
             return;
         }
 
         // Isolate execution-lease behavior from Minecraft GoalSelector
-        // lifecycle management. Other Runtime tests cover goal registration.
+        // lifecycle management before canUse configures mutable action state.
         zombie.goalSelector.removeGoal(engineer);
+
+        if (!engineer.canUse()) {
+            playerHandle.close();
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Long-break engineering fixture could not configure engineer goal");
+            return;
+        }
+
         engineer.start();
 
         int afterAdvertisementExpiry =
