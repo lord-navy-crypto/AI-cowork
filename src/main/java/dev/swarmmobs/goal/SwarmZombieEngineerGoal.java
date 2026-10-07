@@ -305,11 +305,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         UUID currentTarget = state.targetId();
-        // A null current target means temporarily unknown (for example because
-        // the obstacle being engineered blocks perception). The bounded
-        // execution lease is allowed to finish in that case. A positive switch
-        // to a different target is an explicit conflict and cancels the task.
-        return currentTarget == null || currentTarget.equals(task.targetId());
+        return currentTarget != null && currentTarget.equals(task.targetId());
     }
 
     private UUID chooseClaimant(
