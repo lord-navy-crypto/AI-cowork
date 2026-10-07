@@ -124,6 +124,15 @@ public final class SwarmZombieEngineerGoal extends Goal {
             return false;
         }
 
+        // Claimant selection may have completed a material handoff after the
+        // requester performed bridge preflight. Reconfigure from the claimant's
+        // current inventory so execution never uses stale pre-handoff state.
+        if (!configureFromTask(task, state)) {
+            state.clearEngineeringRequestIfMatches(task);
+            state.clearClaimedEngineeringTaskIfMatches(task);
+            return false;
+        }
+
         state.acceptEngineeringTask(task, gameTick);
         activeTask = task;
         armExecutionLease(gameTick);
