@@ -696,6 +696,174 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_unstable_shape_material", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
+    public static void nonFullSupportObstacleIsBrokenButNotSalvagedAsBridgeMaterial(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(
+                obstacle,
+                Blocks.OAK_FENCE.defaultBlockState()
+        );
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Non-full-support material fixture could not start Zombie engineering");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 90; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie failed to remove breakable OAK_FENCE obstacle");
+            return;
+        }
+        if (state.engineeringBlocksBroken() != 1L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("OAK_FENCE removal was missing from engineering break telemetry");
+            return;
+        }
+        if (state.carriedEngineeringBlockCount() != 0) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("OAK_FENCE was incorrectly accepted as stable bridge material");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_invalid_inventory", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void invalidCarriedBlockDoesNotSatisfyBridgePreflight(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+        zombie.setPos(zombie.getX(), zombie.getY() + 1.0, zombie.getZ());
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.salvageEngineeringBlock(
+                Blocks.OAK_DOOR.defaultBlockState(),
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        );
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos bridgeSupport = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY() - 1.0,
+                zombie.getZ()
+        );
+        helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().removeBlock(bridgeSupport.below(), false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.above(), false);
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Invalid-inventory fixture did not expose Zombie engineering goal");
+            return;
+        }
+
+        if (engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Invalid carried OAK_DOOR incorrectly satisfied bridge preflight");
+            return;
+        }
+
+        if (state.engineeringRequest(helper.getTick()) != null
+                || state.claimedEngineeringTask(helper.getTick()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Rejected bridge material still created stale engineering coordination");
+            return;
+        }
+
+        if (state.carriedEngineeringBlockCount() != 1) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Rejected carried material was consumed during preflight");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_target_unknown", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void committedEngineeringSurvivesTemporaryTargetUncertainty(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
