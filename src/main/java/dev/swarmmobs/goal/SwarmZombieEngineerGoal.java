@@ -816,6 +816,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
         if (destroyed) {
             SwarmAgentState agentState =
                     zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            agentState.recordEngineeringBlockBroken();
             if (salvage && agentState.canCarryEngineeringBlock(
                     sourceState,
                     SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
