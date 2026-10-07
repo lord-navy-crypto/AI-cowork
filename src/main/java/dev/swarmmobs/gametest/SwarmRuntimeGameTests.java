@@ -557,6 +557,21 @@ public final class SwarmRuntimeGameTests {
                 SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.get() + 5;
 
         helper.runAfterDelay(afterAdvertisementExpiry, () -> {
+            // Hold target identity constant: this fixture tests execution lease
+            // vs advertisement TTL, not perception-memory refresh behavior.
+            state.rememberTarget(
+                    new TargetObservation(
+                            player.getUUID(),
+                            helper.getTick(),
+                            player.getX(),
+                            player.getY(),
+                            player.getZ(),
+                            1.0,
+                            0.0
+                    ),
+                    false
+            );
+
             if (!engineer.canContinueToUse()) {
                 playerHandle.close();
                 server.setDifficulty(previousDifficulty, true);
