@@ -221,6 +221,185 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_negative_break", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void changedBreakTargetCancelsInsteadOfReportingSuccess(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Negative break fixture could not start Zombie engineering");
+            return;
+        }
+
+        engineer.start();
+
+        // Simulate the world/player changing the selected block after the task was claimed.
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.STONE.defaultBlockState());
+        engineer.tick();
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).is(Blocks.STONE)) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Changed break target was mutated by stale engineering work");
+            return;
+        }
+        if (state.engineeringTasksCompleted() != 0L
+                || state.engineeringBlocksBroken() != 0L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Changed break target was incorrectly reported as completed");
+            return;
+        }
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Failed break left stale engineering coordination");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_negative_bridge", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void occupiedBridgeSiteCancelsWithoutConsumingMaterial(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+        zombie.setPos(zombie.getX(), zombie.getY() + 1.0, zombie.getZ());
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.salvageEngineeringBlock(
+                Blocks.DIRT.defaultBlockState(),
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        );
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos bridgeSupport = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY() - 1.0,
+                zombie.getZ()
+        );
+        helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Negative bridge fixture could not start Zombie engineering");
+            return;
+        }
+
+        engineer.start();
+
+        // Simulate another actor occupying the reserved bridge support before placement.
+        helper.getLevel().setBlockAndUpdate(bridgeSupport, Blocks.STONE.defaultBlockState());
+        for (int i = 0; i < 8; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(bridgeSupport).is(Blocks.STONE)) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Occupied bridge site was overwritten by stale engineering work");
+            return;
+        }
+        if (state.engineeringTasksCompleted() != 0L
+                || state.engineeringBlocksPlaced() != 0L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Blocked bridge placement was incorrectly reported as completed");
+            return;
+        }
+        if (state.carriedEngineeringBlockCount() != 1) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Failed bridge placement consumed engineering material");
+            return;
+        }
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Failed bridge placement left stale engineering coordination");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_execution_lease", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 160)
     public static void claimedLongBreakOutlivesEngineeringAdvertisementTtl(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
