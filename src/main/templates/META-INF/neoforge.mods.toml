@@ -32,3 +32,12 @@ type="required"
 versionRange="${minecraft_version_range}"
 ordering="NONE"
 side="BOTH"
+
+
+[[dependencies.${mod_id}]]
+modId="cloth_config"
+type="required"
+reason="Swarm Mobs uses Cloth Config for the client-side Command Center UI."
+versionRange="[15.0.140,16)"
+ordering="AFTER"
+side="CLIENT"
