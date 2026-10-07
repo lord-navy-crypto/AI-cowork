@@ -6,6 +6,7 @@ import java.util.UUID;
 import dev.swarmmobs.SwarmMobs;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
+import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.agent.SwarmPlannerContext;
@@ -221,6 +222,263 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_negative_break", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void changedBreakTargetCancelsInsteadOfReportingSuccess(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Negative break fixture could not start Zombie engineering");
+            return;
+        }
+
+        engineer.start();
+
+        // Simulate the world/player changing the selected block after the task was claimed.
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.STONE.defaultBlockState());
+        engineer.tick();
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).is(Blocks.STONE)) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Changed break target was mutated by stale engineering work");
+            return;
+        }
+        if (state.engineeringTasksCompleted() != 0L
+                || state.engineeringBlocksBroken() != 0L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Changed break target was incorrectly reported as completed");
+            return;
+        }
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Failed break left stale engineering coordination");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_negative_bridge", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void occupiedBridgeSiteCancelsWithoutConsumingMaterial(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+        zombie.setPos(zombie.getX(), zombie.getY() + 1.0, zombie.getZ());
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.salvageEngineeringBlock(
+                Blocks.DIRT.defaultBlockState(),
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        );
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos bridgeSupport = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY() - 1.0,
+                zombie.getZ()
+        );
+        helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Negative bridge fixture could not start Zombie engineering");
+            return;
+        }
+
+        engineer.start();
+
+        // Simulate another actor occupying the reserved bridge support before placement.
+        helper.getLevel().setBlockAndUpdate(bridgeSupport, Blocks.STONE.defaultBlockState());
+        for (int i = 0; i < 8; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(bridgeSupport).is(Blocks.STONE)) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Occupied bridge site was overwritten by stale engineering work");
+            return;
+        }
+        if (state.engineeringTasksCompleted() != 0L
+                || state.engineeringBlocksPlaced() != 0L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Blocked bridge placement was incorrectly reported as completed");
+            return;
+        }
+        if (state.carriedEngineeringBlockCount() != 1) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Failed bridge placement consumed engineering material");
+            return;
+        }
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Failed bridge placement left stale engineering coordination");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_radius", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void diagonalAabbPeerOutsideTrueRadiusCannotClaimEngineeringTask(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        double previousRadius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
+
+        server.setDifficulty(Difficulty.HARD, true);
+        SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(2.0);
+
+        Zombie requester = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+        Zombie diagonalHelper = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 3));
+        requester.setNoGravity(true);
+        diagonalHelper.setNoGravity(true);
+
+        if (requester.distanceTo(diagonalHelper) <= 2.0) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Radius fixture did not place helper outside true 2-block radius");
+            return;
+        }
+
+        UUID sharedTarget = UUID.randomUUID();
+        SwarmAgentState requesterState = requester.getData(SwarmAttachments.AGENT_STATE.get());
+        SwarmAgentState helperState = diagonalHelper.getData(SwarmAttachments.AGENT_STATE.get());
+
+        requesterState.rememberTarget(sharedTarget, helper.getTick(), false);
+        helperState.rememberTarget(sharedTarget, helper.getTick(), false);
+
+        BlockPos obstacle = BlockPos.containing(
+                diagonalHelper.getX() + 0.9,
+                diagonalHelper.getY(),
+                diagonalHelper.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        requesterState.publishEngineeringRequest(
+                SwarmEngineeringTask.Type.BREAK,
+                requester.getUUID(),
+                diagonalHelper.getUUID(),
+                obstacle,
+                helper.getTick(),
+                40
+        );
+
+        SwarmZombieEngineerGoal helperGoal = diagonalHelper.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (helperGoal == null) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Diagonal helper did not expose engineering goal");
+            return;
+        }
+
+        if (helperGoal.canUse()) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("AABB-corner Zombie incorrectly claimed task outside true engineering radius");
+            return;
+        }
+
+        if (helperState.claimedEngineeringTask(helper.getTick()) != null) {
+            SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Out-of-radius Zombie retained an engineering claim");
+            return;
+        }
+
+        SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(previousRadius);
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_execution_lease", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 160)
     public static void claimedLongBreakOutlivesEngineeringAdvertisementTtl(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
@@ -292,6 +550,16 @@ public final class SwarmRuntimeGameTests {
             if (!helper.getLevel().getBlockState(obstacle).isAir()) {
                 server.setDifficulty(previousDifficulty, true);
                 helper.fail("Long-break engineering lease did not allow STONE removal");
+                return;
+            }
+            if (state.engineeringBlocksBroken() != 1L) {
+                server.setDifficulty(previousDifficulty, true);
+                helper.fail("Confirmed STONE removal was missing from engineering break telemetry");
+                return;
+            }
+            if (state.carriedEngineeringBlockCount() != 0) {
+                server.setDifficulty(previousDifficulty, true);
+                helper.fail("Tool-required STONE was incorrectly salvaged as carried material");
                 return;
             }
 
@@ -1303,6 +1571,73 @@ public final class SwarmRuntimeGameTests {
 
         playerHandle.close();
         helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_true_neighbor_radius", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
+    public static void diagonalPeerOutsideTrueNeighborRadiusIsExcluded(GameTestHelper helper) {
+        double previousRadius = SwarmConfig.NEIGHBOR_RADIUS.get();
+        SwarmConfig.NEIGHBOR_RADIUS.set(2.0);
+
+        Zombie self = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+        Zombie diagonal = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 3));
+        self.setNoGravity(true);
+        diagonal.setNoGravity(true);
+
+        if (self.distanceTo(diagonal) <= 2.0) {
+            SwarmConfig.NEIGHBOR_RADIUS.set(previousRadius);
+            helper.fail("Neighbor-radius fixture did not place peer outside true radius");
+            return;
+        }
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = self.getData(SwarmAttachments.AGENT_STATE.get());
+            if (state.neighborCount() != 0) {
+                SwarmConfig.NEIGHBOR_RADIUS.set(previousRadius);
+                helper.fail("AABB-corner peer incorrectly counted inside true neighbor radius");
+                return;
+            }
+
+            SwarmConfig.NEIGHBOR_RADIUS.set(previousRadius);
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_true_target_radius", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void diagonalPlayerOutsideTrueTargetRadiusIsNotDirectlyObserved(GameTestHelper helper) {
+        double previousRadius = SwarmConfig.TARGET_RADIUS.get();
+        SwarmConfig.TARGET_RADIUS.set(2.0);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 1));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(3.0, 1.0, 3.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        if (zombie.distanceTo(player) <= 2.0) {
+            playerHandle.close();
+            SwarmConfig.TARGET_RADIUS.set(previousRadius);
+            helper.fail("Target-radius fixture did not place player outside true radius");
+            return;
+        }
+
+        helper.runAfterDelay(24, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            if (state.targetId() != null || state.directObservation()) {
+                playerHandle.close();
+                SwarmConfig.TARGET_RADIUS.set(previousRadius);
+                helper.fail("AABB-corner player incorrectly acquired outside true target radius");
+                return;
+            }
+
+            playerHandle.close();
+            SwarmConfig.TARGET_RADIUS.set(previousRadius);
+            helper.succeed();
+        });
     }
 
     @PrefixGameTestTemplate(false)
