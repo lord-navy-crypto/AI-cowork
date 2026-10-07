@@ -557,6 +557,7 @@ public final class SwarmMobEvents {
             double radius,
             int maxNeighbors
     ) {
+        double radiusSqr = radius * radius;
         List<PathfinderMob> nearby = level.getEntitiesOfClass(
                 PathfinderMob.class,
                 self.getBoundingBox().inflate(radius),
@@ -564,6 +565,7 @@ public final class SwarmMobEvents {
                         && candidate.isAlive()
                         && !candidate.isNoAi()
                         && SwarmAgentProfiles.isSupported(candidate)
+                        && self.distanceToSqr(candidate) <= radiusSqr
         );
 
         nearby.sort(Comparator.comparingDouble(self::distanceToSqr));
@@ -707,10 +709,12 @@ public final class SwarmMobEvents {
             PathfinderMob self
     ) {
         double radius = SwarmConfig.TARGET_RADIUS.get();
+        double radiusSqr = radius * radius;
         List<Player> players = level.getEntitiesOfClass(
                 Player.class,
                 self.getBoundingBox().inflate(radius),
-                SwarmMobEvents::validTarget
+                player -> validTarget(player)
+                        && self.distanceToSqr(player) <= radiusSqr
         );
 
         return players.stream()
