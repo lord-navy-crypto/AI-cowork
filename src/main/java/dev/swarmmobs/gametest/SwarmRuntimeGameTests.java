@@ -2330,7 +2330,13 @@ public final class SwarmRuntimeGameTests {
     public static void disablingObstacleAvoidanceClearsActiveDetour(GameTestHelper helper) {
         boolean previousObstacleAvoidance =
                 SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get();
+        boolean previousPathEvidence =
+                SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get();
         SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(true);
+        // This fixture isolates live detour-toggle semantics. Path-evidence
+        // quality is covered independently; disabling it here keeps one lateral
+        // candidate deterministically feasible across runners.
+        SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(false);
 
         for (int x = 0; x <= 4; x++) {
             for (int z = 0; z <= 4; z++) {
@@ -2343,8 +2349,7 @@ public final class SwarmRuntimeGameTests {
 
         TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
         ServerPlayer player = playerHandle.player();
-        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.5));
-        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setPos(zombie.getX() + 3.0, zombie.getY(), zombie.getZ());
         player.setNoGravity(true);
 
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
@@ -2353,8 +2358,8 @@ public final class SwarmRuntimeGameTests {
                 0,
                 0,
                 SwarmRole.CHASER,
-                player.getX(),
-                player.getZ(),
+                zombie.getX() + 3.0,
+                zombie.getZ(),
                 0.0,
                 0.0
         );
@@ -2383,6 +2388,7 @@ public final class SwarmRuntimeGameTests {
 
         if (approachGoal == null || !approachGoal.canUse()) {
             SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+            SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
             playerHandle.close();
             helper.fail("Obstacle-toggle fixture could not start SwarmApproachGoal");
             return;
@@ -2393,6 +2399,7 @@ public final class SwarmRuntimeGameTests {
 
         if (state.navigationMode() != SwarmNavigationMode.OBSTACLE_DETOUR) {
             SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+            SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
             playerHandle.close();
             helper.fail(
                     "Fixture did not establish an active obstacle detour before toggle"
@@ -2406,6 +2413,7 @@ public final class SwarmRuntimeGameTests {
 
         if (state.navigationMode() != SwarmNavigationMode.PLAN) {
             SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+            SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
             playerHandle.close();
             helper.fail(
                     "Obstacle Avoidance OFF retained stale detour waypoint"
@@ -2415,6 +2423,7 @@ public final class SwarmRuntimeGameTests {
         }
 
         SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+        SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
         playerHandle.close();
         helper.succeed();
     }
