@@ -693,7 +693,8 @@ public final class SwarmMobEvents {
         // bridge, a Zombie facing a pre-existing base wall can have a valid
         // vanilla attack target while engineering remains permanently blind
         // because swarm targetId never becomes initialized.
-        if (self.getTarget() instanceof Player vanillaTarget
+        if (state.targetObservation() == null
+                && self.getTarget() instanceof Player vanillaTarget
                 && validTarget(vanillaTarget)
                 && !self.hasLineOfSight(vanillaTarget)
                 && self.distanceToSqr(vanillaTarget)
