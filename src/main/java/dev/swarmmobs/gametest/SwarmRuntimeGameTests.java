@@ -548,6 +548,9 @@ public final class SwarmRuntimeGameTests {
             return;
         }
 
+        // Isolate execution-lease behavior from Minecraft GoalSelector
+        // lifecycle management. Other Runtime tests cover goal registration.
+        zombie.goalSelector.removeGoal(engineer);
         engineer.start();
 
         int afterAdvertisementExpiry =
