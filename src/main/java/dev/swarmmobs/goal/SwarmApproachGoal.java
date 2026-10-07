@@ -221,6 +221,12 @@ public final class SwarmApproachGoal extends Goal {
         if (!recoveryActive && mob.level() instanceof ServerLevel level) {
             long gameTick = level.getGameTime();
 
+            if (!SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()
+                    && obstacleDetourActive) {
+                obstacleDetourActive = false;
+                obstacleDetourUntilTick = Long.MIN_VALUE;
+            }
+
             if (obstacleDetourActive) {
                 double detourDistance = Math.hypot(
                         obstacleDetourX - mob.getX(),

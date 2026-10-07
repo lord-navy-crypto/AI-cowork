@@ -6,6 +6,7 @@ import java.util.UUID;
 import dev.swarmmobs.SwarmMobs;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
+import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -2322,6 +2323,109 @@ public final class SwarmRuntimeGameTests {
             playerHandle.close();
             helper.succeed();
         });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_obstacle_toggle", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void disablingObstacleAvoidanceClearsActiveDetour(GameTestHelper helper) {
+        boolean previousObstacleAvoidance =
+                SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get();
+        boolean previousPathEvidence =
+                SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get();
+        SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(true);
+        // This fixture isolates live detour-toggle semantics. Path-evidence
+        // quality is covered independently; disabling it here keeps one lateral
+        // candidate deterministically feasible across runners.
+        SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(false);
+
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        player.setPos(zombie.getX() + 3.0, zombie.getY(), zombie.getZ());
+        player.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(player.getUUID(), helper.getTick(), true);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 3.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        zombie.setTarget(player);
+
+        BlockPos frontObstacle = BlockPos.containing(
+                zombie.getX() + SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.get(),
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(
+                frontObstacle,
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().setBlockAndUpdate(
+                frontObstacle.above(),
+                Blocks.STONE.defaultBlockState()
+        );
+
+        SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmApproachGoal.class::isInstance)
+                .map(SwarmApproachGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (approachGoal == null || !approachGoal.canUse()) {
+            SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+            SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
+            playerHandle.close();
+            helper.fail("Obstacle-toggle fixture could not start SwarmApproachGoal");
+            return;
+        }
+
+        zombie.goalSelector.removeGoal(approachGoal);
+        approachGoal.start();
+
+        if (state.navigationMode() != SwarmNavigationMode.OBSTACLE_DETOUR) {
+            SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+            SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
+            playerHandle.close();
+            helper.fail(
+                    "Fixture did not establish an active obstacle detour before toggle"
+                            + " mode=" + state.navigationMode()
+            );
+            return;
+        }
+
+        SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(false);
+        approachGoal.start();
+
+        if (state.navigationMode() != SwarmNavigationMode.PLAN) {
+            SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+            SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
+            playerHandle.close();
+            helper.fail(
+                    "Obstacle Avoidance OFF retained stale detour waypoint"
+                            + " mode=" + state.navigationMode()
+            );
+            return;
+        }
+
+        SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(previousObstacleAvoidance);
+        SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(previousPathEvidence);
+        playerHandle.close();
+        helper.succeed();
     }
 
     @PrefixGameTestTemplate(false)
