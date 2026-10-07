@@ -3,6 +3,7 @@ package dev.swarmmobs.goal;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.agent.SwarmEngineeringTask;
+import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmBridgeSpanPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
@@ -252,7 +253,58 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 state.plannerFeasibleCount()
         );
 
-        return engineeringPressure && !meleeBusy(zombie);
+        // Runtime can keep finding nominal lateral detours even while a Zombie is
+        // physically pinned against a breakable block. In that case feasibleCount
+        // stays positive and the planner-only escalation gate can starve engineering
+        // forever. Once navigation has already entered obstacle-detour or recovery
+        // mode, a directly blocking, legally breakable obstacle is sufficient local
+        // evidence to let the engineering goal take over.
+        boolean directBreakPressure = state.navigationMode() != SwarmNavigationMode.PLAN
+                && hasDirectBreakableObstacle(state);
+
+        return (engineeringPressure || directBreakPressure) && !meleeBusy(zombie);
+    }
+
+    private boolean hasDirectBreakableObstacle(SwarmAgentState state) {
+        double dx = state.destinationX() - zombie.getX();
+        double dz = state.destinationZ() - zombie.getZ();
+        double length = Math.hypot(dx, dz);
+        if (length < 1.0e-6) {
+            return false;
+        }
+
+        double stepX = dx / length;
+        double stepZ = dz / length;
+        BlockPos feetAhead = BlockPos.containing(
+                zombie.getX() + stepX * 0.9,
+                zombie.getY(),
+                zombie.getZ() + stepZ * 0.9
+        );
+
+        BlockPos[] candidates = {
+                feetAhead,
+                feetAhead.above()
+        };
+
+        for (BlockPos pos : candidates) {
+            BlockState block = zombie.level().getBlockState(pos);
+            if (block.isAir()
+                    || block.getCollisionShape(zombie.level(), pos).isEmpty()) {
+                continue;
+            }
+
+            double hardness = block.getDestroySpeed(zombie.level(), pos);
+            boolean hasBlockEntity = zombie.level().getBlockEntity(pos) != null;
+            if (SwarmZombieEngineeringPolicy.canAttemptBreak(
+                    hardness,
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.get(),
+                    hasBlockEntity
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private SwarmEngineeringTask findAssignedTask(
