@@ -264,10 +264,13 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         double radius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
+        double radiusSqr = radius * radius;
         return level.getEntitiesOfClass(
                         Zombie.class,
                         zombie.getBoundingBox().inflate(radius),
-                        peer -> peer.isAlive() && SwarmAgentProfiles.isSupported(peer)
+                        peer -> peer.isAlive()
+                                && SwarmAgentProfiles.isSupported(peer)
+                                && zombie.distanceToSqr(peer) <= radiusSqr
                 ).stream()
                 .filter(peer -> {
                     SwarmAgentState peerState =
@@ -313,10 +316,13 @@ public final class SwarmZombieEngineerGoal extends Goal {
         double radius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
         List<SwarmEngineeringTaskPolicy.Candidate> candidates = new ArrayList<>();
 
+        double radiusSqr = radius * radius;
         List<Zombie> localZombies = new ArrayList<>(level.getEntitiesOfClass(
                 Zombie.class,
                 zombie.getBoundingBox().inflate(radius),
-                peer -> peer.isAlive() && SwarmAgentProfiles.isSupported(peer)
+                peer -> peer.isAlive()
+                        && SwarmAgentProfiles.isSupported(peer)
+                        && zombie.distanceToSqr(peer) <= radiusSqr
         ));
 
         if (!localZombies.contains(zombie)) {
@@ -704,10 +710,13 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         double radius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
+        double radiusSqr = radius * radius;
         List<Zombie> local = new ArrayList<>(level.getEntitiesOfClass(
                 Zombie.class,
                 zombie.getBoundingBox().inflate(radius),
-                peer -> peer.isAlive() && SwarmAgentProfiles.isSupported(peer)
+                peer -> peer.isAlive()
+                        && SwarmAgentProfiles.isSupported(peer)
+                        && zombie.distanceToSqr(peer) <= radiusSqr
         ));
 
         if (!local.contains(zombie)) {
