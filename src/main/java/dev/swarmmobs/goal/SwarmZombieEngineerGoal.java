@@ -143,7 +143,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
         if (activeTask != null && zombie.level() instanceof ServerLevel level) {
             SwarmAgentState state =
                     zombie.getData(SwarmAttachments.AGENT_STATE.get());
-            return taskMatchesCurrentTarget(activeTask, state)
+            return taskCompatibleWithExecutionTarget(activeTask, state)
                     && level.getGameTime() < executionDeadlineTick;
         }
         return true;
@@ -283,6 +283,18 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 && state != null
                 && state.targetId() != null
                 && state.targetId().equals(task.targetId());
+    }
+
+    private static boolean taskCompatibleWithExecutionTarget(
+            SwarmEngineeringTask task,
+            SwarmAgentState state
+    ) {
+        if (task == null || state == null) {
+            return false;
+        }
+
+        UUID currentTarget = state.targetId();
+        return currentTarget == null || currentTarget.equals(task.targetId());
     }
 
     private UUID chooseClaimant(
