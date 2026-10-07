@@ -54,6 +54,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
     private int progressTicks;
     private int requiredTicks;
     private boolean completed;
+    private boolean succeeded;
     private SwarmEngineeringTask activeTask;
     private long executionDeadlineTick = Long.MIN_VALUE;
 
@@ -152,6 +153,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
     @Override
     public void start() {
         completed = false;
+        succeeded = false;
         progressTicks = 0;
     }
 
@@ -176,7 +178,11 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         if (completed) {
-            completeCoordination();
+            if (succeeded) {
+                completeCoordination();
+            } else {
+                cancelCoordination();
+            }
         }
     }
 
@@ -186,7 +192,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
             zombie.level().destroyBlockProgress(zombie.getId(), actionPos, -1);
         }
 
-        if (completed) {
+        if (completed && succeeded) {
             completeCoordination();
         } else if (activeTask != null) {
             cancelCoordination();
@@ -198,6 +204,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
         progressTicks = 0;
         requiredTicks = 0;
         completed = false;
+        succeeded = false;
         activeTask = null;
         executionDeadlineTick = Long.MIN_VALUE;
     }
@@ -767,12 +774,14 @@ public final class SwarmZombieEngineerGoal extends Goal {
     private void tickBreak() {
         if (actionPos == null || sourceState == null) {
             completed = true;
+            succeeded = false;
             return;
         }
 
         BlockState current = zombie.level().getBlockState(actionPos);
         if (!current.is(sourceState.getBlock())) {
             completed = true;
+            succeeded = false;
             return;
         }
 
@@ -803,9 +812,10 @@ public final class SwarmZombieEngineerGoal extends Goal {
             );
         }
 
-        zombie.level().destroyBlock(actionPos, false, zombie);
+        boolean destroyed = zombie.level().destroyBlock(actionPos, false, zombie);
         zombie.level().destroyBlockProgress(zombie.getId(), actionPos, -1);
         completed = true;
+        succeeded = destroyed;
     }
 
     private void tickBridge() {
@@ -818,15 +828,19 @@ public final class SwarmZombieEngineerGoal extends Goal {
         if (actionPos == null
                 || sourceState == null
                 || state.carriedEngineeringBlockCount() <= 0
-                || !zombie.level().getBlockState(actionPos).canBeReplaced()) {
+                || !zombie.level().getBlockState(actionPos).canBeReplaced()
+                || !sourceState.canSurvive(zombie.level(), actionPos)) {
             completed = true;
+            succeeded = false;
             return;
         }
 
-        if (zombie.level().setBlockAndUpdate(actionPos, sourceState)) {
+        boolean placed = zombie.level().setBlockAndUpdate(actionPos, sourceState);
+        if (placed) {
             state.consumeEngineeringBlock();
         }
         completed = true;
+        succeeded = placed;
     }
 
     private void cancelCoordination() {
