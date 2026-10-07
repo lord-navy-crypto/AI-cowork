@@ -801,19 +801,23 @@ public final class SwarmZombieEngineerGoal extends Goal {
                 hasCollision
         );
 
-        SwarmAgentState agentState = zombie.getData(SwarmAttachments.AGENT_STATE.get());
-        if (salvage && agentState.canCarryEngineeringBlock(
-                sourceState,
-                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
-        )) {
-            agentState.salvageEngineeringBlock(
-                    sourceState,
-                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
-            );
-        }
-
         boolean destroyed = zombie.level().destroyBlock(actionPos, false, zombie);
         zombie.level().destroyBlockProgress(zombie.getId(), actionPos, -1);
+
+        if (destroyed) {
+            SwarmAgentState agentState =
+                    zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            if (salvage && agentState.canCarryEngineeringBlock(
+                    sourceState,
+                    SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+            )) {
+                agentState.salvageEngineeringBlock(
+                        sourceState,
+                        SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+                );
+            }
+        }
+
         completed = true;
         succeeded = destroyed;
     }
