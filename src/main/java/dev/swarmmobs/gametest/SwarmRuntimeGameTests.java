@@ -33,6 +33,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
@@ -82,6 +83,95 @@ public final class SwarmRuntimeGameTests {
             helper.succeed();
         });
     }
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_vanilla_target_bridge", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void vanillaPlayerTargetBehindWallSeedsIndirectSwarmTarget(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+
+        helper.setBlock(new BlockPos(2, 1, 2), Blocks.STONE);
+        helper.setBlock(new BlockPos(2, 2, 2), Blocks.STONE);
+        zombie.setTarget(player);
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (zombie.hasLineOfSight(player)) {
+                playerHandle.close();
+                helper.fail("Wall fixture unexpectedly left direct line of sight");
+                return;
+            }
+            if (!player.getUUID().equals(state.targetId())) {
+                playerHandle.close();
+                helper.fail("Vanilla target behind wall did not seed swarm target memory");
+                return;
+            }
+            if (state.directObservation()) {
+                playerHandle.close();
+                helper.fail("Occluded vanilla target was incorrectly marked direct");
+                return;
+            }
+            if (!state.hasDestination()) {
+                playerHandle.close();
+                helper.fail("Indirect vanilla target did not produce a swarm destination");
+                return;
+            }
+
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_sensing_dropout_vanilla_guard", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void directSensingDropoutIsNotBypassedByVanillaTarget(GameTestHelper helper) {
+        boolean previousImperfect = SwarmConfig.SENSING_IMPERFECTION_ENABLED.get();
+        double previousDropout = SwarmConfig.SENSING_DROPOUT_RATE.get();
+
+        SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(true);
+        SwarmConfig.SENSING_DROPOUT_RATE.set(1.0);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        Vec3 playerPosition = helper.absoluteVec(new Vec3(4.0, 1.0, 2.0));
+        player.setPos(playerPosition.x, playerPosition.y, playerPosition.z);
+        player.setNoGravity(true);
+        zombie.setTarget(player);
+
+        helper.runAfterDelay(18, () -> {
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!zombie.hasLineOfSight(player)) {
+                SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(previousImperfect);
+                SwarmConfig.SENSING_DROPOUT_RATE.set(previousDropout);
+                playerHandle.close();
+                helper.fail("Dropout guard fixture unexpectedly lost direct LOS");
+                return;
+            }
+            if (state.targetId() != null || state.hasDestination()) {
+                SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(previousImperfect);
+                SwarmConfig.SENSING_DROPOUT_RATE.set(previousDropout);
+                playerHandle.close();
+                helper.fail("Vanilla target bypassed a forced direct sensing dropout");
+                return;
+            }
+
+            SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(previousImperfect);
+            SwarmConfig.SENSING_DROPOUT_RATE.set(previousDropout);
+            playerHandle.close();
+            helper.succeed();
+        });
+    }
+
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
     public static void zombieBreaksSoftObstacleAndReusesItAsBridgeSupport(GameTestHelper helper) {
@@ -223,6 +313,80 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_real_escalation", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void obstacleDetourWithDirectBreakableBlockEscalatesWithoutSyntheticPlannerFailure(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+
+        // This deliberately does NOT inject blocked/unreachable/feasible planner
+        // counts. It reproduces the live failure mode where ordinary navigation
+        // has already entered detour handling but still reports nominal lateral
+        // options, which previously prevented engineering forever.
+        state.updateNavigationTelemetry(
+                SwarmNavigationMode.OBSTACLE_DETOUR,
+                zombie.getX() + 1.5,
+                zombie.getZ(),
+                false
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Direct breakable obstacle did not escalate from live detour state");
+            return;
+        }
+
+        engineer.start();
+        for (int i = 0; i < 20; i++) {
+            engineer.tick();
+        }
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Escalated engineering did not break the direct DIRT obstacle");
+            return;
+        }
+        if (state.engineeringBlocksBroken() != 1L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Real-escalation break telemetry did not increment");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_negative_break", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void changedBreakTargetCancelsInsteadOfReportingSuccess(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
@@ -296,6 +460,84 @@ public final class SwarmRuntimeGameTests {
                 || state.engineeringRequest(helper.getTick()) != null) {
             server.setDifficulty(previousDifficulty, true);
             helper.fail("Failed break left stale engineering coordination");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_state_change", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void sameBlockStateMutationCancelsStaleBreak(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        var closed = Blocks.OAK_STAIRS.defaultBlockState()
+                .setValue(BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.NORTH);
+        var opened = closed.setValue(BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.SOUTH);
+        helper.getLevel().setBlockAndUpdate(obstacle, closed);
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("State-change break fixture could not start engineering");
+            return;
+        }
+
+        engineer.start();
+
+        // Same Block type, different BlockState: stale progress must not carry over.
+        helper.getLevel().setBlockAndUpdate(obstacle, opened);
+        engineer.tick();
+        engineer.stop();
+
+        if (!helper.getLevel().getBlockState(obstacle).equals(opened)) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Changed stair state was mutated by stale break work");
+            return;
+        }
+        if (state.engineeringBlocksBroken() != 0L
+                || state.engineeringTasksCompleted() != 0L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("State-mutated obstacle was incorrectly reported as completed");
             return;
         }
 

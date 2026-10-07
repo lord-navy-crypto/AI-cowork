@@ -687,6 +687,35 @@ public final class SwarmMobEvents {
             state.recordSensingDrop();
         }
 
+        // Vanilla targeting may already know about a player behind an obstacle.
+        // Treat that as an indirect observation instead of requiring the swarm
+        // layer to have seen the player before the wall existed. Without this
+        // bridge, a Zombie facing a pre-existing base wall can have a valid
+        // vanilla attack target while engineering remains permanently blind
+        // because swarm targetId never becomes initialized.
+        if (state.targetObservation() == null
+                && self.getTarget() instanceof Player vanillaTarget
+                && validTarget(vanillaTarget)
+                && !self.hasLineOfSight(vanillaTarget)
+                && self.distanceToSqr(vanillaTarget)
+                        <= SwarmConfig.TARGET_RADIUS.get() * SwarmConfig.TARGET_RADIUS.get()) {
+            Vec3 look = vanillaTarget.getLookAngle();
+            Vec3 velocity = vanillaTarget.getDeltaMovement();
+            TargetObservation observation = new TargetObservation(
+                    vanillaTarget.getUUID(),
+                    gameTick,
+                    vanillaTarget.getX(),
+                    vanillaTarget.getY(),
+                    vanillaTarget.getZ(),
+                    look.x,
+                    look.z,
+                    velocity.x,
+                    velocity.z
+            );
+            state.rememberTarget(observation, false);
+            return new TargetSelection(observation, vanillaTarget, false);
+        }
+
         if (state.targetObservation() != null) {
             records.add(state.targetObservation());
         }

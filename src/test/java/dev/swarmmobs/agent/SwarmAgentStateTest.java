@@ -41,6 +41,38 @@ class SwarmAgentStateTest {
         assertFalse(state.directObservation());
     }
     @Test
+    void clearingLocalPlanAlsoClearsStaleNavigationAndPlannerTelemetry() {
+        SwarmAgentState state = new SwarmAgentState();
+
+        state.updateNavigationTelemetry(
+                SwarmNavigationMode.OBSTACLE_DETOUR,
+                3.0,
+                4.0,
+                true
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                2,
+                1,
+                1,
+                0,
+                1.25,
+                3L
+        );
+
+        state.clearLocalPlan(0);
+
+        assertEquals(SwarmNavigationMode.PLAN, state.navigationMode());
+        assertEquals(SwarmPlannerContext.NONE, state.plannerContext());
+        assertEquals(0, state.plannerCandidateCount());
+        assertEquals(0, state.plannerBlockedCount());
+        assertEquals(0, state.plannerUnreachableCount());
+        assertEquals(0, state.plannerFeasibleCount());
+        assertFalse(state.hasNavigationWaypoint());
+    }
+
+    @Test
     void initialPlanningStaggerDoesNotChangeSteadyStatePeriod() {
         SwarmAgentState state = new SwarmAgentState();
 
