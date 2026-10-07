@@ -44,7 +44,9 @@ public final class SwarmControlNetwork {
     public static void sendSnapshot(ServerPlayer player) {
         PacketDistributor.sendToPlayer(
                 player,
-                new ControlPanelSnapshotPayload(snapshotData(player.serverLevel()))
+                new ControlPanelSnapshotPayload(
+                        snapshotData(player.serverLevel(), player.hasPermissions(2))
+                )
         );
     }
 
@@ -52,7 +54,19 @@ public final class SwarmControlNetwork {
             ControlPanelActionPayload payload,
             IPayloadContext context
     ) {
-        if (!(context.player() instanceof ServerPlayer player) || !player.hasPermissions(2)) {
+        if (!(context.player() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        // Everyone may inspect the server-authoritative panel. Mutations remain
+        // permission-gated on the server.
+        if ("panel_refresh".equals(payload.action())) {
+            sendSnapshot(player);
+            return;
+        }
+
+        if (!player.hasPermissions(2)) {
+            sendSnapshot(player);
             return;
         }
 
@@ -440,7 +454,10 @@ public final class SwarmControlNetwork {
         }
     }
 
-    private static String snapshotData(net.minecraft.server.level.ServerLevel level) {
+    private static String snapshotData(
+            net.minecraft.server.level.ServerLevel level,
+            boolean canEdit
+    ) {
         var metrics = SwarmExperimentMetrics.snapshot(level);
         var ai = SwarmAiShadowState.snapshot();
         var decision = ai.lastDecision();
@@ -495,6 +512,7 @@ public final class SwarmControlNetwork {
         }
 
         return String.join(";",
+                pair("canEdit", canEdit),
                 pair("aiEnabled", SwarmConfig.EXTERNAL_AI_ENABLED.get()),
                 pair("aiModel", SwarmConfig.OLLAMA_MODEL.get()),
                 pair("aiStatus", ai.status().name()),
