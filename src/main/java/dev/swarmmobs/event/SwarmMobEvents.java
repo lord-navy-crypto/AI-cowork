@@ -316,6 +316,8 @@ public final class SwarmMobEvents {
                     specialization,
                     candidateRole
             );
+        } else {
+            state.resetActiveSpecialization();
         }
 
         SwarmRole tacticalRole = state.stabilizeRole(
