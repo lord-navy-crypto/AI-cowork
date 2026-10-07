@@ -695,6 +695,7 @@ public final class SwarmMobEvents {
         // because swarm targetId never becomes initialized.
         if (self.getTarget() instanceof Player vanillaTarget
                 && validTarget(vanillaTarget)
+                && !self.hasLineOfSight(vanillaTarget)
                 && self.distanceToSqr(vanillaTarget)
                         <= SwarmConfig.TARGET_RADIUS.get() * SwarmConfig.TARGET_RADIUS.get()) {
             Vec3 look = vanillaTarget.getLookAngle();
