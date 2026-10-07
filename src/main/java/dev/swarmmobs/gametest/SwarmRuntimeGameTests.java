@@ -1518,6 +1518,125 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_requester_material_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void requesterReconfiguresBridgeAfterReceivingDonorMaterial(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie requester = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        Zombie donor = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 3));
+        requester.setNoGravity(true);
+        donor.setNoGravity(true);
+        requester.setPos(requester.getX(), requester.getY() + 1.0, requester.getZ());
+        donor.setPos(donor.getX(), donor.getY() + 1.0, donor.getZ());
+
+        UUID sharedTarget = UUID.randomUUID();
+        SwarmAgentState requesterState = requester.getData(SwarmAttachments.AGENT_STATE.get());
+        SwarmAgentState donorState = donor.getData(SwarmAttachments.AGENT_STATE.get());
+
+        requesterState.rememberTarget(sharedTarget, helper.getTick(), false);
+        donorState.rememberTarget(sharedTarget, helper.getTick(), false);
+
+        requesterState.updateLocalPlan(
+                1,
+                0,
+                SwarmRole.REAR_PRESSURE,
+                requester.getX() + 4.0,
+                requester.getZ(),
+                0.0,
+                0.0
+        );
+        requesterState.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+        donorState.updateLocalPlan(
+                1,
+                0,
+                SwarmRole.CHASER,
+                donor.getX() + 4.0,
+                donor.getZ(),
+                0.0,
+                0.0
+        );
+        donorState.salvageEngineeringBlock(
+                Blocks.DIRT.defaultBlockState(),
+                SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.get()
+        );
+
+        BlockPos bridgeSupport = BlockPos.containing(
+                requester.getX() + 0.9,
+                requester.getY() - 1.0,
+                requester.getZ()
+        );
+        helper.getLevel().removeBlock(bridgeSupport, false);
+        helper.getLevel().removeBlock(bridgeSupport.below(), false);
+        helper.getLevel().setBlockAndUpdate(
+                bridgeSupport.east(),
+                Blocks.STONE.defaultBlockState()
+        );
+        helper.getLevel().removeBlock(bridgeSupport.above(), false);
+        helper.getLevel().removeBlock(bridgeSupport.east().above(), false);
+
+        SwarmZombieEngineerGoal requesterGoal = requester.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (requesterGoal == null || !requesterGoal.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Requester could not claim bridge after donor material handoff");
+            return;
+        }
+
+        var request = requesterState.engineeringRequest(helper.getTick());
+        if (request == null || !requester.getUUID().equals(request.claimantId())) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Requester-handoff fixture did not keep bridge claim on requester");
+            return;
+        }
+
+        if (donorState.carriedEngineeringBlockCount() != 0
+                || requesterState.carriedEngineeringBlockCount() != 1
+                || donorState.engineeringMaterialsGiven() != 1L
+                || requesterState.engineeringMaterialsReceived() != 1L) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Requester did not receive exactly one donor bridge material");
+            return;
+        }
+
+        requesterGoal.start();
+        for (int i = 0; i < 8; i++) {
+            requesterGoal.tick();
+        }
+        requesterGoal.stop();
+
+        if (helper.getLevel().getBlockState(bridgeSupport).isAir()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Requester kept stale pre-handoff bridge state and failed placement");
+            return;
+        }
+        if (requesterState.engineeringBlocksPlaced() != 1L
+                || requesterState.carriedEngineeringBlockCount() != 0) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Requester bridge placement did not consume transferred material");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_material_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 140)
     public static void bridgeClaimantReceivesOneBlockFromNearbyDonor(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
