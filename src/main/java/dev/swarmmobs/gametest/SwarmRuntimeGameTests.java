@@ -583,6 +583,96 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_target_binding", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void engineeringAbortsWhenZombieSwitchesTarget(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        server.setDifficulty(Difficulty.HARD, true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        UUID originalTarget = UUID.randomUUID();
+        UUID replacementTarget = UUID.randomUUID();
+
+        state.rememberTarget(originalTarget, helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Target-binding fixture could not start Zombie engineering");
+            return;
+        }
+
+        var request = state.engineeringRequest(helper.getTick());
+        if (request == null || !originalTarget.equals(request.targetId())) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Engineering request was not bound to the original target");
+            return;
+        }
+
+        engineer.start();
+        state.rememberTarget(replacementTarget, helper.getTick() + 1, false);
+
+        if (engineer.canContinueToUse()) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie kept executing stale engineering after target switch");
+            return;
+        }
+
+        engineer.stop();
+
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Target switch left stale engineering coordination");
+            return;
+        }
+
+        if (!helper.getLevel().getBlockState(obstacle).is(Blocks.DIRT)) {
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie mutated the old route after switching targets");
+            return;
+        }
+
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_gamerule", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void zombieEngineeringRespectsMobGriefing(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
