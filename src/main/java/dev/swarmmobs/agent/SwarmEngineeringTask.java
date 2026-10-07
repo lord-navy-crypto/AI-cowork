@@ -11,6 +11,7 @@ public record SwarmEngineeringTask(
         Type type,
         UUID requesterId,
         UUID claimantId,
+        UUID targetId,
         BlockPos position,
         long createdTick,
         long expiresTick
@@ -24,6 +25,7 @@ public record SwarmEngineeringTask(
         return type != null
                 && requesterId != null
                 && claimantId != null
+                && targetId != null
                 && position != null
                 && gameTick < expiresTick;
     }
