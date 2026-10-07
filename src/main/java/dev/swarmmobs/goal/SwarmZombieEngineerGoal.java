@@ -20,6 +20,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
@@ -299,12 +300,12 @@ public final class SwarmZombieEngineerGoal extends Goal {
             SwarmEngineeringTask task,
             SwarmAgentState state
     ) {
-        if (task == null || state == null) {
+        if (task == null || state == null || task.targetId() == null) {
             return false;
         }
 
         UUID currentTarget = state.targetId();
-        return currentTarget == null || currentTarget.equals(task.targetId());
+        return currentTarget != null && currentTarget.equals(task.targetId());
     }
 
     private UUID chooseClaimant(
@@ -804,11 +805,12 @@ public final class SwarmZombieEngineerGoal extends Goal {
 
         boolean hasBlockItem = sourceState.getBlock().asItem() instanceof BlockItem;
         boolean hasCollision = !sourceState.getCollisionShape(zombie.level(), actionPos).isEmpty();
-        boolean salvage = SwarmZombieEngineeringPolicy.canSalvageAsBuildingMaterial(
-                sourceState.requiresCorrectToolForDrops(),
-                hasBlockItem,
-                hasCollision
-        );
+        boolean salvage = !(sourceState.getBlock() instanceof FallingBlock)
+                && SwarmZombieEngineeringPolicy.canSalvageAsBuildingMaterial(
+                        sourceState.requiresCorrectToolForDrops(),
+                        hasBlockItem,
+                        hasCollision
+                );
 
         boolean destroyed = zombie.level().destroyBlock(actionPos, false, zombie);
         zombie.level().destroyBlockProgress(zombie.getId(), actionPos, -1);
