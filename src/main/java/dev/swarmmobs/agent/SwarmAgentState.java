@@ -228,6 +228,12 @@ public final class SwarmAgentState {
         return specialization;
     }
 
+    public void resetActiveSpecialization() {
+        currentTask = SwarmTaskType.RESERVE;
+        specialization = SwarmSpecialization.RESERVE;
+        specializationSinceTick = Long.MIN_VALUE;
+    }
+
     public void updateTaskExperience(
             SwarmTaskType activeTask,
             double gain,
