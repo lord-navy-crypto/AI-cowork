@@ -131,6 +131,8 @@ public final class SwarmZombieEngineerGoal extends Goal {
         if (completed
                 || action == Action.NONE
                 || actionPos == null
+                || !SwarmConfig.ENABLED.get()
+                || !SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.get()
                 || !zombie.isAlive()
                 || zombie.level().getDifficulty() != Difficulty.HARD
                 || !zombie.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
