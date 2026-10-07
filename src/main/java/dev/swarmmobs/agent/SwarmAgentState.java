@@ -855,6 +855,7 @@ public final class SwarmAgentState {
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
         this.searchRadius = 0.0;
         clearPredictionTelemetry();
+        clearNavigationTelemetry();
         this.separationMagnitude = 0.0;
         this.cohesionMagnitude = 0.0;
         this.alignmentMagnitude = 0.0;
