@@ -176,7 +176,8 @@ public final class SwarmMobEvents {
         );
 
         SwarmAiActiveState.Snapshot activeStrategy =
-                SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()
+                SwarmConfig.EXTERNAL_AI_ENABLED.get()
+                        && SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get()
                         ? SwarmAiActiveState.snapshot(gameTick)
                         : null;
 
