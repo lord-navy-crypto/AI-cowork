@@ -555,6 +555,10 @@ public final class SwarmAgentState {
                 && carriedEngineeringBlockCount < maxCount);
     }
 
+    public void recordEngineeringBlockBroken() {
+        engineeringBlocksBroken++;
+    }
+
     public boolean salvageEngineeringBlock(BlockState state, int maxCount) {
         if (!canCarryEngineeringBlock(state, maxCount)) {
             return false;
@@ -563,7 +567,6 @@ public final class SwarmAgentState {
             carriedEngineeringBlock = state;
         }
         carriedEngineeringBlockCount++;
-        engineeringBlocksBroken++;
         return true;
     }
 
