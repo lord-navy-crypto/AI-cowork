@@ -77,8 +77,13 @@ public final class SwarmControlNetwork {
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
 
-            case "ai_toggle" ->
-                    SwarmConfig.EXTERNAL_AI_ENABLED.set(!SwarmConfig.EXTERNAL_AI_ENABLED.get());
+            case "ai_toggle" -> {
+                boolean next = !SwarmConfig.EXTERNAL_AI_ENABLED.get();
+                SwarmConfig.EXTERNAL_AI_ENABLED.set(next);
+                if (!next) {
+                    SwarmAiActiveState.clear();
+                }
+            }
             case "ai_shadow" -> SwarmAiShadowService.request(player.serverLevel())
                     .whenComplete((decision, error) ->
                             player.getServer().execute(() -> {
@@ -190,8 +195,13 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
             }
 
-            case "ai_active_toggle" ->
-                    SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(!SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get());
+            case "ai_active_toggle" -> {
+                boolean next = !SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get();
+                SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(next);
+                if (!next) {
+                    SwarmAiActiveState.clear();
+                }
+            }
 
             case "toggle_sensing" ->
                     SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(!SwarmConfig.SENSING_IMPERFECTION_ENABLED.get());

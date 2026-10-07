@@ -131,6 +131,8 @@ public final class SwarmZombieEngineerGoal extends Goal {
         if (completed
                 || action == Action.NONE
                 || actionPos == null
+                || !SwarmConfig.ENABLED.get()
+                || !SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.get()
                 || !zombie.isAlive()
                 || zombie.level().getDifficulty() != Difficulty.HARD
                 || !zombie.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
@@ -182,6 +184,8 @@ public final class SwarmZombieEngineerGoal extends Goal {
 
         if (completed) {
             completeCoordination();
+        } else if (activeTask != null) {
+            cancelCoordination();
         }
 
         action = Action.NONE;
@@ -781,6 +785,35 @@ public final class SwarmZombieEngineerGoal extends Goal {
             state.consumeEngineeringBlock();
         }
         completed = true;
+    }
+
+    private void cancelCoordination() {
+        if (activeTask == null) {
+            return;
+        }
+
+        SwarmAgentState selfState = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        selfState.clearClaimedEngineeringTaskIfMatches(activeTask);
+
+        if (activeTask.requesterId().equals(zombie.getUUID())) {
+            selfState.clearEngineeringRequestIfMatches(activeTask);
+            return;
+        }
+
+        if (zombie.level() instanceof ServerLevel level) {
+            double radius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get() * 2.0;
+            level.getEntitiesOfClass(
+                            Zombie.class,
+                            zombie.getBoundingBox().inflate(radius),
+                            peer -> peer.isAlive()
+                                    && peer.getUUID().equals(activeTask.requesterId())
+                    ).stream()
+                    .findFirst()
+                    .ifPresent(requester ->
+                            requester.getData(SwarmAttachments.AGENT_STATE.get())
+                                    .clearEngineeringRequestIfMatches(activeTask)
+                    );
+        }
     }
 
     private void completeCoordination() {

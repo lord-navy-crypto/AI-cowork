@@ -468,6 +468,121 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_zombie_engineering_disable", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void activeZombieEngineeringStopsWhenControlIsDisabled(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        Difficulty previousDifficulty = helper.getLevel().getDifficulty();
+        boolean previousMaster = SwarmConfig.ENABLED.get();
+        boolean previousEngineering = SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.get();
+
+        server.setDifficulty(Difficulty.HARD, true);
+        SwarmConfig.ENABLED.set(true);
+        SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.updateLocalPlan(
+                0,
+                0,
+                SwarmRole.CHASER,
+                zombie.getX() + 4.0,
+                zombie.getZ(),
+                0.0,
+                0.0
+        );
+        state.updatePlannerTelemetry(
+                SwarmPlannerContext.OBSTACLE_DETOUR,
+                4,
+                4,
+                0,
+                0,
+                -1,
+                0.0,
+                0L
+        );
+
+        BlockPos obstacle = BlockPos.containing(
+                zombie.getX() + 0.9,
+                zombie.getY(),
+                zombie.getZ()
+        );
+        helper.getLevel().setBlockAndUpdate(obstacle, Blocks.DIRT.defaultBlockState());
+
+        SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmZombieEngineerGoal.class::isInstance)
+                .map(SwarmZombieEngineerGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (engineer == null || !engineer.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Fixture could not start Zombie engineering before disable test");
+            return;
+        }
+
+        engineer.start();
+
+        SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(false);
+        if (engineer.canContinueToUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Active Zombie engineering ignored Engineering OFF");
+            return;
+        }
+
+        engineer.stop();
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Aborted Zombie engineering left stale claim/request coordination");
+            return;
+        }
+
+        SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+        if (!engineer.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Zombie engineering could not restart cleanly after stale coordination was released");
+            return;
+        }
+        engineer.start();
+
+        SwarmConfig.ENABLED.set(false);
+        if (engineer.canContinueToUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Active Zombie engineering ignored Swarm master OFF");
+            return;
+        }
+
+        engineer.stop();
+        if (state.claimedEngineeringTask(helper.getTick()) != null
+                || state.engineeringRequest(helper.getTick()) != null) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+            server.setDifficulty(previousDifficulty, true);
+            helper.fail("Swarm master OFF left stale engineering coordination");
+            return;
+        }
+
+        SwarmConfig.ENABLED.set(previousMaster);
+        SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(previousEngineering);
+        server.setDifficulty(previousDifficulty, true);
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_engineering_gamerule", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void zombieEngineeringRespectsMobGriefing(GameTestHelper helper) {
         var server = helper.getLevel().getServer();
