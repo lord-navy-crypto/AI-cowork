@@ -466,6 +466,7 @@ public final class SwarmAgentState {
                 type,
                 requesterId,
                 claimantId,
+                targetId(),
                 position,
                 gameTick,
                 gameTick + Math.max(1, ttlTicks)
