@@ -1901,6 +1901,97 @@ public final class SwarmRuntimeGameTests {
 
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_master_combat_fallback", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void masterOffReleasesCustomCombatBridges(GameTestHelper helper) {
+        boolean previousMaster = SwarmConfig.ENABLED.get();
+        SwarmConfig.ENABLED.set(true);
+
+        Skeleton skeleton = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 1));
+        skeleton.setNoGravity(true);
+        skeleton.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        skeleton.reassessWeaponGoal();
+
+        var creeper = helper.spawn(EntityType.CREEPER, new BlockPos(1, 1, 3));
+        creeper.setNoGravity(true);
+
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        player.setNoGravity(true);
+        player.setPos(skeleton.getX() + 2.0, skeleton.getY(), skeleton.getZ());
+
+        SwarmAgentState skeletonState =
+                skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+        skeletonState.rememberTarget(player.getUUID(), helper.getTick(), true);
+        skeleton.setTarget(player);
+
+        var skeletonBridge = skeleton.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(dev.swarmmobs.goal.SwarmSkeletonBowGoal.class::isInstance)
+                .map(dev.swarmmobs.goal.SwarmSkeletonBowGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (skeletonBridge == null || !skeletonBridge.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            playerHandle.close();
+            helper.fail("Skeleton bridge fixture was not active with swarm master ON");
+            return;
+        }
+
+        player.setPos(creeper.getX() + 2.0, creeper.getY(), creeper.getZ());
+        SwarmAgentState creeperState =
+                creeper.getData(SwarmAttachments.AGENT_STATE.get());
+        creeperState.rememberTarget(player.getUUID(), helper.getTick(), true);
+        creeper.setTarget(player);
+
+        SwarmCreeperSwellGoal creeperBridge = creeper.goalSelector.getAvailableGoals().stream()
+                .map(wrapped -> wrapped.getGoal())
+                .filter(SwarmCreeperSwellGoal.class::isInstance)
+                .map(SwarmCreeperSwellGoal.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (creeperBridge == null || !creeperBridge.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            playerHandle.close();
+            helper.fail("Creeper bridge fixture was not active with swarm master ON");
+            return;
+        }
+
+        SwarmConfig.ENABLED.set(false);
+
+        if (skeletonBridge.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            playerHandle.close();
+            helper.fail("Skeleton custom bow bridge remained active with swarm master OFF");
+            return;
+        }
+
+        if (creeperBridge.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            playerHandle.close();
+            helper.fail("Unlit Creeper custom swell bridge remained active with swarm master OFF");
+            return;
+        }
+
+        // An already-ignited Creeper must not be extinguished merely because the
+        // swarm layer is disabled mid-fuse.
+        creeper.ignite();
+        if (!creeperBridge.canUse()) {
+            SwarmConfig.ENABLED.set(previousMaster);
+            playerHandle.close();
+            helper.fail("Master OFF incorrectly interrupted an already-ignited Creeper fuse");
+            return;
+        }
+
+        creeper.discard();
+        skeleton.discard();
+        SwarmConfig.ENABLED.set(previousMaster);
+        playerHandle.close();
+        helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_zombie_melee_handoff", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
     public static void zombieActuallyAttacksAfterSwarmMeleeHandoff(GameTestHelper helper) {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
