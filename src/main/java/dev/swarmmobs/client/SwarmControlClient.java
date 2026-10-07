@@ -9,20 +9,25 @@ public final class SwarmControlClient {
     private static Screen pendingParent;
     private static Screen activeControlScreen;
     private static String latestSnapshot = "";
+    private static boolean openRequested;
 
     public static void acceptSnapshot(String data) {
         Minecraft minecraft = Minecraft.getInstance();
         latestSnapshot = data == null ? "" : data;
 
-        // Do not tear down a Cloth screen while its Save consumers are sending
-        // multiple server-authoritative actions. The next open will use the fresh
-        // snapshot returned by the server.
+        // Action responses refresh our cached snapshot but must never reopen a
+        // screen the player just saved/closed. Only an explicit requestPanel()
+        // is allowed to create a new Cloth screen.
         if (minecraft.screen == activeControlScreen && activeControlScreen != null) {
+            return;
+        }
+        if (!openRequested) {
             return;
         }
 
         activeControlScreen = SwarmClothControlScreen.create(pendingParent, latestSnapshot);
         pendingParent = null;
+        openRequested = false;
         minecraft.setScreen(activeControlScreen);
     }
 
@@ -33,6 +38,7 @@ public final class SwarmControlClient {
     public static void requestPanel() {
         Minecraft minecraft = Minecraft.getInstance();
         pendingParent = minecraft.screen;
+        openRequested = true;
         sendAction("panel_refresh", 0.0);
     }
 
