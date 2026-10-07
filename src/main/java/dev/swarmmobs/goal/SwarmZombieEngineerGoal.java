@@ -97,6 +97,7 @@ public final class SwarmZombieEngineerGoal extends Goal {
         SwarmEngineeringTask task;
 
         if (existing != null
+                && taskMatchesCurrentTarget(existing, state)
                 && existing.type() == type
                 && existing.position().equals(actionPos)) {
             task = existing;
@@ -140,7 +141,10 @@ public final class SwarmZombieEngineerGoal extends Goal {
         }
 
         if (activeTask != null && zombie.level() instanceof ServerLevel level) {
-            return level.getGameTime() < executionDeadlineTick;
+            SwarmAgentState state =
+                    zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            return taskMatchesCurrentTarget(activeTask, state)
+                    && level.getGameTime() < executionDeadlineTick;
         }
         return true;
     }
@@ -239,8 +243,17 @@ public final class SwarmZombieEngineerGoal extends Goal {
             long gameTick
     ) {
         SwarmEngineeringTask claimed = state.claimedEngineeringTask(gameTick);
-        if (claimed != null && claimed.claimedBy(zombie.getUUID(), gameTick)) {
-            return claimed;
+        if (claimed != null) {
+            if (claimed.claimedBy(zombie.getUUID(), gameTick)
+                    && taskMatchesCurrentTarget(claimed, state)) {
+                return claimed;
+            }
+            state.clearClaimedEngineeringTaskIfMatches(claimed);
+        }
+
+        UUID currentTarget = state.targetId();
+        if (currentTarget == null) {
+            return null;
         }
 
         double radius = SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.get();
@@ -249,10 +262,27 @@ public final class SwarmZombieEngineerGoal extends Goal {
                         zombie.getBoundingBox().inflate(radius),
                         peer -> peer.isAlive() && SwarmAgentProfiles.isSupported(peer)
                 ).stream()
+                .filter(peer -> {
+                    SwarmAgentState peerState =
+                            peer.getData(SwarmAttachments.AGENT_STATE.get());
+                    return currentTarget.equals(peerState.targetId());
+                })
                 .map(peer -> peer.getData(SwarmAttachments.AGENT_STATE.get()).engineeringRequest(gameTick))
-                .filter(task -> task != null && task.claimedBy(zombie.getUUID(), gameTick))
+                .filter(task -> task != null
+                        && currentTarget.equals(task.targetId())
+                        && task.claimedBy(zombie.getUUID(), gameTick))
                 .min(Comparator.comparingDouble(this::distanceToTaskSqr))
                 .orElse(null);
+    }
+
+    private static boolean taskMatchesCurrentTarget(
+            SwarmEngineeringTask task,
+            SwarmAgentState state
+    ) {
+        return task != null
+                && state != null
+                && state.targetId() != null
+                && state.targetId().equals(task.targetId());
     }
 
     private UUID chooseClaimant(
