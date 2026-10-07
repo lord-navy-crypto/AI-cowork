@@ -504,9 +504,9 @@ public final class SwarmRuntimeGameTests {
                 zombie.getY(),
                 zombie.getZ()
         );
-        var closed = Blocks.OAK_TRAPDOOR.defaultBlockState()
-                .setValue(BlockStateProperties.OPEN, false);
-        var opened = closed.setValue(BlockStateProperties.OPEN, true);
+        var closed = Blocks.OAK_STAIRS.defaultBlockState()
+                .setValue(BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.NORTH);
+        var opened = closed.setValue(BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.SOUTH);
         helper.getLevel().setBlockAndUpdate(obstacle, closed);
 
         SwarmZombieEngineerGoal engineer = zombie.goalSelector.getAvailableGoals().stream()
@@ -531,7 +531,7 @@ public final class SwarmRuntimeGameTests {
 
         if (!helper.getLevel().getBlockState(obstacle).equals(opened)) {
             server.setDifficulty(previousDifficulty, true);
-            helper.fail("Changed trapdoor state was mutated by stale break work");
+            helper.fail("Changed stair state was mutated by stale break work");
             return;
         }
         if (state.engineeringBlocksBroken() != 0L
