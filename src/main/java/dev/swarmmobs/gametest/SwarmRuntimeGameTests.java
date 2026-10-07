@@ -543,6 +543,7 @@ public final class SwarmRuntimeGameTests {
 
         helper.runAfterDelay(afterAdvertisementExpiry, () -> {
             if (!engineer.canContinueToUse()) {
+                playerHandle.close();
                 server.setDifficulty(previousDifficulty, true);
                 helper.fail("Claimed long break was aborted when advertisement TTL expired");
                 return;
@@ -554,16 +555,19 @@ public final class SwarmRuntimeGameTests {
             engineer.stop();
 
             if (!helper.getLevel().getBlockState(obstacle).isAir()) {
+                playerHandle.close();
                 server.setDifficulty(previousDifficulty, true);
                 helper.fail("Long-break engineering lease did not allow STONE removal");
                 return;
             }
             if (state.engineeringBlocksBroken() != 1L) {
+                playerHandle.close();
                 server.setDifficulty(previousDifficulty, true);
                 helper.fail("Confirmed STONE removal was missing from engineering break telemetry");
                 return;
             }
             if (state.carriedEngineeringBlockCount() != 0) {
+                playerHandle.close();
                 server.setDifficulty(previousDifficulty, true);
                 helper.fail("Tool-required STONE was incorrectly salvaged as carried material");
                 return;
