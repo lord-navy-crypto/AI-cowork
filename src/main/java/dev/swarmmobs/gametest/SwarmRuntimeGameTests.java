@@ -488,14 +488,19 @@ public final class SwarmRuntimeGameTests {
         Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
         zombie.setNoGravity(true);
 
+        TestPlayerHandle playerHandle = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer player = playerHandle.player();
+        player.setNoGravity(true);
+        player.setPos(zombie.getX() + 4.0, zombie.getY(), zombie.getZ());
+
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
-        state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+        state.rememberTarget(player.getUUID(), helper.getTick(), false);
         state.updateLocalPlan(
                 0,
                 0,
                 SwarmRole.CHASER,
-                zombie.getX() + 4.0,
-                zombie.getZ(),
+                player.getX(),
+                player.getZ(),
                 0.0,
                 0.0
         );
@@ -525,6 +530,7 @@ public final class SwarmRuntimeGameTests {
                 .orElse(null);
 
         if (engineer == null || !engineer.canUse()) {
+            playerHandle.close();
             server.setDifficulty(previousDifficulty, true);
             helper.fail("Long-break engineering fixture could not start");
             return;
@@ -563,6 +569,7 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
+            playerHandle.close();
             server.setDifficulty(previousDifficulty, true);
             helper.succeed();
         });
