@@ -552,6 +552,16 @@ public final class SwarmRuntimeGameTests {
                 helper.fail("Long-break engineering lease did not allow STONE removal");
                 return;
             }
+            if (state.engineeringBlocksBroken() != 1L) {
+                server.setDifficulty(previousDifficulty, true);
+                helper.fail("Confirmed STONE removal was missing from engineering break telemetry");
+                return;
+            }
+            if (state.carriedEngineeringBlockCount() != 0) {
+                server.setDifficulty(previousDifficulty, true);
+                helper.fail("Tool-required STONE was incorrectly salvaged as carried material");
+                return;
+            }
 
             server.setDifficulty(previousDifficulty, true);
             helper.succeed();
