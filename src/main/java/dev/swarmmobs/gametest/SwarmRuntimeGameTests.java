@@ -10,6 +10,7 @@ import dev.swarmmobs.agent.SwarmEngineeringTask;
 import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.agent.SwarmPlannerContext;
+import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
@@ -494,7 +495,18 @@ public final class SwarmRuntimeGameTests {
         player.setPos(zombie.getX() + 4.0, zombie.getY(), zombie.getZ());
 
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
-        state.rememberTarget(player.getUUID(), helper.getTick(), false);
+        state.rememberTarget(
+                new TargetObservation(
+                        player.getUUID(),
+                        helper.getTick(),
+                        player.getX(),
+                        player.getY(),
+                        player.getZ(),
+                        1.0,
+                        0.0
+                ),
+                false
+        );
         state.updateLocalPlan(
                 0,
                 0,
