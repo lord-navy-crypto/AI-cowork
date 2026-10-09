@@ -239,7 +239,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
 
         absorbDroppedResources(level);
         List<PathfinderMob> members = members(level);
-        enrollNearbyWorkers(members);
+        enrollNearbyWorkers(level, members);
         assignVisibleLeaders(members);
 
         // When enabled, each module gets two actual shell blocks. Verify
@@ -455,18 +455,32 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    private void enrollNearbyWorkers(List<PathfinderMob> members) {
-        // Colony residence is ordinary persistent entity NBT, but choosing
-        // a home has no ticking world registry and creates no chunk tickets.
-        // Only unassigned idle workers may join; an active fighter never
-        // loses its combat target or gets a new hauling order.
+    private void enrollNearbyWorkers(ServerLevel level, List<PathfinderMob> members) {
+        // Colony residence is persistent entity NBT; no central hive search
+        // and no new chunk tickets. Existing valid homes must not be stolen
+        // by a second core, but a demolished LOADED home can be replaced.
+        String dimension = level.dimension().location().toString();
         for (PathfinderMob member : members) {
             if (!(member instanceof Zombie) || member.isNoAi()
                     || member.getTarget() != null) continue;
             var data = member.getPersistentData();
-            if (!data.contains("SwarmColonyNest")) {
-                data.putLong("SwarmColonyNest", worldPosition.asLong());
+            if (data.contains("SwarmColonyNest")) {
+                boolean wrongDimension = data.contains("SwarmColonyDimension")
+                        && !dimension.equals(data.getString("SwarmColonyDimension"));
+                if (!wrongDimension) {
+                    BlockPos previousHome = BlockPos.of(data.getLong("SwarmColonyNest"));
+                    if (!level.hasChunkAt(previousHome)) {
+                        continue; // never force-load to investigate an old home
+                    }
+                    if (level.getBlockEntity(previousHome) instanceof SwarmNestBlockEntity
+                            && level.getBlockState(previousHome)
+                                    .is(SwarmNestBlocks.NEST_CORE.get())) {
+                        continue;
+                    }
+                }
             }
+            data.putLong("SwarmColonyNest", worldPosition.asLong());
+            data.putString("SwarmColonyDimension", dimension);
         }
     }
 
