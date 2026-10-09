@@ -60,6 +60,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private long births;
     private long hauledItems;
     private long haulTrips;
+    // Only a nonpersistent hint board: no virtual cargo or chunk tickets.
+    private final SwarmNestScoutBoard scoutBoard = new SwarmNestScoutBoard();
     private int leaderMarks;
 
     public SwarmNestBlockEntity(BlockPos pos, BlockState state) {
@@ -85,6 +87,18 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     public long births() { return births; }
     public long hauledItems() { return hauledItems; }
     public long haulTrips() { return haulTrips; }
+    public SwarmNestScoutBoard scoutBoard() { return scoutBoard; }
+
+    /** Scouts report only real, currently loaded resource entities. */
+    public boolean reportScoutItem(ItemEntity item, long now) {
+        if (!(level instanceof ServerLevel server) || item == null
+                || item.level() != server || !item.isAlive()
+                || item.getItem().isEmpty() || !server.hasChunkAt(item.blockPosition())) {
+            return false;
+        }
+        return scoutBoard.publish(item.getUUID(), item.blockPosition(),
+                classify(item.getItem()), now, worldPosition);
+    }
     public int leaderMarks() { return leaderMarks; }
 
     @Override
