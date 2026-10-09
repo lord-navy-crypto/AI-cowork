@@ -197,8 +197,10 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         assignVisibleLeaders(members);
 
         // When enabled, each module gets two actual shell blocks. Verify
-        // both positions BEFORE charging the same eight-soil/six-wood bill
-        // that already governs virtual chambers. Obstructed sites defer
+        // both positions BEFORE charging the same eight-soil/six-log bill
+        // that already governs virtual chambers. Direct dirt and raw logs
+        // require no crafting, stripping or implicit conversion to planks.
+        // Obstructed sites defer
         // the whole upgrade; they never overwrite existing construction.
         // If an old colony has paid-for abstract rooms, visualize at most
         // one such room per 200-tick cycle without charging it twice.
@@ -350,8 +352,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
         // Minecraft game rules and modded placement listeners may still
         // refuse a setBlock. In that case release ONLY our first new block.
-        var soilState = Blocks.MUD_BRICKS.defaultBlockState();
-        var timberState = Blocks.STRIPPED_OAK_LOG.defaultBlockState();
+        var soilState = Blocks.DIRT.defaultBlockState();
+        var timberState = Blocks.OAK_LOG.defaultBlockState();
         if (!level.setBlockAndUpdate(soilPos, soilState)) return false;
         if (!level.setBlockAndUpdate(timberPos, timberState)) {
             if (level.getBlockState(soilPos).equals(soilState)) {
@@ -380,8 +382,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                         || supporting.is(Blocks.PODZOL)
                         || supporting.is(Blocks.MUD)
                         || supporting.is(Blocks.STONE)
-                : supporting.is(Blocks.MUD_BRICKS)
-                        || supporting.is(Blocks.STRIPPED_OAK_LOG);
+                : supporting.is(Blocks.DIRT)
+                        || supporting.is(Blocks.OAK_LOG);
         if (!validFoundation
                 || !supporting.isFaceSturdy(level, pos.below(), Direction.UP)) {
             return false;
