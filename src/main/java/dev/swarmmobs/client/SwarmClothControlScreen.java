@@ -233,6 +233,20 @@ public final class SwarmClothControlScreen {
                 false,
                 "Optional colony construction (off by default).");
 
+        toggle(category, entries, values,
+                "Colony resource intake and growth",
+                "nestLifecycleEnabled",
+                "nest_lifecycle_toggle",
+                false,
+                "Consume actual dropped items; allow limited spawn cycles near players.");
+
+        intField(category, entries, values,
+                "Maximum local nest population",
+                "nestMaxPopulation",
+                "nest_max_population_delta",
+                12,
+                "Growth pauses when the local supported monster count reaches this cap.");
+
         intField(category, entries, values,
                 "Nest survey interval (ticks)",
                 "nestBuildInterval",
