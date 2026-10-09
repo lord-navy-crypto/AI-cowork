@@ -24,6 +24,14 @@ public final class SwarmPathBudgetRegistry {
         );
     }
 
+    /** Cancels only previously enqueued demand; never allocates a new budget. */
+    public static void cancel(ServerLevel level, PathfinderMob mob) {
+        SwarmPathQueryBudget budget = LEVEL_BUDGETS.get(level);
+        if (budget != null) {
+            budget.cancel(mob.getUUID());
+        }
+    }
+
     public static SwarmPathQueryBudget.Snapshot snapshot(ServerLevel level) {
         return forLevel(level).snapshot(
                 level.getGameTime(),
