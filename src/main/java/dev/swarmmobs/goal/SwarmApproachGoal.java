@@ -373,9 +373,12 @@ public final class SwarmApproachGoal extends Goal {
             mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
             return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
         }
-        // Sample once for all lateral candidates rather than re-querying nearby
-        // entities for every score. The envelope includes the furthest candidate.
-        List<Vec2> congestionPeers = findCongestionPeers(level, self, candidatePoints);
+        // No open candidate can be chosen if the entire detour is blocked.
+        // Avoid an additional entity-index scan in that common wall case.
+        // Otherwise one peer snapshot covers all candidates.
+        List<Vec2> congestionPeers = SwarmPathProbePolicy.requiredQueries(blockedCandidates, true) == 0
+                ? List.of()
+                : findCongestionPeers(level, self, candidatePoints);
         double congestionRadius = SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get();
         List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
         int blockedCount = 0;
@@ -553,7 +556,9 @@ public final class SwarmApproachGoal extends Goal {
             mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
             return null;
         }
-        List<Vec2> congestionPeers = findCongestionPeers(level, self, candidatePoints);
+        List<Vec2> congestionPeers = SwarmPathProbePolicy.requiredQueries(blockedCandidates, true) == 0
+                ? List.of()
+                : findCongestionPeers(level, self, candidatePoints);
         double congestionRadius = SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get();
         List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
         int blockedCount = 0;
