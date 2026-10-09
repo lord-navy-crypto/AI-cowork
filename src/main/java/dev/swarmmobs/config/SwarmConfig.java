@@ -65,6 +65,8 @@ public final class SwarmConfig {
 
     // New idle colony construction is opt-in to protect existing player worlds.
     public static final ModConfigSpec.BooleanValue NEST_CONSTRUCTION_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_LIFECYCLE_ENABLED;
+    public static final ModConfigSpec.IntValue NEST_MAX_POPULATION;
     public static final ModConfigSpec.IntValue NEST_BUILD_INTERVAL_TICKS;
     public static final ModConfigSpec.IntValue NEST_MIN_GROUP_SIZE;
     public static final ModConfigSpec.BooleanValue DIVISION_OF_LABOR_ENABLED;
@@ -336,6 +338,14 @@ public final class SwarmConfig {
         NEST_MIN_GROUP_SIZE = BUILDER
                 .comment("Minimum local supported swarm mobs, including builder, required to found a nest.")
                 .defineInRange("nestMinGroupSize", 3, 2, 16);
+
+        NEST_LIFECYCLE_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: activate resource-fed nest lifecycle and capped colony spawning; OFF by default.")
+                .define("nestLifecycleEnabled", false);
+
+        NEST_MAX_POPULATION = BUILDER
+                .comment("Maximum locally counted colony members before reproduction stops.")
+                .defineInRange("nestMaxPopulation", 12, 3, 32);
 
         BUILDER.pop();
 
