@@ -100,3 +100,69 @@ planned, not yet implemented.
    material and respects protected world areas; never infinite excavation.
 4. Distance-weighted scout/guard tasks and environmental pheromone TTL.
 5. Clear operator readout for inventory, named regents and local population.
+
+## Colony Science Lab — measurable ant/bee-inspired model
+
+Published scientific context:
+- Beshers & Fewell (2001), *Models of Division of Labor in Social Insects*,
+  https://doi.org/10.1146/annurev.ento.46.1.413
+- Khuong et al. (2016), *Stigmergic construction and topochemical information
+  shape ant nest architecture*, https://doi.org/10.1073/pnas.1509829113
+- Khoury et al. (2013), *Modelling Food and Population Dynamics in Honey Bee
+  Colonies*, https://doi.org/10.1371/journal.pone.0059084
+
+Our formula is an **inspired game-scale heuristic**, NOT a calibrated model
+of actual insect population biology. It deliberately simplifies complex
+queen/brood/worker life stages into vanilla Minecraft mob recruitment.
+
+Each loaded, opt-in, active nest samples its own local 14-block population
+every 200 game ticks and records:
+- local count by Zombie-worker / Skeleton-guard / Spider-scout / Creeper-reserve;
+- current, peak, population delta per sample, and EMA (alpha = 0.25);
+- current actual capacity, core/chamber level and 0..1 occupancy;
+- food/nutrient readiness, cumulative births and demand indices;
+- saved points of soil, timber, nutrient/biomass and historical legacy stock.
+
+Per-role demand uses the monotone response-threshold function
+
+    R(s, theta) = s^2 / (s^2 + theta^2)
+
+where s is each role's projected workforce deficit for the NEXT member.
+Within `nestWorkerTargetShare`, `nestGuardTargetShare`, and
+`nestResponseThreshold` bounds, the highest response selects the next
+Zombie/Skeleton/Spider/Creeper. Users may opt for the old round-robin
+sequence by disabling `nestAdaptiveRecruitment`.
+If operator ratios accidentally exceed 80% combined, they are normalized
+so scout and reserve demand cannot be erased.
+
+**Resource conservation update:** current soil, timber and nutrient
+points are independently saved to NBT; the old generic Resources total
+is restored as explicitly labelled legacy supply, not silently recast
+as meat. Fresh soil and timber CANNOT fund reproduction. Only nutrients
+or preserved legacy stock can pay the 12-point spawn cost.
+
+**Nest architecture:** the core has an abstract, persistent chamber level.
+A new core starts with capacity four. When its nearby population reaches
+at least current capacity minus one, one upgrade spends exactly eight
+soil points and six timber points. Each completed abstract chamber adds
+four local capacity, never exceeding the configured global hard cap.
+This is intentionally a simulation of internal room construction: **no**
+automatic external block placements, underground excavation or terrain
+modification accompany it yet.
+
+The Command Center shows the **last active core sampled in that dimension**.
+It is NOT a dimension-wide sum; data carries sample age and coordinates
+so stale observations and multiple nests are not conflated. It does not
+scan unloaded chunks or add a per-tick global registry.
+
+### Acceptance criteria
+
+- New core: capacity four, zero soil/timber/nutrients; no free recruits.
+- Stock is conserved, categories can't be interchanged, capacity is capped.
+- Soil-only nest cannot reproduce, nutrient-fed nest can only reproduce
+  under existing cooldown/population/world-safety gates.
+- A real three-member group with eight dirt and two logs can construct one
+  abstract chamber, reaching capacity eight and spending all materials.
+- Different mixes of actual mobs cause measurably different next recruits.
+- Single GameTest server regression and JAR build must pass; this is NOT
+  a substitute for 50/100/200-mob real MSPT benchmarking.
