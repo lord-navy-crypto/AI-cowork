@@ -133,6 +133,7 @@ public final class SwarmMobEvents {
         }
 
         TargetObservation observation = selection.observation();
+        state.bindTacticalTarget(observation.targetId());
 
         // Tactical slots, task saturation and cross-species fire lanes belong
         // to allies currently pursuing the same target. Keep all physical
