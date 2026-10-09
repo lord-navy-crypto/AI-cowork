@@ -276,6 +276,15 @@ public final class SwarmClothControlScreen {
                         + ", overwatch " + integer(values, "specOverwatch")
                         + ", lead breacher " + integer(values, "specLeadBreacher"));
 
+        status(category, entries,
+                "Target-scoped squads: agents with allies "
+                        + integer(values, "liveTacticalAlliedAgents")
+                        + "  directed peer links " + integer(values, "liveTacticalPeerLinks"));
+        status(category, entries,
+                "Agents supported by a same-target Creeper: "
+                        + integer(values, "liveTacticalBreacherSupport")
+                        + " (different-target Creepers do not count).");
+
         action(category, entries,
                 "Restore coordination baseline",
                 "coord_baseline",
