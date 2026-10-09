@@ -66,6 +66,10 @@ public final class SwarmConfig {
     // New idle colony construction is opt-in to protect existing player worlds.
     public static final ModConfigSpec.BooleanValue NEST_CONSTRUCTION_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_LIFECYCLE_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_HAULING_ENABLED;
+    public static final ModConfigSpec.IntValue NEST_HAUL_SEARCH_RADIUS;
+    public static final ModConfigSpec.IntValue NEST_HAUL_MAX_STACK;
+    public static final ModConfigSpec.IntValue NEST_HAUL_ATTEMPT_INTERVAL;
     public static final ModConfigSpec.BooleanValue NEST_VISIBLE_EXPANSION_ENABLED;
     public static final ModConfigSpec.IntValue NEST_MAX_POPULATION;
     public static final ModConfigSpec.BooleanValue NEST_ADAPTIVE_RECRUITMENT;
@@ -347,6 +351,22 @@ public final class SwarmConfig {
         NEST_LIFECYCLE_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: activate resource-fed nest lifecycle and capped colony spawning; OFF by default.")
                 .define("nestLifecycleEnabled", false);
+
+        NEST_HAULING_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle Zombies assigned to a loaded Nest Core carry actual nearby dropped resources to it. OFF by default.")
+                .define("nestHaulingEnabled", false);
+
+        NEST_HAUL_SEARCH_RADIUS = BUILDER
+                .comment("Maximum search radius in blocks from idle Zombie to a dropped resource; each worker is throttled and no chunks are loaded.")
+                .defineInRange("nestHaulSearchRadius", 8, 4, 16);
+
+        NEST_HAUL_MAX_STACK = BUILDER
+                .comment("Maximum number of items in a dropped stack a Zombie may transport as one real entity.")
+                .defineInRange("nestHaulMaxStack", 16, 1, 64);
+
+        NEST_HAUL_ATTEMPT_INTERVAL = BUILDER
+                .comment("Minimum ticks between a Zombie's idle resource-hauling surveys.")
+                .defineInRange("nestHaulAttemptInterval", 100, 40, 400);
 
         NEST_VISIBLE_EXPANSION_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: physically place conservative soil/timber nest shell blocks when chambers expand. OFF by default. Requires mobGriefing; blocked sites defer upgrades.")
