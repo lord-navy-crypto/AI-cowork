@@ -9,6 +9,8 @@ import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
 import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
+import dev.swarmmobs.algorithm.SwarmNavigationCommandPolicy;
+import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
@@ -53,6 +55,12 @@ public final class SwarmApproachGoal extends Goal {
     private double recoveryX;
     private double recoveryZ;
     private long recoveryUntilTick = Long.MIN_VALUE;
+    private boolean commandIssued;
+    private long lastCommandTick = Long.MIN_VALUE;
+    private double lastCommandX;
+    private double lastCommandY;
+    private double lastCommandZ;
+    private double lastCommandSpeed;
     private boolean obstacleDetourActive;
     private double obstacleDetourX;
     private double obstacleDetourZ;
@@ -158,6 +166,7 @@ public final class SwarmApproachGoal extends Goal {
 
     @Override
     public void start() {
+        commandIssued = false;
         resetProgressSample();
         moveToLatestPlan();
     }
@@ -180,6 +189,8 @@ public final class SwarmApproachGoal extends Goal {
         obstacleDetourUntilTick = Long.MIN_VALUE;
         mob.getData(SwarmAttachments.AGENT_STATE.get()).clearNavigationTelemetry();
         progressSampleTick = Long.MIN_VALUE;
+        commandIssued = false;
+        lastCommandTick = Long.MIN_VALUE;
     }
 
     private void moveToLatestPlan() {
@@ -281,6 +292,37 @@ public final class SwarmApproachGoal extends Goal {
                 false
         );
 
+        if (mob.level() instanceof ServerLevel level) {
+            long now = level.getGameTime();
+            SwarmNavigationCommandPolicy.Decision decision =
+                    SwarmNavigationCommandPolicy.evaluate(
+                            commandIssued,
+                            mob.getNavigation().isDone(),
+                            now,
+                            lastCommandTick,
+                            navigationX,
+                            targetY,
+                            navigationZ,
+                            speed,
+                            lastCommandX,
+                            lastCommandY,
+                            lastCommandZ,
+                            lastCommandSpeed
+                    );
+            SwarmNavigationCommandTelemetry.record(level, decision);
+            if (decision == SwarmNavigationCommandPolicy.Decision.SKIP) {
+                return;
+            }
+            lastCommandTick = now;
+        }
+
+        // Only meaningful changes and bounded retries create a new path.
+        // Active combat goals still retain their original MOVE handoff.
+        commandIssued = true;
+        lastCommandX = navigationX;
+        lastCommandY = targetY;
+        lastCommandZ = navigationZ;
+        lastCommandSpeed = speed;
         mob.getNavigation().moveTo(
                 navigationX,
                 targetY,
