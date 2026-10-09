@@ -22,6 +22,7 @@ import dev.swarmmobs.algorithm.SwarmTaskSaturationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
 import dev.swarmmobs.algorithm.SwarmNeighborSelectionPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
+import dev.swarmmobs.algorithm.SwarmTargetSquadPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.TargetPredictionPolicy;
@@ -131,6 +132,16 @@ public final class SwarmMobEvents {
         }
 
         TargetObservation observation = selection.observation();
+
+        // Tactical slots, task saturation and cross-species fire lanes belong
+        // to allies currently pursuing the same target. Keep all physical
+        // movement neighbors for separation/cohesion and all communication
+        // neighbors for observation relay across the wider local swarm.
+        List<PathfinderMob> tacticalNeighbors = SwarmTargetSquadPolicy.sameTarget(
+                observation.targetId(),
+                movementNeighbors,
+                peer -> peer.getData(SwarmAttachments.AGENT_STATE.get()).targetId()
+        );
         if (selection.direct()) {
             state.recordDirectReacquisition(gameTick, observation.targetId());
         }
@@ -152,7 +163,7 @@ public final class SwarmMobEvents {
 
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
 
-        List<CapabilitySlotAllocator.Member> capabilityMembers = movementNeighbors.stream()
+        List<CapabilitySlotAllocator.Member> capabilityMembers = tacticalNeighbors.stream()
                 .map(peer -> new CapabilitySlotAllocator.Member(
                         peer.getUUID(),
                         SwarmAgentProfiles.profile(peer).archetype()
@@ -173,7 +184,7 @@ public final class SwarmMobEvents {
         );
         SwarmLocalComposition composition = SwarmLocalComposition.fromArchetypes(
                 profile.archetype(),
-                movementNeighbors.stream()
+                tacticalNeighbors.stream()
                         .map(peer -> SwarmAgentProfiles.profile(peer).archetype())
                         .toList()
         );
@@ -254,7 +265,7 @@ public final class SwarmMobEvents {
             EnumMap<SwarmTaskType, Integer> peerTaskOccupancy =
                     new EnumMap<>(SwarmTaskType.class);
             int sameTargetPeerCount = 0;
-            for (PathfinderMob peer : movementNeighbors) {
+            for (PathfinderMob peer : tacticalNeighbors) {
                 SwarmAgentState peerState =
                         peer.getData(SwarmAttachments.AGENT_STATE.get());
                 if (state.targetId() == null
@@ -332,7 +343,7 @@ public final class SwarmMobEvents {
             state.beginSearchEpisode(gameTick, observation.targetId());
             state.clearPredictionTelemetry();
 
-            int sameCapabilityCount = 1 + (int) movementNeighbors.stream()
+            int sameCapabilityCount = 1 + (int) tacticalNeighbors.stream()
                     .filter(peer -> SwarmAgentProfiles.profile(peer).archetype() == profile.archetype())
                     .count();
 
@@ -435,7 +446,7 @@ public final class SwarmMobEvents {
 
             if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
                     && composition.hasBreacher()) {
-                List<Vec2> breacherPositions = movementNeighbors.stream()
+                List<Vec2> breacherPositions = tacticalNeighbors.stream()
                         .filter(peer -> SwarmAgentProfiles.profile(peer).archetype()
                                 == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER)
                         .map(peer -> new Vec2(peer.getX(), peer.getZ()))
