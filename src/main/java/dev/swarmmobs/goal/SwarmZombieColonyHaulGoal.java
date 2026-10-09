@@ -6,6 +6,7 @@ import dev.swarmmobs.colony.SwarmNestBlockEntity;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
 import dev.swarmmobs.colony.SwarmNestHaulPolicy;
+import dev.swarmmobs.colony.SwarmNestScoutSignal;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.registry.SwarmNestBlocks;
@@ -117,6 +118,12 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                     zombie.distanceToSqr(drop), nest.soilPoints(),
                     nest.timberPoints(), nest.nutrientPoints(), nest.legacyPoints(),
                     nest.chamberLevel(), SwarmConfig.NEST_MAX_POPULATION.get());
+            // A roaming Spider can report an existing item, but the worker
+            // still observes, claims, and moves that SAME physical entity.
+            // Expired or foreign-nest hints have no effect on decisions.
+            if (SwarmNestScoutSignal.recentFor(drop, targetHome, tick)) {
+                score *= 0.75;
+            }
             if (score < bestScore) {
                 bestScore = score;
                 best = drop;
