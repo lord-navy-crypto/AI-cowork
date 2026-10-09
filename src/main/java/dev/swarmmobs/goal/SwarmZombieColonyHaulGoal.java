@@ -143,9 +143,11 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         // Direct sensing failed: use the nest's bounded Spider job board.
         // No distant ItemEntity lookup occurs here. The worker must actually
         // reach the reported coordinates before verifying the physical drop.
+        var pos = zombie.blockPosition();
         var report = nest.scoutBoard().reserve(zombie.getUUID(),
-                zombie.blockPosition(), tick, SwarmNestScoutBoard.MAX_DISTANCE);
-        if (report == null || !level.hasChunkAt(report.position())) {
+                new SwarmNestScoutBoard.Position(pos.getX(), pos.getY(), pos.getZ()),
+                tick, SwarmNestScoutBoard.MAX_DISTANCE);
+        if (report == null || !level.hasChunkAt(scoutPosition(report))) {
             if (report != null) nest.scoutBoard().release(report.itemId(), zombie.getUUID());
             return false;
         }
@@ -166,7 +168,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             return false;
         }
         boolean cargoValid = phase == Phase.TO_SCOUT
-                ? scoutLead != null && level.hasChunkAt(scoutLead.position())
+                ? scoutLead != null && level.hasChunkAt(scoutPosition(scoutLead))
                         && SwarmNestColonyPolicy.acceptAmount(nest.resources(), 1,
                                 scoutLead.kind()) > 0
                 : item != null && item.isAlive() && !item.getItem().isEmpty()
@@ -196,14 +198,14 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         long tick = level.getGameTime();
         String workerId = zombie.getUUID().toString();
         if (phase == Phase.TO_SCOUT) {
-            if (scoutLead == null || !level.hasChunkAt(scoutLead.position())
+            if (scoutLead == null || !level.hasChunkAt(scoutPosition(scoutLead))
                     || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
                     || !nest.scoutBoard().renew(
                             scoutLead.itemId(), zombie.getUUID(), tick)) {
                 phase = Phase.NONE;
                 return;
             }
-            BlockPos where = scoutLead.position();
+            BlockPos where = scoutPosition(scoutLead);
             double x = where.getX() + .5, y = where.getY(), z = where.getZ() + .5;
             if (zombie.distanceToSqr(x, y, z) > 9.0) {
                 follow(level, x, y, z, tick);
@@ -337,6 +339,11 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         scoutLead = null;
         home = null;
         phase = Phase.NONE;
+    }
+
+    private static BlockPos scoutPosition(SwarmNestScoutBoard.Lead lead) {
+        var p = lead.position();
+        return new BlockPos(p.x(), p.y(), p.z());
     }
 
     private boolean idle(ServerLevel level) {
