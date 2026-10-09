@@ -492,6 +492,9 @@ public final class SwarmControlNetwork {
         int skeletons = 0;
         int spiders = 0;
         int creepers = 0;
+        int tacticalAgentsWithAllies = 0;
+        int tacticalPeerLinks = 0;
+        int agentsWithTacticalBreacher = 0;
         EnumMap<SwarmTaskType, Integer> taskCounts = new EnumMap<>(SwarmTaskType.class);
         EnumMap<SwarmSpecialization, Integer> specializationCounts =
                 new EnumMap<>(SwarmSpecialization.class);
@@ -509,6 +512,18 @@ public final class SwarmControlNetwork {
                 spiders++;
             } else if (mob.getType() == EntityType.CREEPER) {
                 creepers++;
+            }
+
+            if (masterEnabled) {
+                SwarmAgentState tacticalState =
+                        mob.getData(SwarmAttachments.AGENT_STATE.get());
+                if (tacticalState.tacticalPeerCount() > 0) {
+                    tacticalAgentsWithAllies++;
+                    tacticalPeerLinks += tacticalState.tacticalPeerCount();
+                }
+                if (tacticalState.tacticalBreacherCount() > 0) {
+                    agentsWithTacticalBreacher++;
+                }
             }
 
             if (exposeDynamicAssignments) {
@@ -547,6 +562,9 @@ public final class SwarmControlNetwork {
                 pair("liveSkeletons", skeletons),
                 pair("liveSpiders", spiders),
                 pair("liveCreepers", creepers),
+                pair("liveTacticalAlliedAgents", tacticalAgentsWithAllies),
+                pair("liveTacticalPeerLinks", tacticalPeerLinks),
+                pair("liveTacticalBreacherSupport", agentsWithTacticalBreacher),
                 pair("taskSearch", taskCounts.getOrDefault(SwarmTaskType.SEARCH, 0)),
                 pair("taskFlank", taskCounts.getOrDefault(SwarmTaskType.FLANK, 0)),
                 pair("taskBreach", taskCounts.getOrDefault(SwarmTaskType.BREACH, 0)),
