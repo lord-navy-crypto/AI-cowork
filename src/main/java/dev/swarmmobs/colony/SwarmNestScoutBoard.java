@@ -1,27 +1,31 @@
 package dev.swarmmobs.colony;
 
-import net.minecraft.core.BlockPos;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Transient, bounded stigmergic job board owned by ONE loaded Nest Core.
- * Observation is only a hint about a physical ItemEntity, never an item
- * inventory. Reserving a lead does not reserve the physical cargo: a worker
- * must verify and claim the original ItemEntity when it arrives.
- *
- * The board intentionally does not persist or ticket chunks: all leads
- * disappear on server reload and expire during regular operations.
+ * Pure Java, transient stigmergic job board owned by a loaded Nest Core.
+ * Stores only a handful of sightings of physical dropped ItemEntities,
+ * never objects, inventory stacks, or Minecraft world/chunk references.
  */
 public final class SwarmNestScoutBoard {
     public static final int MAX_LEADS = 8;
     public static final int MAX_DISTANCE = 28;
+    public static final int FRESH_TICKS = 240;
     private static final int CLAIM_TICKS = 180;
     private final Map<UUID, Entry> leads = new LinkedHashMap<>();
 
-    public record Lead(UUID itemId, BlockPos position,
+    public record Position(int x, int y, int z) {
+        public long distanceSquared(Position other) {
+            long dx = (long) x - other.x;
+            long dy = (long) y - other.y;
+            long dz = (long) z - other.z;
+            return dx * dx + dy * dy + dz * dz;
+        }
+    }
+
+    public record Lead(UUID itemId, Position position,
                        SwarmNestColonyPolicy.Kind kind, long observedTick) {}
 
     private static final class Entry {
@@ -31,9 +35,9 @@ public final class SwarmNestScoutBoard {
         private Entry(Lead lead) { this.lead = lead; }
     }
 
-    public boolean publish(UUID itemId, BlockPos position,
+    public boolean publish(UUID itemId, Position position,
                            SwarmNestColonyPolicy.Kind kind, long tick,
-                           BlockPos home) {
+                           Position home) {
         if (itemId == null || position == null || home == null || tick < 0
                 || kind == null || kind == SwarmNestColonyPolicy.Kind.NONE
                 || !within(home, position, MAX_DISTANCE)) return false;
@@ -41,7 +45,7 @@ public final class SwarmNestScoutBoard {
         Entry previous = leads.get(itemId);
         if (previous != null) {
             if (tick < previous.lead.observedTick()) return false;
-            previous.lead = new Lead(itemId, position.immutable(), kind, tick);
+            previous.lead = new Lead(itemId, position, kind, tick);
             return true;
         }
         if (leads.size() >= MAX_LEADS) {
@@ -53,24 +57,28 @@ public final class SwarmNestScoutBoard {
                     break;
                 }
             }
-            if (oldest == null) return false; // never evict an active reservation
+            if (oldest == null) return false;
             leads.remove(oldest);
         }
-        leads.put(itemId, new Entry(new Lead(itemId, position.immutable(), kind, tick)));
+        leads.put(itemId, new Entry(new Lead(itemId, position, kind, tick)));
         return true;
     }
 
-    public Lead reserve(UUID worker, BlockPos workerPos, long tick,
-                        int radius) {
+    public Lead reserve(UUID worker, Position workerPos, long tick, int radius) {
         if (worker == null || workerPos == null) return null;
         prune(tick);
-        Entry best = null;
-        double bestDistance = Double.POSITIVE_INFINITY;
+        // A worker cannot reserve several tasks simultaneously.
         for (Entry entry : leads.values()) {
-            if (entry.worker != null && !entry.worker.equals(worker)
-                    && entry.claimedUntil >= tick) continue;
+            if (worker.equals(entry.worker) && entry.claimedUntil >= tick) {
+                return entry.lead;
+            }
+        }
+        Entry best = null;
+        long bestDistance = Long.MAX_VALUE;
+        for (Entry entry : leads.values()) {
+            if (entry.worker != null && entry.claimedUntil >= tick) continue;
             if (!within(workerPos, entry.lead.position(), Math.max(1, radius))) continue;
-            double distance = workerPos.distSqr(entry.lead.position());
+            long distance = workerPos.distanceSquared(entry.lead.position());
             if (distance < bestDistance) {
                 best = entry;
                 bestDistance = distance;
@@ -82,13 +90,12 @@ public final class SwarmNestScoutBoard {
         return best.lead;
     }
 
-    /** Touch only an existing matching reservation. */
+    /** Only the owner of an unexpired lease can refresh it. */
     public boolean renew(UUID itemId, UUID worker, long tick) {
         Entry entry = leads.get(itemId);
         if (entry == null || worker == null || !worker.equals(entry.worker)
                 || tick > entry.claimedUntil
-                || !SwarmNestScoutSignal.freshFor(0L, 0L,
-                        entry.lead.observedTick(), tick)) return false;
+                || !fresh(entry.lead.observedTick(), tick)) return false;
         entry.claimedUntil = tick + CLAIM_TICKS;
         return true;
     }
@@ -106,11 +113,16 @@ public final class SwarmNestScoutBoard {
     public int size(long tick) { prune(tick); return leads.size(); }
 
     private void prune(long tick) {
-        leads.values().removeIf(entry -> !SwarmNestScoutSignal.freshFor(
-                0L, 0L, entry.lead.observedTick(), tick));
+        leads.values().removeIf(entry -> !fresh(entry.lead.observedTick(), tick));
     }
 
-    private static boolean within(BlockPos a, BlockPos b, int radius) {
-        return a.distSqr(b) <= (double) radius * radius;
+    private static boolean fresh(long observed, long now) {
+        return now >= observed && now - observed <= FRESH_TICKS;
     }
+
+    private static boolean within(Position a, Position b, int radius) {
+        return a.distanceSquared(b) <= (long) radius * radius;
+    }
+
+    private SwarmNestScoutBoard() {}
 }
