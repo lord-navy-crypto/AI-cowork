@@ -67,6 +67,10 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NEST_CONSTRUCTION_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_LIFECYCLE_ENABLED;
     public static final ModConfigSpec.IntValue NEST_MAX_POPULATION;
+    public static final ModConfigSpec.BooleanValue NEST_ADAPTIVE_RECRUITMENT;
+    public static final ModConfigSpec.DoubleValue NEST_WORKER_TARGET_SHARE;
+    public static final ModConfigSpec.DoubleValue NEST_GUARD_TARGET_SHARE;
+    public static final ModConfigSpec.DoubleValue NEST_RESPONSE_THRESHOLD;
     public static final ModConfigSpec.IntValue NEST_BUILD_INTERVAL_TICKS;
     public static final ModConfigSpec.IntValue NEST_MIN_GROUP_SIZE;
     public static final ModConfigSpec.BooleanValue DIVISION_OF_LABOR_ENABLED;
@@ -346,6 +350,22 @@ public final class SwarmConfig {
         NEST_MAX_POPULATION = BUILDER
                 .comment("Maximum locally counted colony members before reproduction stops.")
                 .defineInRange("nestMaxPopulation", 12, 3, 32);
+
+        NEST_ADAPTIVE_RECRUITMENT = BUILDER
+                .comment("If lifecycle is enabled, recruit based on local response-threshold workforce deficits rather than fixed species rotation.")
+                .define("nestAdaptiveRecruitment", true);
+
+        NEST_WORKER_TARGET_SHARE = BUILDER
+                .comment("Desired fraction of local colony population made of Zombie workers (game model, not biological data).")
+                .defineInRange("nestWorkerTargetShare", 0.40, 0.15, 0.65);
+
+        NEST_GUARD_TARGET_SHARE = BUILDER
+                .comment("Desired fraction of local colony population made of Skeleton guards; remaining slots are scouts/reserves.")
+                .defineInRange("nestGuardTargetShare", 0.25, 0.10, 0.50);
+
+        NEST_RESPONSE_THRESHOLD = BUILDER
+                .comment("Response threshold theta in s^2/(s^2 + theta^2); higher values make recruiting less responsive to small deficits.")
+                .defineInRange("nestResponseThreshold", 0.55, 0.10, 3.0);
 
         BUILDER.pop();
 
