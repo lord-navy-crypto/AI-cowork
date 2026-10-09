@@ -55,10 +55,13 @@ fallback. Never run live world/pathfinding access off the server thread.
 
 - The server-level option `navPathEvidenceBudgetPerTick` defaults to 96
   **reserved candidate slots per dimension per game tick** (8..512).
-- Obstacle avoidance reserves up to four evidence queries atomically; recovery
-  reserves up to six. A blocked candidate consumes a reserved slot but does
-  not execute an expensive `createPath`, so reserved tokens are an upper bound
-  on explicit evidence queries rather than a direct CPU time measurement.
+- Obstacle avoidance probes four local candidate positions and recovery probes
+  up to six. **Only terrain-passable candidates** reserve path-evidence slots;
+  already-blocked candidates never consume quota or call `createPath`.
+  A fully blocked candidate set also skips its congestion entity scan.
+- Reservations still happen atomically for all candidate positions requiring
+  evidence; tokens are an upper bound on explicit `createPath` calls and not
+  a direct measurement of CPU time.
 - When an episode cannot reserve its full candidate set, the whole episode is
   deferred. It does not assert false feasibility, inflate recovery failure
   metrics, or execute an unbounded partial set.
