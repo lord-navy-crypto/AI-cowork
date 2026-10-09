@@ -7,6 +7,7 @@ import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmPlannerContext;
+import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
@@ -310,6 +311,14 @@ public final class SwarmApproachGoal extends Goal {
         }
 
         double[] lateralScales = {0.75, -0.75, 1.50, -1.50};
+        List<Vec2> candidatePoints = new ArrayList<>(lateralScales.length);
+        for (double scale : lateralScales) {
+            candidatePoints.add(frontProbe.add(left.scale(lateralDistance * scale)));
+        }
+        // Sample once for all lateral candidates rather than re-querying nearby
+        // entities for every score. The envelope includes the furthest candidate.
+        List<Vec2> congestionPeers = findCongestionPeers(level, self, candidatePoints);
+        double congestionRadius = SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get();
         List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
         int blockedCount = 0;
         int unreachableCount = 0;
@@ -320,7 +329,7 @@ public final class SwarmApproachGoal extends Goal {
             Vec2 candidate = frontProbe.add(left.scale(lateralOffset));
             boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
             if (blocked) blockedCount++;
-            double congestion = localCongestion(level, candidate);
+            double congestion = SwarmCongestionPolicy.countWithin(congestionPeers, candidate, congestionRadius);
 
             boolean pathReachable = true;
             int pathNodeCount = 0;
@@ -391,23 +400,31 @@ public final class SwarmApproachGoal extends Goal {
         return new SwarmObstacleAvoidancePolicy.Avoidance(choice.waypoint(), true, side);
     }
 
-    private double localCongestion(ServerLevel level, Vec2 candidate) {
-        double radius = SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get();
-        double radiusSqr = radius * radius;
-
+    /**
+     * One conservative entity-index scan covers every candidate in this local
+     * planning episode. Capturing positions also guarantees each candidate is
+     * scored against the same peer snapshot, preventing intra-plan jitter.
+     */
+    private List<Vec2> findCongestionPeers(
+            ServerLevel level,
+            Vec2 self,
+            List<Vec2> candidatePoints
+    ) {
+        if (candidatePoints.isEmpty()) {
+            return List.of();
+        }
+        double radius = SwarmCongestionPolicy.scanRadius(
+                self, candidatePoints, SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get()
+        );
         return level.getEntitiesOfClass(
                         PathfinderMob.class,
-                        mob.getBoundingBox().inflate(radius + SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.get()),
+                        mob.getBoundingBox().inflate(radius),
                         peer -> peer != mob
                                 && peer.isAlive()
                                 && SwarmAgentProfiles.isSupported(peer)
                 ).stream()
-                .filter(peer -> {
-                    double dx = peer.getX() - candidate.x();
-                    double dz = peer.getZ() - candidate.z();
-                    return dx * dx + dz * dz <= radiusSqr;
-                })
-                .count();
+                .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                .toList();
     }
 
     private boolean isProbeBlocked(ServerLevel level, double x, double z) {
@@ -461,6 +478,11 @@ public final class SwarmApproachGoal extends Goal {
             return new SwarmNavigationRecoveryPolicy.Recovery(destination, false);
         }
 
+        List<Vec2> candidatePoints = generated.stream()
+                .map(SwarmRecoveryCandidatePolicy.RecoveryCandidate::waypoint)
+                .toList();
+        List<Vec2> congestionPeers = findCongestionPeers(level, self, candidatePoints);
+        double congestionRadius = SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get();
         List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
         int blockedCount = 0;
         int unreachableCount = 0;
@@ -469,7 +491,7 @@ public final class SwarmApproachGoal extends Goal {
             Vec2 candidate = recoveryCandidate.waypoint();
             boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
             if (blocked) blockedCount++;
-            double congestion = localCongestion(level, candidate);
+            double congestion = SwarmCongestionPolicy.countWithin(congestionPeers, candidate, congestionRadius);
 
             boolean pathReachable = true;
             int pathNodeCount = 0;
