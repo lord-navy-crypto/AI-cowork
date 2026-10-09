@@ -96,8 +96,12 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 || item.getItem().isEmpty() || !server.hasChunkAt(item.blockPosition())) {
             return false;
         }
-        return scoutBoard.publish(item.getUUID(), item.blockPosition(),
-                classify(item.getItem()), now, worldPosition);
+        BlockPos site = item.blockPosition();
+        return scoutBoard.publish(item.getUUID(),
+                new SwarmNestScoutBoard.Position(site.getX(), site.getY(), site.getZ()),
+                classify(item.getItem()), now,
+                new SwarmNestScoutBoard.Position(
+                        worldPosition.getX(), worldPosition.getY(), worldPosition.getZ()));
     }
     public int leaderMarks() { return leaderMarks; }
 
