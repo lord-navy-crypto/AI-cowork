@@ -289,3 +289,23 @@ per dimension. Remote nest chunks are never force-loaded.
 A real GameTest must verify that delivering two existing oak-log items
 produces exactly six timber points and one successful trip, and that
 interrupting a dirt delivery leaves the full dropped stack available.
+
+### Cargo proximity and demolished-home recovery
+
+Worker delivery checks both sides of the physical logistics contract:
+the worker must arrive at its valid loaded Nest Core **and** the original
+claimed dropped-item entity must still be within four blocks of the worker.
+At the dock the real cargo entity is synchronized to the worker before the
+core can consume it; far-away or removed item entities cannot magically
+be deposited. If the worker is interrupted, the real item stays where it
+physically was and its temporary claim is released.
+
+Loaded cores can re-enroll idle Zombies if their previously assigned home
+is proven destroyed in a **loaded** chunk, or if that home belonged to a
+different dimension. A core never loads an old chunk to investigate a
+missing home, and it never steals a worker from another valid nest.
+The worker's home dimension key is also stored as ordinary persistent NBT.
+
+This is a first logistics prototype; multiplayer item ownership, third-party
+claim permissions and long-run 100+ worker navigation MSPT require further
+manual validation before enabling default automation.
