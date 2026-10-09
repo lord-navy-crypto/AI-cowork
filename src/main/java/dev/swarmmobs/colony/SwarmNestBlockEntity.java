@@ -38,7 +38,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private static final int POPULATION_RADIUS = 14;
     private static final int RESOURCE_RADIUS = 3;
     private static final int[] DX = {2, -2, 0, 0, 2, -2, 2, -2};
-    private static final int[] DZ = {0, 0, 2, -2, 2, 2, -2};
+    private static final int[] DZ = {0, 0, 2, -2, 2, 2, -2, -2};
     private int resources;
     private int chamberLevel;
     // Individually conserved resource categories. Legacy points keep old
@@ -212,13 +212,21 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         recordPopulationSample(science.population());
         SwarmNestScienceTelemetry.record(level, worldPosition, this, science);
 
-        BlockPos birthSite = findSpawnSite(level);
         boolean playerClose = level.players().stream().anyMatch(
                 player -> player.distanceToSqr(
                         worldPosition.getX() + .5, worldPosition.getY() + .5,
                         worldPosition.getZ() + .5) <= 12.0 * 12.0);
 
         long tick = level.getGameTime();
+        // Cheap resource/cooldown/population gates before reading eight
+        // separate positions. Most inactive colonies do zero birth-site IO.
+        boolean birthCouldRun = nutrientPoints + legacyPoints >= SwarmNestColonyPolicy.SPAWN_COST
+                && members.size() < effectiveCapacity()
+                && tick >= nextSpawnTick
+                && !playerClose
+                && level.getDifficulty() != Difficulty.PEACEFUL
+                && level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING);
+        BlockPos birthSite = birthCouldRun ? findSpawnSite(level) : null;
         if (!SwarmNestColonyPolicy.canSpawn(
                 true,
                 level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING),
