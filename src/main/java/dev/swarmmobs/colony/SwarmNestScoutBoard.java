@@ -124,5 +124,5 @@ public final class SwarmNestScoutBoard {
         return a.distanceSquared(b) <= (long) radius * radius;
     }
 
-    private SwarmNestScoutBoard() {}
+    public SwarmNestScoutBoard() {}
 }
