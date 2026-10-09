@@ -386,7 +386,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 || !supporting.isFaceSturdy(level, pos.below(), Direction.UP)) {
             return false;
         }
-        return level.getEntities(null, new AABB(pos), entity -> entity.isAlive()).isEmpty();
+        return level.getEntities((net.minecraft.world.entity.Entity) null,
+                new AABB(pos), entity -> entity.isAlive()).isEmpty();
     }
 
     private void recordPopulationSample(int actualCount) {
