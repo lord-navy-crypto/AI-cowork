@@ -255,6 +255,26 @@ public final class SwarmClothControlScreen {
                 "Growth pauses when the local supported monster count reaches this cap.");
 
         toggle(category, entries, values,
+                "Zombie worker item hauling",
+                "nestHaulingEnabled", "nest_haul_toggle", false,
+                "OFF by default: idle colony members move existing dirt, logs and food item entities to their own loaded nest; no auto-crafting.");
+
+        intField(category, entries, values,
+                "Worker item search radius",
+                "nestHaulSearchRadius", "nest_haul_radius_delta", 8,
+                "Search only nearby real dropped items (4-16 blocks); budgeted per dimension.");
+
+        intField(category, entries, values,
+                "Maximum one-stack hauling size",
+                "nestHaulMaxStack", "nest_haul_stack_delta", 16,
+                "Only item stacks up to this size may be transported; larger stacks remain where they dropped.");
+
+        intField(category, entries, values,
+                "Worker item search interval (ticks)",
+                "nestHaulAttemptInterval", "nest_haul_interval_delta", 100,
+                "Each worker surveys for an unclaimed dropped item infrequently.");
+
+        toggle(category, entries, values,
                 "Adaptive insect-inspired recruiting",
                 "nestAdaptiveRecruitment",
                 "nest_adaptive_toggle",
@@ -309,6 +329,11 @@ public final class SwarmClothControlScreen {
                             + ", skeleton guards " + integer(values, "colonyScienceGuards")
                             + ", spider scouts " + integer(values, "colonyScienceScouts")
                             + ", creeper reserves " + integer(values, "colonyScienceReserves"));
+
+            status(category, entries,
+                    "Worker logistics: delivered items " + integer(values, "colonyHaulItems")
+                            + " | completed trips " + integer(values, "colonyHaulTrips")
+                            + " (last sampled loaded core)");
 
             status(category, entries,
                     "Stored points: soil " + integer(values, "colonyScienceSoil")
