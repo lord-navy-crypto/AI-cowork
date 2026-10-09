@@ -1,4 +1,5 @@
 {
   "key.swarmmobs.open_command_center": "打开蜂群控制中心",
-  "key.categories.swarmmobs": "Swarm Mobs 蜂群模组"
+  "key.categories.swarmmobs": "Swarm Mobs 蜂群模组",
+  "block.swarmmobs.nest_core": "蜂群巢穴核心"
 }
