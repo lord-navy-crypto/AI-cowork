@@ -58,6 +58,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private double meanPopulation;
     private long nextSpawnTick;
     private long births;
+    private long hauledItems;
+    private long haulTrips;
     private int leaderMarks;
 
     public SwarmNestBlockEntity(BlockPos pos, BlockState state) {
@@ -81,6 +83,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     public long populationSamples() { return populationSamples; }
     public double meanPopulation() { return meanPopulation; }
     public long births() { return births; }
+    public long hauledItems() { return hauledItems; }
+    public long haulTrips() { return haulTrips; }
     public int leaderMarks() { return leaderMarks; }
 
     @Override
@@ -107,6 +111,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         meanPopulation = Math.max(0.0, Math.min(64.0, tag.getDouble("MeanPopulation")));
         nextSpawnTick = Math.max(0L, tag.getLong("NextSpawnTick"));
         births = Math.max(0L, tag.getLong("Births"));
+        hauledItems = Math.max(0L, tag.getLong("HauledItems"));
+        haulTrips = Math.max(0L, tag.getLong("HaulTrips"));
         leaderMarks = Math.max(0, Math.min(3, tag.getInt("LeaderMarks")));
     }
 
@@ -126,6 +132,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         tag.putDouble("MeanPopulation", meanPopulation);
         tag.putLong("NextSpawnTick", nextSpawnTick);
         tag.putLong("Births", births);
+        tag.putLong("HauledItems", hauledItems);
+        tag.putLong("HaulTrips", haulTrips);
         tag.putInt("LeaderMarks", leaderMarks);
     }
 
@@ -165,6 +173,20 @@ public final class SwarmNestBlockEntity extends BlockEntity {
             item.discard();
         } else {
             item.setItem(stack);
+        }
+        return accepted;
+    }
+
+    /**
+     * Same atomic item intake used by ordinary Nest Core suction, but count
+     * successful voluntary worker trips separately for scientific telemetry.
+     */
+    public int acceptHaulDelivery(ItemEntity item, int maxItems) {
+        int accepted = acceptDroppedItem(item, maxItems);
+        if (accepted > 0) {
+            haulTrips++;
+            hauledItems += accepted;
+            setChanged();
         }
         return accepted;
     }
