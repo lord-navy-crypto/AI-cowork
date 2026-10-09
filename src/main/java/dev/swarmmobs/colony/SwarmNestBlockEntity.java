@@ -19,6 +19,7 @@ import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -41,6 +42,9 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private static final int[] DZ = {0, 0, 2, -2, 2, 2, -2, -2};
     private int resources;
     private int chamberLevel;
+    // Actual placed shell modules can lag virtual capacity if the visual
+    // feature was disabled earlier or neighboring space became obstructed.
+    private int visibleChamberLevel;
     // Individually conserved resource categories. Legacy points keep old
     // 0.14 pre-science worlds compatible without inventing a food source.
     private int soilPoints;
@@ -62,6 +66,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
 
     public int resources() { return resources; }
     public int chamberLevel() { return chamberLevel; }
+    public int visibleChamberLevel() { return visibleChamberLevel; }
     public int effectiveCapacity() {
         return SwarmNestArchitecturePolicy.effectiveCapacity(
                 chamberLevel, SwarmConfig.NEST_MAX_POPULATION.get());
@@ -85,6 +90,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 tag.getInt("Resources")));
         chamberLevel = Math.max(0, Math.min(SwarmNestArchitecturePolicy.MAX_CHAMBER_LEVEL,
                 tag.getInt("ChamberLevel")));
+        visibleChamberLevel = Math.max(0, Math.min(chamberLevel,
+                tag.getInt("VisibleChamberLevel")));
         // Clamp every resource bucket to the unallocated remainder. Old saves
         // have only "Resources": preserve them as explicitly labeled legacy
         // supply rather than pretending they are newly acquired nutrition.
@@ -108,6 +115,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         super.saveAdditional(tag, registries);
         tag.putInt("Resources", resources);
         tag.putInt("ChamberLevel", chamberLevel);
+        tag.putInt("VisibleChamberLevel", visibleChamberLevel);
         tag.putInt("SoilPoints", soilPoints);
         tag.putInt("TimberPoints", timberPoints);
         tag.putInt("NutrientPoints", nutrientPoints);
@@ -188,17 +196,27 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         List<PathfinderMob> members = members(level);
         assignVisibleLeaders(members);
 
-        // A local, real-material engineering upgrade: virtual nest chambers
-        // expand carrying capacity without altering protected world terrain.
-        if (SwarmNestArchitecturePolicy.canExtend(
+        // When enabled, each module gets two actual shell blocks. Verify
+        // both positions BEFORE charging the same eight-soil/six-wood bill
+        // that already governs virtual chambers. Obstructed sites defer
+        // the whole upgrade; they never overwrite existing construction.
+        // If an old colony has paid-for abstract rooms, visualize at most
+        // one such room per 200-tick cycle without charging it twice.
+        boolean visible = SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get();
+        if (visible && visibleChamberLevel < chamberLevel) {
+            tryPlaceShellModule(level, visibleChamberLevel);
+        } else if (SwarmNestArchitecturePolicy.canExtend(
                 chamberLevel, SwarmConfig.NEST_MAX_POPULATION.get(),
                 members.size(), soilPoints, timberPoints)) {
-            soilPoints -= SwarmNestArchitecturePolicy.SOIL_COST;
-            timberPoints -= SwarmNestArchitecturePolicy.TIMBER_COST;
-            resources -= SwarmNestArchitecturePolicy.SOIL_COST
-                    + SwarmNestArchitecturePolicy.TIMBER_COST;
-            chamberLevel++;
-            setChanged();
+            boolean worldReady = !visible || tryPlaceShellModule(level, chamberLevel);
+            if (worldReady) {
+                soilPoints -= SwarmNestArchitecturePolicy.SOIL_COST;
+                timberPoints -= SwarmNestArchitecturePolicy.TIMBER_COST;
+                resources -= SwarmNestArchitecturePolicy.SOIL_COST
+                        + SwarmNestArchitecturePolicy.TIMBER_COST;
+                chamberLevel++;
+                setChanged();
+            }
         }
 
         int workerCount = 0, guardCount = 0, scoutCount = 0, reserveCount = 0;
@@ -298,6 +316,77 @@ public final class SwarmNestBlockEntity extends BlockEntity {
             SwarmNestScienceTelemetry.record(level, worldPosition, this, afterBirth);
             setChanged();
         }
+    }
+
+    /**
+     * Intentionally tiny world footprint: two pieces for one module, no
+     * excavation, no replacing ANY placed block and no chunk tickets.
+     * One attempt per colony sample. Owned shell at the lower tier is the
+     * only valid foundation for upper-tier elements.
+     */
+    private boolean tryPlaceShellModule(ServerLevel level, int module) {
+        if (!SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()
+                || !level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)
+                || module != visibleChamberLevel) {
+            return false;
+        }
+        // Keep this optional terrain modification away from people, even if
+        // an already-paid abstract room is now being visualized.
+        boolean playerNearby = level.players().stream().anyMatch(player ->
+                player.isAlive() && player.distanceToSqr(
+                        worldPosition.getX() + 0.5, worldPosition.getY() + 0.5,
+                        worldPosition.getZ() + 0.5) <= 12.0 * 12.0);
+        if (playerNearby) return false;
+
+        var soilPiece = SwarmNestVisibleShellPolicy.piece(module, 0);
+        var timberPiece = SwarmNestVisibleShellPolicy.piece(module, 1);
+        BlockPos soilPos = worldPosition.offset(
+                soilPiece.x(), soilPiece.y(), soilPiece.z());
+        BlockPos timberPos = worldPosition.offset(
+                timberPiece.x(), timberPiece.y(), timberPiece.z());
+        if (!canPlaceShellPiece(level, soilPos, soilPiece.y())
+                || !canPlaceShellPiece(level, timberPos, timberPiece.y())) {
+            return false;
+        }
+        // Minecraft game rules and modded placement listeners may still
+        // refuse a setBlock. In that case release ONLY our first new block.
+        var soilState = Blocks.MUD_BRICKS.defaultBlockState();
+        var timberState = Blocks.STRIPPED_OAK_LOG.defaultBlockState();
+        if (!level.setBlockAndUpdate(soilPos, soilState)) return false;
+        if (!level.setBlockAndUpdate(timberPos, timberState)) {
+            if (level.getBlockState(soilPos).equals(soilState)) {
+                level.setBlockAndUpdate(soilPos, Blocks.AIR.defaultBlockState());
+            }
+            return false;
+        }
+        visibleChamberLevel++;
+        setChanged();
+        return true;
+    }
+
+    private boolean canPlaceShellPiece(ServerLevel level, BlockPos pos, int tier) {
+        if (!level.isInWorldBounds(pos)
+                || !level.hasChunkAt(pos)
+                || !level.hasChunkAt(pos.below())
+                || !level.getBlockState(pos).isAir()
+                || !level.getFluidState(pos).isEmpty()) {
+            return false;
+        }
+        var supporting = level.getBlockState(pos.below());
+        boolean validFoundation = tier == 0
+                ? supporting.is(Blocks.DIRT) || supporting.is(Blocks.GRASS_BLOCK)
+                        || supporting.is(Blocks.COARSE_DIRT)
+                        || supporting.is(Blocks.ROOTED_DIRT)
+                        || supporting.is(Blocks.PODZOL)
+                        || supporting.is(Blocks.MUD)
+                        || supporting.is(Blocks.STONE)
+                : supporting.is(Blocks.MUD_BRICKS)
+                        || supporting.is(Blocks.STRIPPED_OAK_LOG);
+        if (!validFoundation
+                || !supporting.isFaceSturdy(level, pos.below(), Direction.UP)) {
+            return false;
+        }
+        return level.getEntities(null, new AABB(pos), entity -> entity.isAlive()).isEmpty();
     }
 
     private void recordPopulationSample(int actualCount) {
