@@ -103,6 +103,39 @@ class SwarmPathQueryBudgetTest {
     }
 
     @Test
+    void canceledWaitingHeadImmediatelyUnblocksOtherRequesters() {
+        var budget = new SwarmPathQueryBudget();
+        assertTrue(budget.tryReserve(A, 10, 6, 8));
+        assertFalse(budget.tryReserve(B, 10, 4, 8));
+        assertEquals(1, budget.snapshot(11, 8).waiters());
+        budget.cancel(B);
+        assertEquals(0, budget.snapshot(11, 8).waiters());
+        assertTrue(budget.tryReserve(C, 11, 8, 8));
+    }
+
+    @Test
+    void cancelingOneQueuedMobPreservesAnotherWaiterOrder() {
+        var budget = new SwarmPathQueryBudget();
+        assertTrue(budget.tryReserve(A, 1, 8, 8));
+        assertFalse(budget.tryReserve(B, 1, 6, 8));
+        assertFalse(budget.tryReserve(C, 1, 4, 8));
+        budget.cancel(B);
+        assertEquals(1, budget.snapshot(2, 8).waiters());
+        assertTrue(budget.tryReserve(C, 2, 4, 8));
+        assertEquals(0, budget.snapshot(2, 8).waiters());
+    }
+
+    @Test
+    void cancelingNullOrUnknownIdIsHarmless() {
+        var budget = new SwarmPathQueryBudget();
+        assertTrue(budget.tryReserve(A, 0, 3, 8));
+        budget.cancel(null);
+        budget.cancel(B);
+        assertEquals(3, budget.snapshot(0, 8).reservedTokens());
+        assertEquals(0, budget.snapshot(0, 8).waiters());
+    }
+
+    @Test
     void invalidRequestsAreRejectedRatherThanCorruptingState() {
         var budget = new SwarmPathQueryBudget();
         assertThrows(IllegalArgumentException.class,
