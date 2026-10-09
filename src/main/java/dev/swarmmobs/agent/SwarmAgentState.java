@@ -783,6 +783,7 @@ public final class SwarmAgentState {
     }
 
     public void forgetTarget() {
+        bindTacticalTarget(null);
         this.targetObservation = null;
         this.directObservation = false;
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
