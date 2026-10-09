@@ -144,9 +144,17 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         // No distant ItemEntity lookup occurs here. The worker must actually
         // reach the reported coordinates before verifying the physical drop.
         var pos = zombie.blockPosition();
+        var workerPos = new SwarmNestScoutBoard.Position(
+                pos.getX(), pos.getY(), pos.getZ());
         var report = nest.scoutBoard().reserve(zombie.getUUID(),
-                new SwarmNestScoutBoard.Position(pos.getX(), pos.getY(), pos.getZ()),
-                tick, SwarmNestScoutBoard.MAX_DISTANCE);
+                workerPos, tick, SwarmNestScoutBoard.MAX_DISTANCE,
+                lead -> SwarmNestColonyPolicy.acceptAmount(
+                        nest.resources(), 1, lead.kind()) > 0,
+                lead -> SwarmNestHaulPolicy.pickupScore(lead.kind(),
+                        workerPos.distanceSquared(lead.position()),
+                        nest.soilPoints(), nest.timberPoints(),
+                        nest.nutrientPoints(), nest.legacyPoints(),
+                        nest.chamberLevel(), SwarmConfig.NEST_MAX_POPULATION.get()));
         if (report == null || !level.hasChunkAt(scoutPosition(report))) {
             if (report != null) nest.scoutBoard().release(report.itemId(), zombie.getUUID());
             return false;
