@@ -17,6 +17,9 @@ import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
+import dev.swarmmobs.colony.SwarmNestHaulLease;
+import net.minecraft.world.entity.item.ItemEntity;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
@@ -4283,6 +4286,149 @@ public final class SwarmRuntimeGameTests {
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(oldGrief, helper.getLevel().getServer());
             observer.close();
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_hauling",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void zombieCarriesExistingLogDropToHomeWithoutCreatingExtraItems(
+            GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(0, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        var entity = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(entity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Real haul test has no Nest Core");
+            return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(corePos).asLong());
+        Vec3 dropPos = helper.absoluteVec(new Vec3(4.9, 1.2, 2.5));
+        ItemEntity physicalDrop = new ItemEntity(
+                helper.getLevel(), dropPos.x, dropPos.y, dropPos.z,
+                new ItemStack(Items.OAK_LOG, 2));
+        helper.getLevel().addFreshEntity(physicalDrop);
+
+        boolean wasEnabled = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean wasLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean wasMaster = SwarmConfig.ENABLED.get();
+        boolean wasGriefing = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+
+            SwarmZombieColonyHaulGoal goal = worker.goalSelector.getAvailableGoals()
+                    .stream().map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmZombieColonyHaulGoal.class::isInstance)
+                    .map(SwarmZombieColonyHaulGoal.class::cast)
+                    .findFirst().orElse(null);
+            if (goal == null || !goal.canUse()) {
+                helper.fail("Idle enrolled worker failed to recognize a real dropped log");
+                return;
+            }
+
+            goal.start();
+            goal.tick(); // Material remains an ItemEntity while picked up.
+            if (!physicalDrop.isAlive() || physicalDrop.getItem().getCount() != 2
+                    || !SwarmNestHaulLease.isClaimed(
+                            physicalDrop, helper.getLevel().getGameTime())
+                    || nest.resources() != 0) {
+                helper.fail("Physical cargo unexpectedly vanished or became free inventory");
+                return;
+            }
+
+            // Move worker to the destination: it must deposit the SAME
+            // ItemEntity, without spawning a synthetic replacement item.
+            Vec3 dock = helper.absoluteVec(new Vec3(1.1, 1.0, 2.5));
+            worker.setPos(dock.x, dock.y, dock.z);
+            goal.tick();
+            goal.stop();
+            if (physicalDrop.isAlive() || nest.timberPoints() != 6
+                    || nest.resources() != 6 || nest.hauledItems() != 2
+                    || nest.haulTrips() != 1) {
+                helper.fail("Worker item delivery failed exact accounting"
+                        + " timber=" + nest.timberPoints()
+                        + " hauled=" + nest.hauledItems()
+                        + " trips=" + nest.haulTrips());
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.NEST_HAULING_ENABLED.set(wasEnabled);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(wasLifecycle);
+            SwarmConfig.ENABLED.set(wasMaster);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(wasGriefing, helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_haul_abort",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void workerInterruptedDuringHaulDoesNotDeleteItsRealCargo(
+            GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(0, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        var entity = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(entity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Interrupted worker fixture missing Nest Core");
+            return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(corePos).asLong());
+        Vec3 pos = helper.absoluteVec(new Vec3(4.9, 1.2, 2.5));
+        ItemEntity physicalDrop = new ItemEntity(
+                helper.getLevel(), pos.x, pos.y, pos.z,
+                new ItemStack(Items.DIRT, 4));
+        helper.getLevel().addFreshEntity(physicalDrop);
+
+        boolean wasEnabled = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean wasLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean wasMaster = SwarmConfig.ENABLED.get();
+        boolean wasGriefing = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            var goal = new SwarmZombieColonyHaulGoal(worker);
+            if (!goal.canUse()) {
+                helper.fail("Worker failed to claim interrupted drop");
+                return;
+            }
+            goal.start();
+            goal.tick();
+            // Simulate a higher-priority interruption before nest arrival.
+            SwarmConfig.NEST_HAULING_ENABLED.set(false);
+            if (goal.canContinueToUse()) {
+                helper.fail("Disabled hauling kept controlling the worker");
+                return;
+            }
+            goal.stop();
+            if (!physicalDrop.isAlive() || physicalDrop.getItem().getCount() != 4
+                    || SwarmNestHaulLease.isClaimed(
+                            physicalDrop, helper.getLevel().getGameTime())
+                    || nest.resources() != 0 || nest.haulTrips() != 0) {
+                helper.fail("Interrupted job lost cargo, duplicated it or kept a stale lease");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.NEST_HAULING_ENABLED.set(wasEnabled);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(wasLifecycle);
+            SwarmConfig.ENABLED.set(wasMaster);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(wasGriefing, helper.getLevel().getServer());
         }
     }
 
