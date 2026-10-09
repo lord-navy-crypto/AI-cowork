@@ -631,6 +631,8 @@ public final class SwarmControlNetwork {
                 pair("colonyScienceLocation", colony.available()
                         ? colony.x() + "," + colony.y() + "," + colony.z() : "unavailable"),
                 pair("colonySciencePopulation", colony.population()),
+                pair("colonyScienceChamberLevel", colony.chamberLevel()),
+                pair("colonyScienceCapacity", colony.colonyCapacity()),
                 pair("colonySciencePeak", colony.peakPopulation()),
                 pair("colonyScienceDelta", colony.deltaPopulation()),
                 pair("colonyScienceMean", colony.averagePopulation()),
