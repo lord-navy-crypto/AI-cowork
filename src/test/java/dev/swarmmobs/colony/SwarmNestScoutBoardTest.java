@@ -43,17 +43,42 @@ class SwarmNestScoutBoardTest {
     @Test
     void cannotStealReservedLeadWhenBoardFullAndCannotResumeExpiredLead() {
         var board = new SwarmNestScoutBoard();
-        var owner = UUID.randomUUID();
         for (int i = 0; i < SwarmNestScoutBoard.MAX_LEADS; i++) {
             UUID item = new UUID(0, i + 1);
-            assertTrue(board.publish(item, new SwarmNestScoutBoard.Position(5 + i, 64, 0),
+            var location = new SwarmNestScoutBoard.Position(5 + i, 64, 0);
+            assertTrue(board.publish(item, location,
                     SwarmNestColonyPolicy.Kind.SOIL, 10, HOME));
-            assertNotNull(board.reserve(owner, new SwarmNestScoutBoard.Position(5 + i, 64, 0), 10, 1));
+            var lead = board.reserve(new UUID(1, i + 1), location, 10, 1);
+            assertNotNull(lead);
+            assertEquals(item, lead.itemId());
         }
-        // Renewed by the same owner, but a subsequent single reservation can
-        // select an existing one. At least one reserved lead still remains.
-        assertTrue(board.size(10) <= SwarmNestScoutBoard.MAX_LEADS);
+        assertFalse(board.publish(new UUID(0, 999),
+                new SwarmNestScoutBoard.Position(20, 64, 0),
+                SwarmNestColonyPolicy.Kind.SOIL, 10, HOME));
+        assertEquals(SwarmNestScoutBoard.MAX_LEADS, board.size(10));
         assertEquals(0, board.size(260));
+    }
+
+    @Test
+    void shortageScoreAndCapacityGateDetermineWhichSpiderLeadGetsAssigned() {
+        var board = new SwarmNestScoutBoard();
+        UUID soil = UUID.randomUUID(), food = UUID.randomUUID();
+        assertTrue(board.publish(soil, new SwarmNestScoutBoard.Position(5, 64, 0),
+                SwarmNestColonyPolicy.Kind.SOIL, 10, HOME));
+        assertTrue(board.publish(food, new SwarmNestScoutBoard.Position(7, 64, 0),
+                SwarmNestColonyPolicy.Kind.NUTRIENT, 10, HOME));
+        var chosen = board.reserve(UUID.randomUUID(), HOME, 11, 20,
+                lead -> SwarmNestColonyPolicy.acceptAmount(0, 1, lead.kind()) > 0,
+                lead -> SwarmNestHaulPolicy.pickupScore(
+                        lead.kind(), HOME.distanceSquared(lead.position()),
+                        8, 6, 0, 0, 0, 12));
+        assertNotNull(chosen);
+        assertEquals(food, chosen.itemId(), "Food shortage should beat a modest extra trip");
+        var second = board.reserve(UUID.randomUUID(), HOME, 11, 20,
+                lead -> lead.kind() == SwarmNestColonyPolicy.Kind.SOIL,
+                lead -> HOME.distanceSquared(lead.position()));
+        assertNotNull(second);
+        assertEquals(soil, second.itemId());
     }
 
     @Test
