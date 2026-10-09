@@ -246,6 +246,84 @@ class SwarmAgentStateTest {
     }
 
     @Test
+    void changingPlayerTargetImmediatelyReassignsSpiderFlankSide() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID playerA = UUID.randomUUID();
+        UUID playerB = UUID.randomUUID();
+
+        assertTrue(state.bindTacticalTarget(playerA));
+        assertEquals(0, state.stabilizeFormationSlot(0, 100L, 40));
+        assertEquals(SwarmRole.FLANK_LEFT,
+                state.stabilizeRole(SwarmRole.FLANK_LEFT, 100L, 30));
+
+        // On the same target, normal hysteresis prevents sudden side hopping.
+        assertEquals(0, state.stabilizeFormationSlot(1, 105L, 40));
+        assertEquals(SwarmRole.FLANK_LEFT,
+                state.stabilizeRole(SwarmRole.FLANK_RIGHT, 105L, 30));
+
+        assertTrue(state.bindTacticalTarget(playerB));
+        assertEquals(playerB, state.tacticalAssignmentTarget());
+        assertEquals(-1, state.pendingFormationSlot());
+        assertNull(state.pendingRole());
+        assertEquals(1, state.stabilizeFormationSlot(1, 106L, 40));
+        assertEquals(SwarmRole.FLANK_RIGHT,
+                state.stabilizeRole(SwarmRole.FLANK_RIGHT, 106L, 30));
+    }
+
+    @Test
+    void switchingTargetsClearsPriorTemporaryWorkLeaseButPreservesExperience() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID playerA = UUID.randomUUID();
+        UUID playerB = UUID.randomUUID();
+        state.bindTacticalTarget(playerA);
+        state.stabilizeSpecialization(
+                SwarmTaskType.ENGINEERING, SwarmSpecialization.ENGINEER, 100L, 40);
+        state.updateTaskExperience(SwarmTaskType.ENGINEERING, 0.3, 1.0);
+        double retainedLearning = state.taskExperience(SwarmTaskType.ENGINEERING);
+        assertEquals(SwarmSpecialization.ENGINEER, state.specialization());
+
+        assertTrue(state.bindTacticalTarget(playerB));
+        assertEquals(SwarmTaskType.RESERVE, state.currentTask());
+        assertEquals(SwarmSpecialization.RESERVE, state.specialization());
+        assertEquals(Long.MIN_VALUE, state.specializationSinceTick());
+        assertEquals(retainedLearning, state.taskExperience(SwarmTaskType.ENGINEERING), 1.0e-9);
+
+        // New target can immediately assign the correct task instead of
+        // inheriting old target's 40-tick minimum specialization hold.
+        assertEquals(SwarmSpecialization.FLANKER_LEFT,
+                state.stabilizeSpecialization(
+                        SwarmTaskType.FLANK, SwarmSpecialization.FLANKER_LEFT, 101L, 40));
+    }
+
+    @Test
+    void sameTargetObservationRefreshNeverResetsHysteresis() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID playerA = UUID.randomUUID();
+        assertTrue(state.bindTacticalTarget(playerA));
+        assertEquals(0, state.stabilizeFormationSlot(0, 100L, 40));
+        assertEquals(0, state.stabilizeFormationSlot(1, 101L, 40));
+        assertFalse(state.bindTacticalTarget(playerA));
+        assertEquals(0, state.stabilizeFormationSlot(1, 102L, 40));
+        assertEquals(1, state.pendingFormationSlot());
+    }
+
+    @Test
+    void forgettingTargetReleasesTacticalBindingAndStalePeerCounters() {
+        SwarmAgentState state = new SwarmAgentState();
+        UUID playerA = UUID.randomUUID();
+        state.bindTacticalTarget(playerA);
+        state.rememberTarget(playerA, 10L, true);
+        state.updateTacticalSquadTelemetry(3, 1);
+        state.forgetTarget();
+
+        assertNull(state.tacticalAssignmentTarget());
+        assertNull(state.targetId());
+        assertEquals(0, state.tacticalPeerCount());
+        assertEquals(0, state.tacticalBreacherCount());
+        assertTrue(state.bindTacticalTarget(playerA));
+    }
+
+    @Test
     void targetConfidenceDecaysWithObservationAge() {
         SwarmAgentState state = new SwarmAgentState();
         UUID target = UUID.randomUUID();
