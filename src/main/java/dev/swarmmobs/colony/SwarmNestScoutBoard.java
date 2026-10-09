@@ -3,6 +3,8 @@ package dev.swarmmobs.colony;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Pure Java, transient stigmergic job board owned by a loaded Nest Core.
@@ -65,23 +67,40 @@ public final class SwarmNestScoutBoard {
     }
 
     public Lead reserve(UUID worker, Position workerPos, long tick, int radius) {
-        if (worker == null || workerPos == null) return null;
+        return reserve(worker, workerPos, tick, radius,
+                lead -> true, lead -> workerPos.distanceSquared(lead.position()));
+    }
+
+    /**
+     * Filter reports against current stock capacity, then score them by
+     * distance and shortages. Pure Java callbacks cannot query the world.
+     */
+    public Lead reserve(UUID worker, Position workerPos, long tick, int radius,
+                        Predicate<Lead> acceptable, ToDoubleFunction<Lead> score) {
+        if (worker == null || workerPos == null || acceptable == null || score == null)
+            return null;
         prune(tick);
-        // A worker cannot reserve several tasks simultaneously.
+        // A worker cannot hold more than one report at a time.
         for (Entry entry : leads.values()) {
             if (worker.equals(entry.worker) && entry.claimedUntil >= tick) {
-                return entry.lead;
+                if (acceptable.test(entry.lead)
+                        && within(workerPos, entry.lead.position(), Math.max(1, radius))) {
+                    return entry.lead;
+                }
+                entry.worker = null;
+                entry.claimedUntil = 0L;
             }
         }
         Entry best = null;
-        long bestDistance = Long.MAX_VALUE;
+        double bestScore = Double.POSITIVE_INFINITY;
         for (Entry entry : leads.values()) {
             if (entry.worker != null && entry.claimedUntil >= tick) continue;
-            if (!within(workerPos, entry.lead.position(), Math.max(1, radius))) continue;
-            long distance = workerPos.distanceSquared(entry.lead.position());
-            if (distance < bestDistance) {
+            if (!within(workerPos, entry.lead.position(), Math.max(1, radius))
+                    || !acceptable.test(entry.lead)) continue;
+            double candidate = score.applyAsDouble(entry.lead);
+            if (Double.isFinite(candidate) && candidate < bestScore) {
                 best = entry;
-                bestDistance = distance;
+                bestScore = candidate;
             }
         }
         if (best == null) return null;
