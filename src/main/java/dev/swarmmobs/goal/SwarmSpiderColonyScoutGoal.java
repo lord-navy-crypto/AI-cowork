@@ -105,6 +105,10 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
                             home.getY() + .5, home.getZ() + .5) < 16.0) {
                 continue; // local passive intake already handles core-adjacent drops
             }
+            // Deliver the sighting to the loaded Nest Core. This shares
+            // distant resource coordinates with its workers, without an
+            // ItemEntity reference or an invented inventory stack.
+            if (!nest.reportScoutItem(item, now)) continue;
             SwarmNestScoutSignal.mark(item, home, now);
             if (++marked >= MAX_MARKS_PER_SURVEY) break;
         }
