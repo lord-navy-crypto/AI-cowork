@@ -1,6 +1,7 @@
 package dev.swarmmobs.network;
 
 import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
+import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 
 import dev.swarmmobs.client.SwarmControlClient;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
@@ -469,6 +470,7 @@ public final class SwarmControlNetwork {
     ) {
         var metrics = SwarmExperimentMetrics.snapshot(level);
         var pathBudget = SwarmPathBudgetRegistry.snapshot(level);
+        var navCommands = SwarmNavigationCommandTelemetry.snapshot(level);
         var ai = SwarmAiShadowState.snapshot();
         var decision = ai.lastDecision();
         var activeAi = SwarmAiActiveState.snapshot(level.getGameTime());
@@ -599,6 +601,10 @@ public final class SwarmControlNetwork {
                 pair("metricRecoveryAttempts", (int) Math.min(Integer.MAX_VALUE, metrics.recoveryPlanningAttempts())),
                 pair("metricRecoveryFailures", (int) Math.min(Integer.MAX_VALUE, metrics.recoveryPlanningFailures())),
                 pair("metricPathQueries", (int) Math.min(Integer.MAX_VALUE, metrics.pathQueries())),
+                pair("metricNavCommandsIssued", (int) Math.min(Integer.MAX_VALUE, navCommands.issued())),
+                pair("metricNavCommandsSkipped", (int) Math.min(Integer.MAX_VALUE, navCommands.skipped())),
+                pair("metricNavRetries", (int) Math.min(Integer.MAX_VALUE, navCommands.retryDone())),
+                pair("metricNavRefreshes", (int) Math.min(Integer.MAX_VALUE, navCommands.periodicRefresh())),
                 pair("metricRoleReassignments", (int) Math.min(Integer.MAX_VALUE, metrics.roleReassignments())),
                 pair("metricSearchStarted", (int) Math.min(Integer.MAX_VALUE, metrics.searchEpisodesStarted())),
                 pair("metricSearchSucceeded", (int) Math.min(Integer.MAX_VALUE, metrics.searchEpisodesSucceeded())),
