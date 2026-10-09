@@ -184,6 +184,9 @@ public final class SwarmApproachGoal extends Goal {
     @Override
     public void stop() {
         mob.getNavigation().stop();
+        if (mob.level() instanceof ServerLevel level) {
+            SwarmPathBudgetRegistry.cancel(level, mob);
+        }
         recoveryActive = false;
         recoveryUntilTick = Long.MIN_VALUE;
         obstacleDetourActive = false;
@@ -266,6 +269,12 @@ public final class SwarmApproachGoal extends Goal {
                         new Vec2(mob.getX(), mob.getZ()),
                         new Vec2(state.destinationX(), state.destinationZ())
                 );
+                if (avoidance == null) {
+                    // Evidence budget denied this entire detour episode.
+                    // Preserve the existing movement command; submitting a
+                    // direct unverified path would defeat the quota.
+                    return;
+                }
                 if (avoidance.active()) {
                     obstacleDetourActive = true;
                     obstacleDetourX = avoidance.waypoint().x();
@@ -351,6 +360,7 @@ public final class SwarmApproachGoal extends Goal {
         Vec2 frontProbe = self.add(forward.scale(Math.min(distance, lookahead)));
         boolean frontBlocked = isProbeBlocked(level, frontProbe.x(), frontProbe.z());
         if (!frontBlocked) {
+            SwarmPathBudgetRegistry.cancel(level, mob);
             return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
         }
 
@@ -370,12 +380,19 @@ public final class SwarmApproachGoal extends Goal {
         if (requiredPathQueries > 0
                 && !SwarmPathBudgetRegistry.reserve(level, mob, requiredPathQueries)) {
             // Unknown evidence is neither a valid path nor a failed path.
+            // Returning null means "deferred", not "use direct route".
             mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
-            return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
+            return null;
+        }
+        if (requiredPathQueries == 0) {
+            SwarmPathBudgetRegistry.cancel(level, mob);
         }
         // No open candidate can be chosen if the entire detour is blocked.
         // Avoid an additional entity-index scan in that common wall case.
         // Otherwise one peer snapshot covers all candidates.
+        if (requiredPathQueries == 0) {
+            SwarmPathBudgetRegistry.cancel(level, mob);
+        }
         List<Vec2> congestionPeers = SwarmPathProbePolicy.requiredQueries(blockedCandidates, true) == 0
                 ? List.of()
                 : findCongestionPeers(level, self, candidatePoints);
@@ -536,6 +553,7 @@ public final class SwarmApproachGoal extends Goal {
                 );
 
         if (generated.isEmpty()) {
+            SwarmPathBudgetRegistry.cancel(level, mob);
             return new SwarmNavigationRecoveryPolicy.Recovery(destination, false);
         }
 
