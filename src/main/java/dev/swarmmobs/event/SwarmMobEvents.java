@@ -122,6 +122,7 @@ public final class SwarmMobEvents {
         TargetSelection selection = findTarget(level, mob, state, gameTick);
 
         if (selection == null) {
+            state.updateTacticalSquadTelemetry(0, 0);
             state.recordSearchFailure();
             state.forgetTarget();
             state.clearLocalPlan(movementNeighbors.size());
@@ -187,6 +188,13 @@ public final class SwarmMobEvents {
                 tacticalNeighbors.stream()
                         .map(peer -> SwarmAgentProfiles.profile(peer).archetype())
                         .toList()
+        );
+        state.updateTacticalSquadTelemetry(
+                tacticalNeighbors.size(),
+                (int) tacticalNeighbors.stream()
+                        .filter(peer -> SwarmAgentProfiles.profile(peer).archetype()
+                                == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER)
+                        .count()
         );
 
         SwarmAiActiveState.Snapshot activeStrategy =
