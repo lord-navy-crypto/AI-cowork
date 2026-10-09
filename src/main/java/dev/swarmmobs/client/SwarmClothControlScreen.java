@@ -234,6 +234,13 @@ public final class SwarmClothControlScreen {
                 "Optional colony construction (off by default).");
 
         toggle(category, entries, values,
+                "Physical nest shell construction",
+                "nestVisibleExpansionEnabled",
+                "nest_visible_expansion_toggle",
+                false,
+                "OFF by default: spend actual soil/timber supplies on visible small shell modules; requires mobGriefing, loaded natural ground and an unoccupied site. Never replaces existing blocks.");
+
+        toggle(category, entries, values,
                 "Colony resource intake and growth",
                 "nestLifecycleEnabled",
                 "nest_lifecycle_toggle",
@@ -282,6 +289,11 @@ public final class SwarmClothControlScreen {
                             + " / " + integer(values, "colonyScienceCapacity")
                             + " | occupancy " + decimal(values, "colonyScienceOccupancy")
                             + " | peak " + integer(values, "colonySciencePeak"));
+
+            status(category, entries,
+                    "Built shell levels: " + integer(values, "colonyScienceVisibleShellLevel")
+                            + " / " + integer(values, "colonyScienceChamberLevel")
+                            + " virtual room levels");
 
             status(category, entries,
                     "Chamber level: " + integer(values, "colonyScienceChamberLevel")
