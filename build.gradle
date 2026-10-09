@@ -124,7 +124,7 @@ def generateNestArtwork = tasks.register("generateNestArtwork") {
                             r = 166; g = 111; b = 212
                         }
                     }
-                    image.setRGB(x, y, 0xff000000 | (r << 16) | (g << 8) | b)
+                    image.setRGB(x, y, new java.awt.Color(r, g, b).getRGB())
                 }
             }
             javax.imageio.ImageIO.write(image, "png",
