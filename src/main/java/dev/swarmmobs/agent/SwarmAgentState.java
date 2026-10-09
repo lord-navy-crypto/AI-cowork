@@ -87,6 +87,7 @@ public final class SwarmAgentState {
     private long engineeringTasksCompleted;
     private long engineeringMaterialsGiven;
     private long engineeringMaterialsReceived;
+    private long nestsFounded;
 
     private SwarmTaskType currentTask = SwarmTaskType.RESERVE;
     private SwarmSpecialization specialization = SwarmSpecialization.RESERVE;
@@ -474,6 +475,14 @@ public final class SwarmAgentState {
 
     public long engineeringMaterialsReceived() {
         return engineeringMaterialsReceived;
+    }
+
+    public long nestsFounded() {
+        return nestsFounded;
+    }
+
+    public void recordNestFounded() {
+        nestsFounded++;
     }
 
     public boolean transferOneEngineeringBlockTo(
