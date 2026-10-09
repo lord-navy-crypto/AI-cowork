@@ -9,6 +9,7 @@ import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
 import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
+import dev.swarmmobs.algorithm.SwarmPathProbePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
@@ -354,16 +355,23 @@ public final class SwarmApproachGoal extends Goal {
         }
 
         double[] lateralScales = {0.75, -0.75, 1.50, -1.50};
-        if (SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
-                && !SwarmPathBudgetRegistry.reserve(level, mob, lateralScales.length)) {
-            // The complete candidate set was not measured. Do not publish
-            // optimistic feasibility or a false 'all paths blocked' signal.
+        List<Vec2> candidatePoints = new ArrayList<>(lateralScales.length);
+        boolean[] blockedCandidates = new boolean[lateralScales.length];
+        for (int i = 0; i < lateralScales.length; i++) {
+            Vec2 candidate = frontProbe.add(left.scale(lateralDistance * lateralScales[i]));
+            candidatePoints.add(candidate);
+            blockedCandidates[i] = isProbeBlocked(level, candidate.x(), candidate.z());
+        }
+        // A blocked candidate never calls createPath. Reserving all four slots
+        // wastes the shared per-tick budget and can starve viable candidates.
+        int requiredPathQueries = SwarmPathProbePolicy.requiredQueries(
+                blockedCandidates, SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
+        );
+        if (requiredPathQueries > 0
+                && !SwarmPathBudgetRegistry.reserve(level, mob, requiredPathQueries)) {
+            // Unknown evidence is neither a valid path nor a failed path.
             mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
             return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
-        }
-        List<Vec2> candidatePoints = new ArrayList<>(lateralScales.length);
-        for (double scale : lateralScales) {
-            candidatePoints.add(frontProbe.add(left.scale(lateralDistance * scale)));
         }
         // Sample once for all lateral candidates rather than re-querying nearby
         // entities for every score. The envelope includes the furthest candidate.
@@ -374,10 +382,10 @@ public final class SwarmApproachGoal extends Goal {
         int unreachableCount = 0;
         int pathQueries = 0;
 
-        for (double scale : lateralScales) {
-            double lateralOffset = lateralDistance * scale;
-            Vec2 candidate = frontProbe.add(left.scale(lateralOffset));
-            boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
+        for (int i = 0; i < lateralScales.length; i++) {
+            double lateralOffset = lateralDistance * lateralScales[i];
+            Vec2 candidate = candidatePoints.get(i);
+            boolean blocked = blockedCandidates[i];
             if (blocked) blockedCount++;
             double congestion = SwarmCongestionPolicy.countWithin(congestionPeers, candidate, congestionRadius);
 
@@ -527,26 +535,34 @@ public final class SwarmApproachGoal extends Goal {
         if (generated.isEmpty()) {
             return new SwarmNavigationRecoveryPolicy.Recovery(destination, false);
         }
-        if (SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
-                && !SwarmPathBudgetRegistry.reserve(level, mob, generated.size())) {
-            // null means deferred (not a failed recovery attempt). The caller
-            // leaves its progress sample intact and retries on a later tick.
-            mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
-            return null;
-        }
 
         List<Vec2> candidatePoints = generated.stream()
                 .map(SwarmRecoveryCandidatePolicy.RecoveryCandidate::waypoint)
                 .toList();
+        boolean[] blockedCandidates = new boolean[generated.size()];
+        for (int i = 0; i < candidatePoints.size(); i++) {
+            Vec2 point = candidatePoints.get(i);
+            blockedCandidates[i] = isProbeBlocked(level, point.x(), point.z());
+        }
+        int requiredPathQueries = SwarmPathProbePolicy.requiredQueries(
+                blockedCandidates, SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
+        );
+        if (requiredPathQueries > 0
+                && !SwarmPathBudgetRegistry.reserve(level, mob, requiredPathQueries)) {
+            // null means deferred, not a recovery failure or evidence verdict.
+            mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
+            return null;
+        }
         List<Vec2> congestionPeers = findCongestionPeers(level, self, candidatePoints);
         double congestionRadius = SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get();
         List<SwarmLocalPlannerPolicy.Candidate> candidates = new ArrayList<>();
         int blockedCount = 0;
         int unreachableCount = 0;
         int pathQueries = 0;
-        for (var recoveryCandidate : generated) {
-            Vec2 candidate = recoveryCandidate.waypoint();
-            boolean blocked = isProbeBlocked(level, candidate.x(), candidate.z());
+        for (int i = 0; i < generated.size(); i++) {
+            var recoveryCandidate = generated.get(i);
+            Vec2 candidate = candidatePoints.get(i);
+            boolean blocked = blockedCandidates[i];
             if (blocked) blockedCount++;
             double congestion = SwarmCongestionPolicy.countWithin(congestionPeers, candidate, congestionRadius);
 
