@@ -38,6 +38,7 @@ import dev.swarmmobs.debug.SwarmDebugParticles;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
+import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
@@ -45,6 +46,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Skeleton;
+import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
@@ -80,6 +82,10 @@ public final class SwarmMobEvents {
             mob.goalSelector.addGoal(0, new SwarmCreeperSwellGoal(creeper));
         } else if (mob instanceof Zombie zombie) {
             mob.goalSelector.addGoal(0, new SwarmZombieEngineerGoal(zombie));
+        } else if (mob instanceof Spider spider) {
+            // A sensor-only action with no MOVE/LOOK flags. Vanilla and
+            // swarm tactical navigation retain control of the scout.
+            mob.goalSelector.addGoal(2, new SwarmSpiderColonyScoutGoal(spider));
         }
 
         mob.goalSelector.addGoal(1, new SwarmApproachGoal(mob));
