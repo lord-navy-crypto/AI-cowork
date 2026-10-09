@@ -50,8 +50,9 @@ Capacity is 128 points. Partial fractional items are not consumed: if
 remaining capacity is 2 and an item is worth 4, no part of that item is
 accepted. Accepted stacks shrink by the exact whole-item count.
 **No free material creation, automatic terrain strip-mining or animal
-hunting has been implemented.** Manual item delivery currently works; a
-physical worker-hauling goal is a later increment.
+hunting has been implemented.** Physical dropped-item hauling is implemented
+as a separate, opt-in Zombie Goal; a roaming Spider may also report drops
+to its loaded home core.
 
 ### Capped colony production
 
@@ -75,9 +76,10 @@ leader marks prevent repeated appointments just because one walks away.
 
 A separate pure policy models flexible idle task **biases**:
 Zombie = worker, Skeleton = guard, Spider = scout, Creeper = reserve.
-Only the Zombie construction job is implemented; guard patrols,
-resource-hauling trips, scout discoveries, and breeding chambers are
-planned, not yet implemented.
+Zombie construction and real-item hauling are implemented, and Spider
+resource-drop sightings now feed an opt-in, transient job board. Guard
+patrols, autonomous block harvesting and full breeding chambers remain
+outside this increment.
 
 ## Developer and player precautions
 
@@ -94,12 +96,16 @@ planned, not yet implemented.
 
 ## Next roadmap
 
-1. End-to-end mob production and NBT persistence runtime checks.
-2. Worker-hauling tasks with real cargo, cooldowns and rollback on failure.
-3. Local nest maintenance and room-module building that **spends** stored
-   material and respects protected world areas; never infinite excavation.
-4. Distance-weighted scout/guard tasks and environmental pheromone TTL.
-5. Clear operator readout for inventory, named regents and local population.
+1. Dedicated multi-minute **natural pathfinding** tests for distant reports
+   and returns with real ground/collision geometry (existing delivery tests
+   reposition workers to isolate pickup and exact accounting).
+2. Safe, separately opt-in resource generation/harvesting after deciding how
+   to protect player-built dirt/logs and third-party land claims.
+3. Add operator telemetry for active scout leads, rejected routes and stock
+   shortage decisions without increasing per-tick scan costs.
+4. Benchmark 10/50/100/200 monster MSPT/TPS and real multiplayer logistics.
+5. Expand construction decisions to consider stock shortages, safe sites,
+   capacity pressure and competing colonies.
 
 ## Colony Science Lab — measurable ant/bee-inspired model
 
@@ -309,3 +315,40 @@ The worker's home dimension key is also stored as ordinary persistent NBT.
 This is a first logistics prototype; multiplayer item ownership, third-party
 claim permissions and long-run 100+ worker navigation MSPT require further
 manual validation before enabling default automation.
+
+## Remote Spider → Zombie resource dispatch (opt-in)
+
+Spiders keep ordinary movement/combat AI. Every 160+ ticks, an idle Spider
+assigned to a **loaded** Nest Core may inspect a bounded local area for
+existing drops and report up to eight eligible items. Sightings are limited
+to 28 blocks from the home core. The core maintains a **transient pure-Java
+scout board** with at most eight (item UUID, position, material category,
+observation tick) tuples. It is **not** an inventory and is deliberately
+not persisted: reloading a world clears sightings, not physical items.
+
+One Zombie at a time may reserve a lead, with an expiring ownership lease.
+The worker can follow a lead outside its own normal drop-search radius,
+subject to the ordinary home-distance limit and the per-dimension move
+budget. It does not consume a remotely reported item: on arrival it must
+resolve the **same living ItemEntity UUID**, check player proximity,
+material category, stack size and current core capacity, and then take
+the ordinary physical item lease before returning home. A vanished item
+causes the hint to be discarded. Expiration, unreachable paths, invalid
+homes and interruptions safely end or release the task without granting
+resources. Nearby directly claimed items invalidate redundant remote leads.
+
+The dispatcher now filters reports against current whole-item point
+capacity, then scores eligible drops by distance and actual construction or
+nutrition shortages. This preference is a game-model heuristic, not a
+biological measurement. No global item scan, forced chunk load or
+out-of-range teleport is used.
+
+**Verification status:** The 55 required Runtime GameTests passed in CI
+#570 for the initial remote-dispatch handoff, including a fixture that
+repositions a worker between pickup and dock to verify resource conservation.
+The later shortage-ranked dispatcher and Spider-to-board publication checks
+must also pass their subsequent CI run before being called verified.
+**A multi-minute, fully autonomous long-distance path-following test is
+still pending.** Block harvesting, woodcutting and animal hunting remain
+unimplemented; adding them must be explicit opt-in and avoid damaging
+player structures or bypassing claim protections.
