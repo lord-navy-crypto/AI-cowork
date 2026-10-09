@@ -32,10 +32,10 @@ class SwarmPathQueryBudgetTest {
         var budget = new SwarmPathQueryBudget();
         assertTrue(budget.tryReserve(A, 10, 6, 8));
         assertFalse(budget.tryReserve(B, 10, 4, 8));
-        assertFalse(budget.tryReserve(C, 11, 4, 8));
-        assertEquals(2, budget.snapshot(11, 8).waiters());
-        assertTrue(budget.tryReserve(B, 11, 4, 8));
+        // C can spend only the tokens not reserved for older waiter B.
         assertTrue(budget.tryReserve(C, 11, 4, 8));
+        assertEquals(1, budget.snapshot(11, 8).waiters());
+        assertTrue(budget.tryReserve(B, 11, 4, 8));
         assertEquals(8, budget.snapshot(11, 8).reservedTokens());
     }
 
@@ -79,6 +79,27 @@ class SwarmPathQueryBudgetTest {
         assertFalse(budget.tryReserve(B, 4, 4, 6));
         assertEquals(0, budget.snapshot(5, 6).reservedTokens());
         assertTrue(budget.tryReserve(B, 5, 4, 6));
+    }
+
+    @Test
+    void oldWaitingEpisodeCannotBeStarvedByLargeNewRequest() {
+        var budget = new SwarmPathQueryBudget();
+        assertTrue(budget.tryReserve(A, 0, 6, 8));
+        assertFalse(budget.tryReserve(B, 0, 6, 8));
+        assertFalse(budget.tryReserve(C, 1, 4, 8));
+        assertTrue(budget.tryReserve(B, 1, 6, 8));
+        assertTrue(budget.tryReserve(C, 2, 4, 8));
+    }
+
+    @Test
+    void absentHeadDoesNotIdleTheEntireTick() {
+        var budget = new SwarmPathQueryBudget();
+        assertTrue(budget.tryReserve(A, 0, 6, 8));
+        assertFalse(budget.tryReserve(B, 0, 6, 8));
+        // B does not request on tick 1, but the unprotected remainder is usable.
+        assertTrue(budget.tryReserve(C, 1, 2, 8));
+        assertEquals(2, budget.snapshot(1, 8).reservedTokens());
+        assertEquals(1, budget.snapshot(1, 8).waiters());
     }
 
     @Test
