@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class SwarmAgentState {
@@ -20,6 +21,8 @@ public final class SwarmAgentState {
     private long nextPlanTick;
     private boolean planningScheduleInitialized;
     private boolean directObservation;
+    // Hysteresis and temporary work leases must not cross target boundaries.
+    private UUID tacticalAssignmentTarget;
     private int tacticalPeerCount;
     private int tacticalBreacherCount;
     private int neighborCount;
@@ -102,6 +105,34 @@ public final class SwarmAgentState {
     public UUID targetId() {
         return targetObservation == null ? null : targetObservation.targetId();
     }
+
+    public UUID tacticalAssignmentTarget() {
+        return tacticalAssignmentTarget;
+    }
+
+    /**
+     * Bind tactical hysteresis to the selected target (not the latest message
+     * source). A new target is a new squad: stale slots/roles/specialization
+     * must not hold for 12-30 ticks before the new squad can coordinate.
+     * Task experience and cumulative counters deliberately survive switches.
+     */
+    public boolean bindTacticalTarget(UUID selectedTarget) {
+        if (Objects.equals(tacticalAssignmentTarget, selectedTarget)) {
+            return false;
+        }
+        tacticalAssignmentTarget = selectedTarget;
+
+        formationSlotInitialized = false;
+        pendingFormationSlot = -1;
+        pendingFormationSlotSinceTick = Long.MIN_VALUE;
+        roleInitialized = false;
+        pendingRole = null;
+        pendingRoleSinceTick = Long.MIN_VALUE;
+        resetActiveSpecialization();
+        updateTacticalSquadTelemetry(0, 0);
+        return true;
+    }
+
 
     public long lastTargetObservationTick() {
         return targetObservation == null ? Long.MIN_VALUE : targetObservation.observationTick();
