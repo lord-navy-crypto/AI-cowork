@@ -2435,8 +2435,11 @@ public final class SwarmRuntimeGameTests {
     private static TestPlayerHandle createTickingTestPlayer(GameTestHelper helper, GameType gameType) {
         var level = helper.getLevel();
         var server = level.getServer();
+        // Multiple fake players must have different names to avoid player
+        // session replacement. Minecraft usernames are at most 16 characters.
+        UUID testPlayerId = UUID.randomUUID();
         CommonListenerCookie cookie = CommonListenerCookie.createInitial(
-                new GameProfile(UUID.randomUUID(), "swarm-test-player"),
+                new GameProfile(testPlayerId, "swarm-" + testPlayerId.toString().substring(0, 8)),
                 false
         );
 
