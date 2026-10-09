@@ -18,6 +18,8 @@ import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.registry.SwarmNestBlocks;
+import dev.swarmmobs.colony.SwarmNestBlockEntity;
+import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
 import net.minecraft.core.BlockPos;
@@ -3974,6 +3976,41 @@ public final class SwarmRuntimeGameTests {
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(beforeMobGriefing, helper.getLevel().getServer());
         }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_resource_accounting",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
+    public static void colonyNestResourceStorageIsFiniteAndRequiresRealMaterial(GameTestHelper helper) {
+        BlockPos localCore = new BlockPos(2, 1, 2);
+        helper.setBlock(localCore, SwarmNestBlocks.NEST_CORE.get());
+        var core = helper.getLevel().getBlockEntity(helper.absolutePos(localCore));
+        if (!(core instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Nest Core block has no persistent colony block entity");
+            return;
+        }
+
+        if (nest.resources() != 0 || nest.births() != 0) {
+            helper.fail("New colony core unexpectedly started with free resources");
+            return;
+        }
+
+        int acceptedLogs = nest.deposit(SwarmNestColonyPolicy.Kind.TIMBER, 2);
+        int acceptedFood = nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 1);
+        int rejected = nest.deposit(SwarmNestColonyPolicy.Kind.NONE, 100);
+        if (acceptedLogs != 2 || acceptedFood != 1 || rejected != 0
+                || nest.resources() != 10) {
+            helper.fail("Nest storage did not conserve deposited material");
+            return;
+        }
+
+        int acceptedExtra = nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 1000);
+        if (acceptedExtra != 29
+                || nest.resources() != SwarmNestColonyPolicy.MAX_STORED_RESOURCES) {
+            helper.fail("Nest resources exceeded their fixed storage capacity");
+            return;
+        }
+        helper.succeed();
     }
 
 }
