@@ -4261,9 +4261,9 @@ public final class SwarmRuntimeGameTests {
             nest.runColonyCycle(helper.getLevel());
             if (nest.chamberLevel() != 1 || nest.visibleChamberLevel() != 1
                     || nest.effectiveCapacity() != 8 || nest.resources() != 0
-                    || !helper.getLevel().getBlockState(helper.absolutePos(soilPos)).is(Blocks.MUD_BRICKS)
-                    || !helper.getLevel().getBlockState(helper.absolutePos(timberPos)).is(Blocks.STRIPPED_OAK_LOG)) {
-                helper.fail("Safe nest shell failed to place physical mud-brick/wood modules"
+                    || !helper.getLevel().getBlockState(helper.absolutePos(soilPos)).is(Blocks.DIRT)
+                    || !helper.getLevel().getBlockState(helper.absolutePos(timberPos)).is(Blocks.OAK_LOG)) {
+                helper.fail("Safe nest shell failed to place raw dirt / oak-log modules"
                         + " chambers=" + nest.chamberLevel()
                         + " visual=" + nest.visibleChamberLevel()
                         + " reserve=" + nest.resources());
