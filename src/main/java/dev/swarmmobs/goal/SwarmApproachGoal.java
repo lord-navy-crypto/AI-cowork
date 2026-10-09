@@ -8,6 +8,7 @@ import dev.swarmmobs.agent.SwarmBehaviorMode;
 import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
+import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
 import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
@@ -311,6 +312,13 @@ public final class SwarmApproachGoal extends Goal {
         }
 
         double[] lateralScales = {0.75, -0.75, 1.50, -1.50};
+        if (SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
+                && !SwarmPathBudgetRegistry.reserve(level, mob, lateralScales.length)) {
+            // The complete candidate set was not measured. Do not publish
+            // optimistic feasibility or a false 'all paths blocked' signal.
+            mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
+            return new SwarmObstacleAvoidancePolicy.Avoidance(destination, false, 0);
+        }
         List<Vec2> candidatePoints = new ArrayList<>(lateralScales.length);
         for (double scale : lateralScales) {
             candidatePoints.add(frontProbe.add(left.scale(lateralDistance * scale)));
@@ -477,6 +485,13 @@ public final class SwarmApproachGoal extends Goal {
         if (generated.isEmpty()) {
             return new SwarmNavigationRecoveryPolicy.Recovery(destination, false);
         }
+        if (SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()
+                && !SwarmPathBudgetRegistry.reserve(level, mob, generated.size())) {
+            // null means deferred (not a failed recovery attempt). The caller
+            // leaves its progress sample intact and retries on a later tick.
+            mob.getData(SwarmAttachments.AGENT_STATE.get()).clearPlannerTelemetry();
+            return null;
+        }
 
         List<Vec2> candidatePoints = generated.stream()
                 .map(SwarmRecoveryCandidatePolicy.RecoveryCandidate::waypoint)
@@ -605,6 +620,10 @@ public final class SwarmApproachGoal extends Goal {
                     new Vec2(mob.getX(), mob.getZ()),
                     new Vec2(state.destinationX(), state.destinationZ())
             );
+            if (recovery == null) {
+                // Budget deferral is not an unreachable path or a failed plan.
+                return;
+            }
             state.recordRecoveryPlanning(recovery.active());
 
             if (recovery.active()) {
