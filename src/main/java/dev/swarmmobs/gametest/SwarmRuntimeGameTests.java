@@ -3845,9 +3845,10 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
-            // Move B out of direct perception. All three now see A, so their
-            // next planning cycles should form one target-scoped mixed squad.
-            playerB.setPos(bPos.x + 80.0, bPos.y, bPos.z + 80.0);
+            // B becomes ineligible without teleporting outside the loaded
+            // GameTest region. All three now choose the remaining valid A,
+            // so next planning cycles should form one mixed tactical squad.
+            playerB.gameMode.changeGameModeForPlayer(GameType.SPECTATOR);
         });
 
         helper.runAfterDelay(58, () -> {
