@@ -227,6 +227,36 @@ public final class SwarmClothControlScreen {
             Map<String, String> values
     ) {
         toggle(category, entries, values,
+                "Colony nest construction",
+                "nestEnabled",
+                "nest_toggle",
+                false,
+                "Optional colony construction (off by default).");
+
+        intField(category, entries, values,
+                "Nest survey interval (ticks)",
+                "nestBuildInterval",
+                "nest_interval_delta",
+                200,
+                "Controls idle site survey frequency.");
+
+        intField(category, entries, values,
+                "Minimum local colony size",
+                "nestMinPopulation",
+                "nest_population_delta",
+                3,
+                "Required local agent count.");
+
+        status(category, entries,
+                "Nest cores founded by currently loaded agents: "
+                        + integer(values, "nestCoresFoundedByLoadedAgents"));
+
+        action(category, entries,
+                "Restore colony defaults",
+                "nest_baseline",
+                "Reset colony construction settings.");
+
+        toggle(category, entries, values,
                 "Dynamic division of labor",
                 "divisionEnabled",
                 "toggle_division",
