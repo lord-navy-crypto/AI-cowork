@@ -383,7 +383,12 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                         || supporting.is(Blocks.MUD)
                         || supporting.is(Blocks.STONE)
                 : supporting.is(Blocks.DIRT)
-                        || supporting.is(Blocks.OAK_LOG);
+                        || supporting.is(Blocks.OAK_LOG)
+                        // Existing test worlds may already have legacy shells
+                        // made from mud bricks / stripped oak. Keep them valid
+                        // as SUPPORTS, but never construct new crafted blocks.
+                        || supporting.is(Blocks.MUD_BRICKS)
+                        || supporting.is(Blocks.STRIPPED_OAK_LOG);
         if (!validFoundation
                 || !supporting.isFaceSturdy(level, pos.below(), Direction.UP)) {
             return false;
