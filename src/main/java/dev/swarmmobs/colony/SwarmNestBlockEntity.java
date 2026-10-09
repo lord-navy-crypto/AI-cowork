@@ -457,12 +457,15 @@ public final class SwarmNestBlockEntity extends BlockEntity {
 
     private void enrollNearbyWorkers(ServerLevel level, List<PathfinderMob> members) {
         // Colony residence is persistent entity NBT; no central hive search
-        // and no new chunk tickets. Existing valid homes must not be stolen
-        // by a second core, but a demolished LOADED home can be replaced.
+        // and no new chunk tickets. Idle Spider scouts share the same home
+        // convention as Zombie carriers. Existing valid homes must not be
+        // stolen by a second core, but a demolished LOADED home can be replaced.
         String dimension = level.dimension().location().toString();
         for (PathfinderMob member : members) {
-            if (!(member instanceof Zombie) || member.isNoAi()
-                    || member.getTarget() != null) continue;
+            if (!(member instanceof Zombie) && member.getType() != EntityType.SPIDER) {
+                continue;
+            }
+            if (member.isNoAi() || member.getTarget() != null) continue;
             var data = member.getPersistentData();
             if (data.contains("SwarmColonyNest")) {
                 boolean wrongDimension = data.contains("SwarmColonyDimension")
