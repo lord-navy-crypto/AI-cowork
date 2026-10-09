@@ -212,6 +212,22 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
             }
 
+            case "nest_toggle" ->
+                    SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(!SwarmConfig.NEST_CONSTRUCTION_ENABLED.get());
+            case "nest_interval_delta" -> SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set((int) clamp(
+                    SwarmConfig.NEST_BUILD_INTERVAL_TICKS.get() + value,
+                    100.0, 1200.0
+            ));
+            case "nest_population_delta" -> SwarmConfig.NEST_MIN_GROUP_SIZE.set((int) clamp(
+                    SwarmConfig.NEST_MIN_GROUP_SIZE.get() + value,
+                    2.0, 16.0
+            ));
+            case "nest_baseline" -> {
+                SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
+                SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
+                SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
+            }
+
             case "ai_active_toggle" -> {
                 boolean next = !SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.get();
                 SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(next);
@@ -401,6 +417,9 @@ public final class SwarmControlNetwork {
             }
 
             case "baseline_all" -> {
+                SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
+                SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
+                SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
                 SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
                 SwarmConfig.ENABLED.set(true);
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
@@ -495,6 +514,7 @@ public final class SwarmControlNetwork {
         int tacticalAgentsWithAllies = 0;
         int tacticalPeerLinks = 0;
         int agentsWithTacticalBreacher = 0;
+        long nestsFoundedByLoadedAgents = 0L;
         EnumMap<SwarmTaskType, Integer> taskCounts = new EnumMap<>(SwarmTaskType.class);
         EnumMap<SwarmSpecialization, Integer> specializationCounts =
                 new EnumMap<>(SwarmSpecialization.class);
@@ -512,6 +532,11 @@ public final class SwarmControlNetwork {
                 spiders++;
             } else if (mob.getType() == EntityType.CREEPER) {
                 creepers++;
+            }
+
+            if (masterEnabled) {
+                nestsFoundedByLoadedAgents +=
+                        mob.getData(SwarmAttachments.AGENT_STATE.get()).nestsFounded();
             }
 
             if (masterEnabled) {
@@ -562,6 +587,11 @@ public final class SwarmControlNetwork {
                 pair("liveSkeletons", skeletons),
                 pair("liveSpiders", spiders),
                 pair("liveCreepers", creepers),
+                pair("nestEnabled", SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()),
+                pair("nestBuildInterval", SwarmConfig.NEST_BUILD_INTERVAL_TICKS.get()),
+                pair("nestMinPopulation", SwarmConfig.NEST_MIN_GROUP_SIZE.get()),
+                pair("nestCoresFoundedByLoadedAgents",
+                        (int) Math.min(Integer.MAX_VALUE, nestsFoundedByLoadedAgents)),
                 pair("liveTacticalAlliedAgents", tacticalAgentsWithAllies),
                 pair("liveTacticalPeerLinks", tacticalPeerLinks),
                 pair("liveTacticalBreacherSupport", agentsWithTacticalBreacher),
