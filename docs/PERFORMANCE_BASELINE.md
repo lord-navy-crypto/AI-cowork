@@ -112,3 +112,26 @@ that it does not delay reactive steering or trapped-mob recovery.
 The queue cancellation protects other mobs' reserved capacity; it is not a
 Minecraft vanilla-pathfinding rate limit. If no existing path is active, the
 agent can stay still until quota becomes available on a subsequent tick.
+
+## Target-scoped tactical coordination
+
+Physical neighbors are not automatically tactical teammates when multiple
+players are present. We now split the local peer set:
+
+- **Physical neighbors**: all supported nearby peers continue to participate
+  in collision-aware steering (separation, cohesion and alignment).
+- **Communication neighbors**: all in-range peers may still relay observations,
+  with existing latency/dropout/sensing rules unchanged.
+- **Tactical squad**: only peers whose current remembered target UUID matches
+  this agent's selected target UUID influence capability-based formation slots,
+  composition/breacher standoff, fire-support lane selection, role/task
+  saturation, and same-capability search sector counts.
+
+Null target UUIDs never form squads. This avoids a Skeleton shifting its
+support lane due to a nearby Creeper attacking a *different* player. It also
+keeps role assignments from another player's unrelated fight from crowding
+the squad's allocation.
+
+This does **not** prevent target observations from moving between local
+agents: the ordinary message pipeline may still cause a mob to switch
+targets, at which point it joins the new target's local tactical squad.
