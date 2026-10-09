@@ -50,3 +50,23 @@ not frame-time, MSPT, or load scaling.
 Measure path creation cost before imposing new per-tick budgets. Global budgets
 must be fair between mobs, avoid path-starvation, and preserve combat/engineering
 fallback. Never run live world/pathfinding access off the server thread.
+
+## Path evidence budget (next v0.13 increment)
+
+- The server-level option `navPathEvidenceBudgetPerTick` defaults to 96
+  **reserved candidate slots per dimension per game tick** (8..512).
+- Obstacle avoidance reserves up to four evidence queries atomically; recovery
+  reserves up to six. A blocked candidate consumes a reserved slot but does
+  not execute an expensive `createPath`, so reserved tokens are an upper bound
+  on explicit evidence queries rather than a direct CPU time measurement.
+- When an episode cannot reserve its full candidate set, the whole episode is
+  deferred. It does not assert false feasibility, inflate recovery failure
+  metrics, or execute an unbounded partial set.
+- FIFO waiting priority prevents newly arriving agents from indefinitely
+  bypassing already deferred agents. Inactive waiter entries expire.
+- The Cloth Navigation tab displays this tick's reservations, queue length,
+  and lifetime grant/deferral counters; the existing experiment Path Queries
+  field still tracks actual explicit evidence calls.
+- This quota does **not** cover vanilla path work initiated by
+  `PathNavigation.moveTo` or other Minecraft AI goals. Those require
+  separate profiling before attempting to throttle them.
