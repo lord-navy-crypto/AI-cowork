@@ -63,6 +63,10 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS;
     public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN;
 
+    // New idle colony construction is opt-in to protect existing player worlds.
+    public static final ModConfigSpec.BooleanValue NEST_CONSTRUCTION_ENABLED;
+    public static final ModConfigSpec.IntValue NEST_BUILD_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue NEST_MIN_GROUP_SIZE;
     public static final ModConfigSpec.BooleanValue DIVISION_OF_LABOR_ENABLED;
     public static final ModConfigSpec.IntValue SPECIALIZATION_MIN_HOLD_TICKS;
     public static final ModConfigSpec.DoubleValue SPECIALIZATION_EXPERIENCE_GAIN;
@@ -316,6 +320,22 @@ public final class SwarmConfig {
         ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN = BUILDER
                 .comment("Maximum consecutive unsupported blocks a local Zombie team may commit to bridging.")
                 .defineInRange("zombieEngineeringMaxBridgeSpan", 4, 1, 8);
+
+        BUILDER.pop();
+
+        BUILDER.push("colonies");
+
+        NEST_CONSTRUCTION_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: allow idle Zombie workers to place a persistent Nest Core on suitable natural soil; OFF by default to protect player worlds.")
+                .define("nestConstructionEnabled", false);
+
+        NEST_BUILD_INTERVAL_TICKS = BUILDER
+                .comment("Minimum interval between idle nest-building site surveys for each worker (game ticks).")
+                .defineInRange("nestBuildIntervalTicks", 200, 100, 1200);
+
+        NEST_MIN_GROUP_SIZE = BUILDER
+                .comment("Minimum local supported swarm mobs, including builder, required to found a nest.")
+                .defineInRange("nestMinGroupSize", 3, 2, 16);
 
         BUILDER.pop();
 
