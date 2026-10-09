@@ -24,6 +24,7 @@ public final class SwarmPathQueryBudget {
 
     private long currentTick = Long.MIN_VALUE;
     private int remainingTokens;
+    private int usedTokens;
     private int tokenLimit;
     private long granted;
     private long deferred;
@@ -60,6 +61,7 @@ public final class SwarmPathQueryBudget {
         }
 
         remainingTokens -= requestedTokens;
+        usedTokens += requestedTokens;
         waiting.remove(requester);
         granted++;
         return true;
@@ -67,7 +69,7 @@ public final class SwarmPathQueryBudget {
 
     public Snapshot snapshot(long tick, int maxTokensPerTick) {
         refresh(tick, maxTokensPerTick);
-        return new Snapshot(tokenLimit, tokenLimit - remainingTokens, waiting.size(), granted, deferred);
+        return new Snapshot(tokenLimit, usedTokens, waiting.size(), granted, deferred);
     }
 
     private void refresh(long tick, int maxTokensPerTick) {
@@ -75,6 +77,7 @@ public final class SwarmPathQueryBudget {
         if (tick != currentTick) {
             currentTick = tick;
             remainingTokens = cap;
+            usedTokens = 0;
             tokenLimit = cap;
             Iterator<Map.Entry<UUID, WaitingRequest>> iterator = waiting.entrySet().iterator();
             while (iterator.hasNext()) {
@@ -85,9 +88,8 @@ public final class SwarmPathQueryBudget {
             }
         } else if (cap != tokenLimit) {
             // Mid-tick config changes must not give back spent tokens.
-            int used = tokenLimit - remainingTokens;
             tokenLimit = cap;
-            remainingTokens = Math.max(0, cap - used);
+            remainingTokens = Math.max(0, cap - usedTokens);
         }
     }
 }
