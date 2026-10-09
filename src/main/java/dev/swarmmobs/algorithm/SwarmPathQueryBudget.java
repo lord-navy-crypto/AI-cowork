@@ -10,22 +10,24 @@ import java.util.UUID;
  *
  * Reservations are atomic per local planning episode: a denied request must
  * defer the entire episode, never treat unmeasured paths as reachable or
- * unreachable. The FIFO waitlist makes later requests yield to previously
- * deferred, still-active agents. Minecraft world access stays on the server
- * thread; this class does not run pathfinding asynchronously.
+ * unreachable. The waiting queue protects the oldest request's required
+ * tokens while allowing other agents to use spare capacity in the same tick.
+ * All calls happen on the Minecraft logical server thread.
  */
 public final class SwarmPathQueryBudget {
-    private static final long WAITING_TIMEOUT_TICKS = 120L;
+    private static final long WAITING_TIMEOUT_TICKS = 40L;
 
     public record Snapshot(int tokenLimit, int reservedTokens, int waiters,
                            long reservationsGranted, long reservationsDeferred) {}
+
+    private record WaitingRequest(long lastRequestTick, int requiredTokens) {}
 
     private long currentTick = Long.MIN_VALUE;
     private int remainingTokens;
     private int tokenLimit;
     private long granted;
     private long deferred;
-    private final LinkedHashMap<UUID, Long> waiting = new LinkedHashMap<>();
+    private final LinkedHashMap<UUID, WaitingRequest> waiting = new LinkedHashMap<>();
 
     public boolean tryReserve(UUID requester, long tick, int requestedTokens, int maxTokensPerTick) {
         if (requester == null || requestedTokens < 0 || maxTokensPerTick < 0) {
@@ -37,23 +39,22 @@ public final class SwarmPathQueryBudget {
             return true;
         }
         if (requestedTokens > tokenLimit) {
-            // Configuration should always admit our largest planning episode.
-            // Do not enqueue a request that can never be granted.
+            // Reject reservations that cannot ever fit without filling the FIFO
+            // with an impossible head request.
             deferred++;
             return false;
         }
 
-        // Once a request is deferred, subsequent new arrivals must not jump
-        // the queue. Stale head entries expire when they stop requesting.
-        UUID head = waiting.isEmpty() ? null : waiting.keySet().iterator().next();
-        if (head != null && !head.equals(requester)) {
-            waiting.put(requester, tick);
-            deferred++;
-            return false;
-        }
-
-        if (remainingTokens < requestedTokens) {
-            waiting.put(requester, tick);
+        // Reserve the oldest waiting agent's full cost, even if that agent's
+        // GoalSelector happens to tick later. Remaining tokens may still be
+        // used by other mobs so a temporarily absent head cannot stall a tick.
+        Map.Entry<UUID, WaitingRequest> first = waiting.isEmpty()
+                ? null : waiting.entrySet().iterator().next();
+        int protectedTokens = first != null && !first.getKey().equals(requester)
+                ? first.getValue().requiredTokens()
+                : 0;
+        if (remainingTokens < requestedTokens + protectedTokens) {
+            waiting.put(requester, new WaitingRequest(tick, requestedTokens));
             deferred++;
             return false;
         }
@@ -75,16 +76,15 @@ public final class SwarmPathQueryBudget {
             currentTick = tick;
             remainingTokens = cap;
             tokenLimit = cap;
-            Iterator<Map.Entry<UUID, Long>> iterator = waiting.entrySet().iterator();
+            Iterator<Map.Entry<UUID, WaitingRequest>> iterator = waiting.entrySet().iterator();
             while (iterator.hasNext()) {
-                long lastRequestTick = iterator.next().getValue();
+                long lastRequestTick = iterator.next().getValue().lastRequestTick();
                 if (tick < lastRequestTick || tick - lastRequestTick > WAITING_TIMEOUT_TICKS) {
                     iterator.remove();
                 }
             }
         } else if (cap != tokenLimit) {
-            // If an operator changes the limit mid-tick, do not restore tokens
-            // already spent earlier in this tick.
+            // Mid-tick config changes must not give back spent tokens.
             int used = tokenLimit - remainingTokens;
             tokenLimit = cap;
             remainingTokens = Math.max(0, cap - used);
