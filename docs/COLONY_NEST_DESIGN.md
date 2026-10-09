@@ -177,7 +177,8 @@ mechanic below is **not** a biologically calibrated reconstruction.
 When `nestVisibleExpansionEnabled=true`, the core attempts to express
 each newly completed abstract chamber as a pair of **actual world blocks**:
 
-- One mud-brick soil masonry element and one stripped-oak timber support.
+- One directly placeable dirt block and one unstripped oak-log support: neither
+  block requires a Zombie to craft mud bricks, planks, or strip bark.
 - Positions are deterministic within a two-block-radius footprint.
   Up to four chambers fill eight positions at ground level; subsequent
   chambers place supported upper-tier pieces (14 maximum pieces).
@@ -214,3 +215,25 @@ We explicitly separate the current measured engineering ratios (game design)
 from ant/honeybee experimental biology. A future 'forager' should physically
 collect item drops in loaded chunks and deliver them, with no duplicate
 item creation or forced animal hunting/excavation.
+
+## Raw-logs/no-crafting correction
+
+A Zombie's current capabilities must not imply access to the player's 2x2/3x3
+crafting grid. The nest accepts actual item-tagged logs (`ItemTags.LOGS`);
+logs count as 3 timber points per log. The visible structural supports now
+place ordinary `minecraft:oak_log`, not `stripped_oak_log`, and the soil
+member is ordinary `minecraft:dirt`, not crafted mud bricks.
+
+Existing chamber costs are unchanged: eight soil points plus six timber points
+(two actual log-item equivalents) finance a four-capacity chamber and its
+visible compact two-block representation. The consumed resources also stand
+for implicit foundation/building costs; it is not a one-block-for-one-item
+world blueprint. Wood species are pooled into a generic timber resource, so
+the new raw-log support visually defaults to oak even if supplied with
+another log species. A future material-provenance system can make these
+exact-species supports without silently changing stored legacy inventories.
+
+Important distinction: the nest already **absorbs nearby dropped log items**
+but Zombies are not yet implemented as reliable log collectors with
+transport and delivery. A future worker task can implement all three
+steps and produce telemetry, without granting them a hidden crafting API.
