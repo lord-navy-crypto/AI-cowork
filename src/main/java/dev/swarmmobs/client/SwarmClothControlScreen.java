@@ -550,6 +550,13 @@ public final class SwarmClothControlScreen {
                         + "  deferred " + integer(values, "pathBudgetDeferred")
                         + " (a deferred episode is not a failed path).");
 
+        status(category, entries,
+                "Navigation commands: issued " + integer(values, "metricNavCommandsIssued")
+                        + "  skipped " + integer(values, "metricNavCommandsSkipped"));
+        status(category, entries,
+                "Navigation retries after completion: " + integer(values, "metricNavRetries")
+                        + "  periodic active refreshes: " + integer(values, "metricNavRefreshes"));
+
         action(category, entries,
                 "Restore navigation baseline",
                 "nav_baseline",
