@@ -4599,8 +4599,11 @@ public final class SwarmRuntimeGameTests {
                 helper.fail("Worker did not reserve remote scout report");
                 return;
             }
+            var currentPos = worker.blockPosition();
             if (nest.scoutBoard().reserve(UUID.randomUUID(),
-                    worker.blockPosition(), helper.getLevel().getGameTime(), 28) != null) {
+                    new dev.swarmmobs.colony.SwarmNestScoutBoard.Position(
+                            currentPos.getX(), currentPos.getY(), currentPos.getZ()),
+                    helper.getLevel().getGameTime(), 28) != null) {
                 helper.fail("Two workers reserved the same remote item lead");
                 goal.stop();
                 return;
