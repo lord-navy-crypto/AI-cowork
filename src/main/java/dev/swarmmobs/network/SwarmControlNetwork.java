@@ -16,6 +16,7 @@ import java.util.EnumMap;
 import dev.swarmmobs.ai.SwarmAiShadowService;
 import dev.swarmmobs.ai.SwarmAiShadowState;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.colony.SwarmNestScienceTelemetry;
 import dev.swarmmobs.experiment.SwarmExperimentManager;
 import dev.swarmmobs.experiment.SwarmExperimentMetrics;
 import dev.swarmmobs.experiment.SwarmExperimentPreset;
@@ -212,6 +213,17 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
             }
 
+            case "nest_adaptive_toggle" ->
+                    SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(!SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.get());
+            case "nest_worker_share_delta" -> SwarmConfig.NEST_WORKER_TARGET_SHARE.set(clamp(
+                    SwarmConfig.NEST_WORKER_TARGET_SHARE.get() + value, 0.15, 0.65
+            ));
+            case "nest_guard_share_delta" -> SwarmConfig.NEST_GUARD_TARGET_SHARE.set(clamp(
+                    SwarmConfig.NEST_GUARD_TARGET_SHARE.get() + value, 0.10, 0.50
+            ));
+            case "nest_response_threshold_delta" -> SwarmConfig.NEST_RESPONSE_THRESHOLD.set(clamp(
+                    SwarmConfig.NEST_RESPONSE_THRESHOLD.get() + value, 0.10, 3.0
+            ));
             case "nest_lifecycle_toggle" ->
                     SwarmConfig.NEST_LIFECYCLE_ENABLED.set(!SwarmConfig.NEST_LIFECYCLE_ENABLED.get());
             case "nest_max_population_delta" -> SwarmConfig.NEST_MAX_POPULATION.set((int) clamp(
@@ -231,6 +243,10 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
                 SwarmConfig.NEST_MAX_POPULATION.set(12);
+                SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
+                SwarmConfig.NEST_WORKER_TARGET_SHARE.set(0.40);
+                SwarmConfig.NEST_GUARD_TARGET_SHARE.set(0.25);
+                SwarmConfig.NEST_RESPONSE_THRESHOLD.set(0.55);
                 SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
                 SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
             }
@@ -427,6 +443,10 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
                 SwarmConfig.NEST_MAX_POPULATION.set(12);
+                SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
+                SwarmConfig.NEST_WORKER_TARGET_SHARE.set(0.40);
+                SwarmConfig.NEST_GUARD_TARGET_SHARE.set(0.25);
+                SwarmConfig.NEST_RESPONSE_THRESHOLD.set(0.55);
                 SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
                 SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
                 SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
@@ -499,6 +519,8 @@ public final class SwarmControlNetwork {
         var metrics = SwarmExperimentMetrics.snapshot(level);
         var pathBudget = SwarmPathBudgetRegistry.snapshot(level);
         var navCommands = SwarmNavigationCommandTelemetry.snapshot(level);
+        var colony = SwarmNestScienceTelemetry.snapshot(level);
+        var colonyModel = colony.science();
         var ai = SwarmAiShadowState.snapshot();
         var decision = ai.lastDecision();
         var activeAi = SwarmAiActiveState.snapshot(level.getGameTime());
@@ -599,6 +621,37 @@ public final class SwarmControlNetwork {
                 pair("nestEnabled", SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()),
                 pair("nestLifecycleEnabled", SwarmConfig.NEST_LIFECYCLE_ENABLED.get()),
                 pair("nestMaxPopulation", SwarmConfig.NEST_MAX_POPULATION.get()),
+                pair("nestAdaptiveRecruitment", SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.get()),
+                pair("nestWorkerShare", SwarmConfig.NEST_WORKER_TARGET_SHARE.get()),
+                pair("nestGuardShare", SwarmConfig.NEST_GUARD_TARGET_SHARE.get()),
+                pair("nestResponseThreshold", SwarmConfig.NEST_RESPONSE_THRESHOLD.get()),
+                pair("colonyScienceAvailable", colony.available()),
+                pair("colonyScienceAgeTicks", colony.available()
+                        ? Math.max(0L, level.getGameTime() - colony.sampleTick()) : -1),
+                pair("colonyScienceLocation", colony.available()
+                        ? colony.x() + "," + colony.y() + "," + colony.z() : "unavailable"),
+                pair("colonySciencePopulation", colony.population()),
+                pair("colonySciencePeak", colony.peakPopulation()),
+                pair("colonyScienceDelta", colony.deltaPopulation()),
+                pair("colonyScienceMean", colony.averagePopulation()),
+                pair("colonyScienceSamples", colony.samples()),
+                pair("colonyScienceOccupancy", colonyModel.occupancy()),
+                pair("colonyScienceFoodReadiness", colonyModel.nutritionReadiness()),
+                pair("colonyScienceWorkers", colonyModel.workers()),
+                pair("colonyScienceGuards", colonyModel.guards()),
+                pair("colonyScienceScouts", colonyModel.scouts()),
+                pair("colonyScienceReserves", colonyModel.reserves()),
+                pair("colonyScienceNextRecruit", colonyModel.recommendedRecruit().name()),
+                pair("colonyScienceWorkerResponse", colonyModel.workerResponse()),
+                pair("colonyScienceGuardResponse", colonyModel.guardResponse()),
+                pair("colonyScienceScoutResponse", colonyModel.scoutResponse()),
+                pair("colonyScienceReserveResponse", colonyModel.reserveResponse()),
+                pair("colonyScienceSoil", colony.soilPoints()),
+                pair("colonyScienceTimber", colony.timberPoints()),
+                pair("colonyScienceNutrient", colony.nutrientPoints()),
+                pair("colonyScienceLegacy", colony.legacyPoints()),
+                pair("colonyScienceTotal", colony.resourceTotal()),
+                pair("colonyScienceBirths", colony.births()),
                 pair("nestBuildInterval", SwarmConfig.NEST_BUILD_INTERVAL_TICKS.get()),
                 pair("nestMinPopulation", SwarmConfig.NEST_MIN_GROUP_SIZE.get()),
                 pair("nestCoresFoundedByLoadedAgents",
