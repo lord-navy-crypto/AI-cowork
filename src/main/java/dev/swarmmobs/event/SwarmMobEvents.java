@@ -107,6 +107,20 @@ public final class SwarmMobEvents {
             return;
         }
 
+        // If the entire dimension currently has no players, a mob with no
+        // target or queued relay has nothing to coordinate against. Avoid
+        // running neighbor queries, line-of-sight checks and task allocation
+        // for inactive swarms in loaded chunks. Poll once per second so
+        // freshly entering players are detected without chunk tickets.
+        if (level.players().isEmpty()
+                && state.targetId() == null
+                && state.pendingTargetMessageCount() == 0
+                && mob.getTarget() == null) {
+            state.scheduleNextPlan(gameTick, Math.max(interval, 20));
+            state.clearLocalPlan(0);
+            return;
+        }
+
         state.scheduleNextPlan(gameTick, interval);
 
         var neighbors = findNearbyPeers(level, mob);
