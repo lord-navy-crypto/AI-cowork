@@ -4107,4 +4107,70 @@ public final class SwarmRuntimeGameTests {
         }
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_architecture",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void colonyChamberExpansionConsumesSoilAndTimberAndRaisesCapacity(GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(2, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        var entity = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(entity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Colony architecture core is not a saved block entity");
+            return;
+        }
+        for (BlockPos pos : java.util.List.of(
+                new BlockPos(1, 1, 1),
+                new BlockPos(3, 1, 1),
+                new BlockPos(1, 1, 3))) {
+            Zombie member = helper.spawn(EntityType.ZOMBIE, pos);
+            member.setNoAi(true);
+            member.setNoGravity(true);
+        }
+
+        TestPlayerHandle observer = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        boolean previous = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        int previousCap = SwarmConfig.NEST_MAX_POPULATION.get();
+        try {
+            var player = observer.player();
+            player.setNoGravity(true);
+            Vec3 point = helper.absoluteVec(new Vec3(20.0, 1.0, 2.0));
+            player.setPos(point.x, point.y, point.z);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_MAX_POPULATION.set(12);
+
+            // Eight dirt and two log items: 8 soil + 6 timber resource points.
+            if (nest.deposit(SwarmNestColonyPolicy.Kind.SOIL, 8) != 8
+                    || nest.deposit(SwarmNestColonyPolicy.Kind.TIMBER, 2) != 2) {
+                helper.fail("Colony could not store its construction bill of materials");
+                return;
+            }
+            if (nest.chamberLevel() != 0 || nest.effectiveCapacity() != 4) {
+                helper.fail("New nest should start with a four-member core capacity");
+                return;
+            }
+
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.chamberLevel() != 1 || nest.effectiveCapacity() != 8
+                    || nest.soilPoints() != 0 || nest.timberPoints() != 0
+                    || nest.resources() != 0 || nest.lastPopulation() != 3) {
+                helper.fail("Nest room upgrade did not consume exact supplies or expand capacity"
+                        + " rooms=" + nest.chamberLevel()
+                        + " capacity=" + nest.effectiveCapacity()
+                        + " reserve=" + nest.resources()
+                        + " observedPopulation=" + nest.lastPopulation());
+                return;
+            }
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.chamberLevel() != 1) {
+                helper.fail("Nest added a free second chamber with zero materials");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(previous);
+            SwarmConfig.NEST_MAX_POPULATION.set(previousCap);
+            observer.close();
+        }
+    }
+
 }
