@@ -506,6 +506,14 @@ public final class SwarmClothControlScreen {
                 true,
                 "Use PathNavigation evidence to validate local candidates.");
 
+        intField(category, entries, values,
+                "Path-evidence budget per server tick",
+                "navPathBudgetPerTick",
+                "nav_path_budget_delta",
+                96,
+                "Shared across this dimension. When exhausted, complete planner episodes defer instead of assuming untested paths work.");
+
+
         doubleField(category, entries, values,
                 "Path node penalty",
                 "navPathNodePenalty",
@@ -532,6 +540,15 @@ public final class SwarmClothControlScreen {
                         + "  recoveries " + integer(values, "metricRecoveries")
                         + "  recovery failures " + integer(values, "metricRecoveryFailures")
                         + "  path queries " + integer(values, "metricPathQueries"));
+
+        status(category, entries,
+                "Path budget this tick: " + integer(values, "pathBudgetUsed")
+                        + " / " + integer(values, "navPathBudgetPerTick")
+                        + "  | waiting agents " + integer(values, "pathBudgetWaiters"));
+        status(category, entries,
+                "Budget lifetime reservations: granted " + integer(values, "pathBudgetGranted")
+                        + "  deferred " + integer(values, "pathBudgetDeferred")
+                        + " (a deferred episode is not a failed path).");
 
         action(category, entries,
                 "Restore navigation baseline",
