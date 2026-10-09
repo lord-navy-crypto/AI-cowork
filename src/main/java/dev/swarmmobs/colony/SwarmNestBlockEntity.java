@@ -147,7 +147,13 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
         if (stack.is(Items.ROTTEN_FLESH) || stack.is(Items.BONE)
                 || stack.is(Items.SPIDER_EYE) || stack.is(Items.BEEF)
-                || stack.is(Items.PORKCHOP) || stack.is(Items.CHICKEN)) {
+                || stack.is(Items.PORKCHOP) || stack.is(Items.CHICKEN)
+                || stack.is(Items.MUTTON) || stack.is(Items.RABBIT)
+                || stack.is(Items.COD) || stack.is(Items.SALMON)
+                || stack.is(Items.COOKED_BEEF) || stack.is(Items.COOKED_PORKCHOP)
+                || stack.is(Items.COOKED_CHICKEN) || stack.is(Items.COOKED_MUTTON)
+                || stack.is(Items.COOKED_RABBIT) || stack.is(Items.COOKED_COD)
+                || stack.is(Items.COOKED_SALMON)) {
             return SwarmNestColonyPolicy.Kind.NUTRIENT;
         }
         return SwarmNestColonyPolicy.Kind.NONE;
