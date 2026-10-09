@@ -66,6 +66,7 @@ public final class SwarmConfig {
     // New idle colony construction is opt-in to protect existing player worlds.
     public static final ModConfigSpec.BooleanValue NEST_CONSTRUCTION_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_LIFECYCLE_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_VISIBLE_EXPANSION_ENABLED;
     public static final ModConfigSpec.IntValue NEST_MAX_POPULATION;
     public static final ModConfigSpec.BooleanValue NEST_ADAPTIVE_RECRUITMENT;
     public static final ModConfigSpec.DoubleValue NEST_WORKER_TARGET_SHARE;
@@ -346,6 +347,10 @@ public final class SwarmConfig {
         NEST_LIFECYCLE_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: activate resource-fed nest lifecycle and capped colony spawning; OFF by default.")
                 .define("nestLifecycleEnabled", false);
+
+        NEST_VISIBLE_EXPANSION_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: physically place conservative soil/timber nest shell blocks when chambers expand. OFF by default. Requires mobGriefing; blocked sites defer upgrades.")
+                .define("nestVisibleExpansionEnabled", false);
 
         NEST_MAX_POPULATION = BUILDER
                 .comment("Maximum locally counted colony members before reproduction stops.")
