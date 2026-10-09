@@ -1,6 +1,8 @@
 package dev.swarmmobs.goal;
 
 import dev.swarmmobs.agent.SwarmAgentState;
+import dev.swarmmobs.agent.SwarmAgentProfiles;
+import dev.swarmmobs.algorithm.SwarmColonyCastePolicy;
 import dev.swarmmobs.algorithm.SwarmNestSitePolicy;
 import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.config.SwarmConfig;
@@ -13,6 +15,7 @@ import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -123,6 +126,11 @@ public final class SwarmIdleNestGoal extends Goal {
                 || zombie.getTarget() != null) {
             return false;
         }
+        if (SwarmColonyCastePolicy.idleCaste(
+                SwarmAgentProfiles.profile(zombie).archetype(), true, false)
+                != SwarmColonyCastePolicy.Caste.WORKER) {
+            return false;
+        }
         // Don't modify terrain close to a player, even with mobGriefing on.
         return level.players().stream().noneMatch(
                 player -> player.isAlive() && player.distanceToSqr(zombie) <= 64.0
@@ -157,6 +165,13 @@ public final class SwarmIdleNestGoal extends Goal {
                 || floor.is(Blocks.PODZOL)
                 || floor.is(Blocks.MUD)
                 || floor.is(Blocks.MYCELIUM);
+
+        // Don't create a full cube inside a moving mob/player bounding box.
+        // This extra query only runs after rare, globally-budgeted surveys.
+        if (!level.getEntities(zombie, new AABB(candidate),
+                other -> other.isAlive()).isEmpty()) {
+            return false;
+        }
 
         return SwarmNestSitePolicy.naturalFoundation(
                 naturalSoil,
