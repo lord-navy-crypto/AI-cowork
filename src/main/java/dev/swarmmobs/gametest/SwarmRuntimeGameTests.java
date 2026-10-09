@@ -3823,6 +3823,14 @@ public final class SwarmRuntimeGameTests {
                 helper.fail("Nearby monsters failed to choose their respective closer players");
                 return;
             }
+            if (!playerA.getUUID().equals(skeletonState.tacticalAssignmentTarget())
+                    || !playerA.getUUID().equals(zombieState.tacticalAssignmentTarget())
+                    || !playerB.getUUID().equals(creeperState.tacticalAssignmentTarget())) {
+                alpha.close();
+                beta.close();
+                helper.fail("Initial target-scoped tactical binding mismatch");
+                return;
+            }
             if (skeletonState.tacticalPeerCount() != 1
                     || skeletonState.tacticalBreacherCount() != 0
                     || zombieState.tacticalPeerCount() != 1
@@ -3862,6 +3870,14 @@ public final class SwarmRuntimeGameTests {
                 alpha.close();
                 beta.close();
                 helper.fail("Mixed swarm did not converge on remaining directly visible player");
+                return;
+            }
+            if (!playerA.getUUID().equals(skeletonState.tacticalAssignmentTarget())
+                    || !playerA.getUUID().equals(zombieState.tacticalAssignmentTarget())
+                    || !playerA.getUUID().equals(creeperState.tacticalAssignmentTarget())) {
+                alpha.close();
+                beta.close();
+                helper.fail("Tactical assignment target stayed bound to the old player");
                 return;
             }
             if (skeletonState.tacticalPeerCount() != 2
