@@ -157,15 +157,26 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             }
         }
         if (phase == Phase.TO_NEST) {
-            // Drag the original ItemEntity as visible cargo, at most once
-            // every three ticks. If another system collected it, stop cleanly.
-            if (tick % 3 == 0) {
+            // Reject abnormal external relocation: the same item MUST still
+            // be physically near the worker. It may not be deposited from
+            // an unrelated location simply because the worker reached home.
+            if (item.level() != level || zombie.distanceToSqr(item) > 16.0) {
+                phase = Phase.NONE;
+                return;
+            }
+            boolean atDock = zombie.distanceToSqr(
+                    home.getX() + .5, home.getY() + .5, home.getZ() + .5) <= 5.0;
+            // Drag the original ItemEntity, normally at most every three
+            // ticks; always synchronize it at the dock before depositing.
+            if (tick % 3 == 0 || atDock) {
                 item.setDeltaMovement(Vec3.ZERO);
                 item.setPos(zombie.getX(), zombie.getY() + .65, zombie.getZ());
             }
-            if (zombie.distanceToSqr(
-                    home.getX() + .5, home.getY() + .5, home.getZ() + .5) <= 5.0) {
-                if (level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
+            if (atDock) {
+                double cargoToDock = item.distanceToSqr(
+                        home.getX() + .5, home.getY() + .5, home.getZ() + .5);
+                if (cargoToDock <= 9.0
+                        && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
                     nest.acceptHaulDelivery(item, SwarmConfig.NEST_HAUL_MAX_STACK.get());
                 }
                 phase = Phase.NONE;
