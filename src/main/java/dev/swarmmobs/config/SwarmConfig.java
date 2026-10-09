@@ -48,6 +48,7 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue NAV_LOCAL_LATERAL_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_LOCAL_CONGESTION_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_LOCAL_CONGESTION_RADIUS;
+    public static final ModConfigSpec.IntValue NAV_PATH_EVIDENCE_BUDGET_PER_TICK;
     public static final ModConfigSpec.BooleanValue NAV_PATH_EVIDENCE_ENABLED;
     public static final ModConfigSpec.DoubleValue NAV_PATH_NODE_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_PATH_RESIDUAL_PENALTY;
@@ -263,6 +264,10 @@ public final class SwarmConfig {
         NAV_LOCAL_CONGESTION_RADIUS = BUILDER
                 .comment("Radius, in blocks, used to estimate crowding around local navigation candidates.")
                 .defineInRange("navLocalCongestionRadius", 2.5, 0.5, 8.0);
+
+        NAV_PATH_EVIDENCE_BUDGET_PER_TICK = BUILDER
+                .comment("Maximum path-evidence reservations per server-level tick; complete local episodes defer when budget is exhausted.")
+                .defineInRange("navPathEvidenceBudgetPerTick", 96, 8, 512);
 
         NAV_PATH_EVIDENCE_ENABLED = BUILDER
                 .comment("Use Minecraft PathNavigation reachability and path cost as evidence for local detour candidates.")
