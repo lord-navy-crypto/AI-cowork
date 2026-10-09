@@ -1,5 +1,7 @@
 package dev.swarmmobs.network;
 
+import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
+
 import dev.swarmmobs.client.SwarmControlClient;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
@@ -354,6 +356,11 @@ public final class SwarmControlNetwork {
                     0.5,
                     8.0
             ));
+            case "nav_path_budget_delta" -> SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.set((int) clamp(
+                    SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.get() + value,
+                    8.0,
+                    512.0
+            ));
             case "toggle_path_evidence" ->
                     SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(!SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get());
             case "nav_path_node_penalty_delta" -> SwarmConfig.NAV_PATH_NODE_PENALTY.set(clamp(
@@ -385,6 +392,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
                 SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
+                SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.set(96);
                 SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
@@ -438,6 +446,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
                 SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
+                SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.set(96);
                 SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
@@ -459,6 +468,7 @@ public final class SwarmControlNetwork {
             boolean canEdit
     ) {
         var metrics = SwarmExperimentMetrics.snapshot(level);
+        var pathBudget = SwarmPathBudgetRegistry.snapshot(level);
         var ai = SwarmAiShadowState.snapshot();
         var decision = ai.lastDecision();
         var activeAi = SwarmAiActiveState.snapshot(level.getGameTime());
@@ -629,6 +639,11 @@ public final class SwarmControlNetwork {
                 pair("navLateralPenalty", SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get()),
                 pair("navCongestionPenalty", SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get()),
                 pair("navCongestionRadius", SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get()),
+                pair("navPathBudgetPerTick", SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.get()),
+                pair("pathBudgetUsed", pathBudget.reservedTokens()),
+                pair("pathBudgetWaiters", pathBudget.waiters()),
+                pair("pathBudgetGranted", Math.min(Integer.MAX_VALUE, pathBudget.reservationsGranted())),
+                pair("pathBudgetDeferred", Math.min(Integer.MAX_VALUE, pathBudget.reservationsDeferred())),
                 pair("navPathEvidenceEnabled", SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()),
                 pair("navPathNodePenalty", SwarmConfig.NAV_PATH_NODE_PENALTY.get()),
                 pair("navPathResidualPenalty", SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()),
