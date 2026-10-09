@@ -67,6 +67,17 @@ public final class SwarmPathQueryBudget {
         return true;
     }
 
+    /**
+     * A mob no longer needing path evidence must release any queued demand.
+     * This prevents obsolete requests from protecting unused tokens while
+     * another mob is waiting for a legitimate obstacle/recovery query.
+     */
+    public void cancel(UUID requester) {
+        if (requester != null) {
+            waiting.remove(requester);
+        }
+    }
+
     public Snapshot snapshot(long tick, int maxTokensPerTick) {
         refresh(tick, maxTokensPerTick);
         return new Snapshot(tokenLimit, usedTokens, waiting.size(), granted, deferred);
