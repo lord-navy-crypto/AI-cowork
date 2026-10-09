@@ -4432,4 +4432,59 @@ public final class SwarmRuntimeGameTests {
         }
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_rehoming",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void idleWorkerRehomesFromDestroyedLoadedCoreWithoutGlobalSearch(
+            GameTestHelper helper) {
+        BlockPos original = new BlockPos(0, 1, 2);
+        BlockPos replacement = new BlockPos(4, 1, 2);
+        helper.setBlock(original, SwarmNestBlocks.NEST_CORE.get());
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        worker.setNoGravity(true);
+
+        TestPlayerHandle observer = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        boolean oldLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean oldMaster = SwarmConfig.ENABLED.get();
+        try {
+            ServerPlayer player = observer.player();
+            player.setNoGravity(true);
+            Vec3 distant = helper.absoluteVec(new Vec3(20.0, 1.0, 2.0));
+            player.setPos(distant.x, distant.y, distant.z);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.ENABLED.set(true);
+
+            var originalEntity = helper.getLevel().getBlockEntity(helper.absolutePos(original));
+            if (!(originalEntity instanceof SwarmNestBlockEntity first)) {
+                helper.fail("First home was not a functional Nest Core");
+                return;
+            }
+            first.runColonyCycle(helper.getLevel());
+            if (!worker.getPersistentData().contains("SwarmColonyNest")
+                    || worker.getPersistentData().getLong("SwarmColonyNest")
+                            != helper.absolutePos(original).asLong()) {
+                helper.fail("First core failed to enroll nearby idle worker");
+                return;
+            }
+            helper.setBlock(original, Blocks.AIR);
+            helper.setBlock(replacement, SwarmNestBlocks.NEST_CORE.get());
+            var replacementEntity = helper.getLevel().getBlockEntity(helper.absolutePos(replacement));
+            if (!(replacementEntity instanceof SwarmNestBlockEntity second)) {
+                helper.fail("Replacement home has no colony block entity");
+                return;
+            }
+            second.runColonyCycle(helper.getLevel());
+            if (worker.getPersistentData().getLong("SwarmColonyNest")
+                    != helper.absolutePos(replacement).asLong()) {
+                helper.fail("Worker kept a demolished home despite a nearby valid replacement");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            observer.close();
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(oldLifecycle);
+            SwarmConfig.ENABLED.set(oldMaster);
+        }
+    }
+
 }
