@@ -4198,4 +4198,92 @@ public final class SwarmRuntimeGameTests {
         }
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_visible_shell",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void colonyVisibleShellRequiresLoadedFreeSpaceAndRealMaterials(GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(2, 1, 2);
+        BlockPos soilPos = new BlockPos(4, 1, 2);
+        BlockPos timberPos = new BlockPos(0, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(new BlockPos(4, 0, 2), Blocks.DIRT);
+        helper.setBlock(new BlockPos(0, 0, 2), Blocks.DIRT);
+        var entity = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(entity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("No persistent Nest Core block entity for visible shell");
+            return;
+        }
+        for (BlockPos pos : java.util.List.of(
+                new BlockPos(1, 1, 1),
+                new BlockPos(3, 1, 1),
+                new BlockPos(1, 1, 3))) {
+            Zombie member = helper.spawn(EntityType.ZOMBIE, pos);
+            member.setNoAi(true);
+            member.setNoGravity(true);
+        }
+
+        TestPlayerHandle observer = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        boolean oldLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean oldVisible = SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get();
+        boolean oldGrief = helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        int oldCap = SwarmConfig.NEST_MAX_POPULATION.get();
+        try {
+            ServerPlayer player = observer.player();
+            player.setNoGravity(true);
+            Vec3 farAway = helper.absoluteVec(new Vec3(20.0, 1.0, 2.0));
+            player.setPos(farAway.x, farAway.y, farAway.z);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(true);
+            SwarmConfig.NEST_MAX_POPULATION.set(12);
+            nest.deposit(SwarmNestColonyPolicy.Kind.SOIL, 8);
+            nest.deposit(SwarmNestColonyPolicy.Kind.TIMBER, 2);
+
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(false, helper.getLevel().getServer());
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.chamberLevel() != 0 || nest.visibleChamberLevel() != 0
+                    || nest.resources() != 14) {
+                helper.fail("Visible construction violated mobGriefing=false");
+                return;
+            }
+
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            helper.setBlock(soilPos, Blocks.STONE);
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.chamberLevel() != 0 || nest.resources() != 14
+                    || !helper.getLevel().getBlockState(helper.absolutePos(soilPos)).is(Blocks.STONE)) {
+                helper.fail("Obstructed nest shell site was overwritten or charged materials");
+                return;
+            }
+
+            helper.setBlock(soilPos, Blocks.AIR);
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.chamberLevel() != 1 || nest.visibleChamberLevel() != 1
+                    || nest.effectiveCapacity() != 8 || nest.resources() != 0
+                    || !helper.getLevel().getBlockState(helper.absolutePos(soilPos)).is(Blocks.MUD_BRICKS)
+                    || !helper.getLevel().getBlockState(helper.absolutePos(timberPos)).is(Blocks.STRIPPED_OAK_LOG)) {
+                helper.fail("Safe nest shell failed to place physical mud-brick/wood modules"
+                        + " chambers=" + nest.chamberLevel()
+                        + " visual=" + nest.visibleChamberLevel()
+                        + " reserve=" + nest.resources());
+                return;
+            }
+
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.chamberLevel() != 1 || nest.visibleChamberLevel() != 1) {
+                helper.fail("Construction gained extra modules without new supplies");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(oldLifecycle);
+            SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(oldVisible);
+            SwarmConfig.NEST_MAX_POPULATION.set(oldCap);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(oldGrief, helper.getLevel().getServer());
+            observer.close();
+        }
+    }
+
 }
