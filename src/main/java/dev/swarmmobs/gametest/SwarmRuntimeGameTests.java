@@ -4130,7 +4130,9 @@ public final class SwarmRuntimeGameTests {
         TestPlayerHandle observer = createTickingTestPlayer(helper, GameType.SURVIVAL);
         boolean previous = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
         int previousCap = SwarmConfig.NEST_MAX_POPULATION.get();
+        String stage = "starting";
         try {
+            stage = "placing observer";
             var player = observer.player();
             player.setNoGravity(true);
             Vec3 point = helper.absoluteVec(new Vec3(20.0, 1.0, 2.0));
@@ -4139,6 +4141,7 @@ public final class SwarmRuntimeGameTests {
             SwarmConfig.NEST_MAX_POPULATION.set(12);
 
             // Eight dirt and two log items: 8 soil + 6 timber resource points.
+            stage = "depositing soil and timber";
             if (nest.deposit(SwarmNestColonyPolicy.Kind.SOIL, 8) != 8
                     || nest.deposit(SwarmNestColonyPolicy.Kind.TIMBER, 2) != 2) {
                 helper.fail("Colony could not store its construction bill of materials");
@@ -4149,7 +4152,9 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
 
+            stage = "first colony sample and upgrade";
             nest.runColonyCycle(helper.getLevel());
+            stage = "checking material accounting";
             if (nest.chamberLevel() != 1 || nest.effectiveCapacity() != 8
                     || nest.soilPoints() != 0 || nest.timberPoints() != 0
                     || nest.resources() != 0 || nest.lastPopulation() != 3) {
@@ -4166,6 +4171,10 @@ public final class SwarmRuntimeGameTests {
                 return;
             }
             helper.succeed();
+        } catch (RuntimeException cause) {
+            String trace = java.util.Arrays.toString(cause.getStackTrace());
+            helper.fail("Colony architecture failed during [" + stage + "]: "
+                    + cause + " stack=" + trace.substring(0, Math.min(1400, trace.length())));
         } finally {
             SwarmConfig.NEST_LIFECYCLE_ENABLED.set(previous);
             SwarmConfig.NEST_MAX_POPULATION.set(previousCap);
