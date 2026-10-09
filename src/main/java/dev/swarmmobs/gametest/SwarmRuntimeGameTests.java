@@ -16,6 +16,8 @@ import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
+import dev.swarmmobs.goal.SwarmIdleNestGoal;
+import dev.swarmmobs.registry.SwarmNestBlocks;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
 import net.minecraft.core.BlockPos;
@@ -3898,6 +3900,67 @@ public final class SwarmRuntimeGameTests {
             beta.close();
             helper.succeed();
         });
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_foundation", templateNamespace = SwarmMobs.MOD_ID,
+            template = TEMPLATE, timeoutTicks = 80)
+    public static void idleLocalGroupCanFoundOneOptInNestCore(GameTestHelper helper) {
+        Zombie founder = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        Zombie allyOne = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        Zombie allyTwo = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 1));
+        founder.setNoGravity(true);
+        allyOne.setNoGravity(true);
+        allyTwo.setNoGravity(true);
+
+        boolean beforeEnabled = SwarmConfig.NEST_CONSTRUCTION_ENABLED.get();
+        boolean beforeMobGriefing = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        int beforePopulation = SwarmConfig.NEST_MIN_GROUP_SIZE.get();
+
+        try {
+            // The standard GameTest floor is not natural soil. Make exactly
+            // one candidate site suitable for a persistent nest marker.
+            helper.setBlock(new BlockPos(4, 0, 2), Blocks.DIRT);
+            SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(true);
+            SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+
+            SwarmIdleNestGoal goal = founder.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmIdleNestGoal.class::isInstance)
+                    .map(SwarmIdleNestGoal.class::cast)
+                    .findFirst().orElse(null);
+            if (goal == null || !goal.canUse()) {
+                helper.fail("Eligible idle group could not claim a natural-soil nest site");
+                return;
+            }
+
+            goal.start();
+            var corePosition = helper.absolutePos(new BlockPos(4, 1, 2));
+            if (!helper.getLevel().getBlockState(corePosition).is(SwarmNestBlocks.NEST_CORE.get())) {
+                helper.fail("Idle colony did not persistently place a Nest Core block");
+                return;
+            }
+            var founded = founder.getData(SwarmAttachments.AGENT_STATE.get()).nestsFounded();
+            if (founded != 1L) {
+                helper.fail("Nest founding telemetry did not record exactly one placement");
+                return;
+            }
+            // A second attempt must not create a second nest nearby.
+            var duplicate = new SwarmIdleNestGoal(allyOne);
+            if (duplicate.canUse()) {
+                helper.fail("Nearby existing nest was not respected by new builder");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(beforeEnabled);
+            SwarmConfig.NEST_MIN_GROUP_SIZE.set(beforePopulation);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(beforeMobGriefing, helper.getLevel().getServer());
+        }
     }
 
 }
