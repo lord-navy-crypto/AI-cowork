@@ -243,6 +243,23 @@ public final class SwarmNestBlockEntity extends BlockEntity {
             resources -= SwarmNestColonyPolicy.SPAWN_COST;
             births++;
             nextSpawnTick = tick + SwarmNestColonyPolicy.SPAWN_COOLDOWN_TICKS;
+            // One successful admission is part of this same sampling cycle.
+            // Update both the persisted trend and the live science readout.
+            lastPopulation++;
+            peakPopulation = Math.max(peakPopulation, lastPopulation);
+            populationDelta++;
+            meanPopulation += populationSamples <= 1 ? 1.0 : 0.25;
+            var afterBirth = SwarmColonySciencePolicy.evaluate(
+                    workerCount + (recruit == SwarmColonySciencePolicy.Job.WORKER ? 1 : 0),
+                    guardCount + (recruit == SwarmColonySciencePolicy.Job.GUARD ? 1 : 0),
+                    scoutCount + (recruit == SwarmColonySciencePolicy.Job.SCOUT ? 1 : 0),
+                    reserveCount + (recruit == SwarmColonySciencePolicy.Job.RESERVE ? 1 : 0),
+                    SwarmConfig.NEST_MAX_POPULATION.get(),
+                    nutrientPoints + legacyPoints,
+                    SwarmConfig.NEST_WORKER_TARGET_SHARE.get(),
+                    SwarmConfig.NEST_GUARD_TARGET_SHARE.get(),
+                    SwarmConfig.NEST_RESPONSE_THRESHOLD.get());
+            SwarmNestScienceTelemetry.record(level, worldPosition, this, afterBirth);
             setChanged();
         }
     }
