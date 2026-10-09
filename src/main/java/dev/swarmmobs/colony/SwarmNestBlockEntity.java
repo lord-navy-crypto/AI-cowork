@@ -40,6 +40,17 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private static final int[] DX = {2, -2, 0, 0, 2, -2, 2, -2};
     private static final int[] DZ = {0, 0, 2, -2, 2, 2, -2};
     private int resources;
+    // Individually conserved resource categories. Legacy points keep old
+    // 0.14 pre-science worlds compatible without inventing a food source.
+    private int soilPoints;
+    private int timberPoints;
+    private int nutrientPoints;
+    private int legacyPoints;
+    private int lastPopulation;
+    private int peakPopulation;
+    private int populationDelta;
+    private long populationSamples;
+    private double meanPopulation;
     private long nextSpawnTick;
     private long births;
     private int leaderMarks;
@@ -49,6 +60,15 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     }
 
     public int resources() { return resources; }
+    public int soilPoints() { return soilPoints; }
+    public int timberPoints() { return timberPoints; }
+    public int nutrientPoints() { return nutrientPoints; }
+    public int legacyPoints() { return legacyPoints; }
+    public int lastPopulation() { return lastPopulation; }
+    public int peakPopulation() { return peakPopulation; }
+    public int populationDelta() { return populationDelta; }
+    public long populationSamples() { return populationSamples; }
+    public double meanPopulation() { return meanPopulation; }
     public long births() { return births; }
     public int leaderMarks() { return leaderMarks; }
 
@@ -57,6 +77,19 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         super.loadAdditional(tag, registries);
         resources = Math.max(0, Math.min(SwarmNestColonyPolicy.MAX_STORED_RESOURCES,
                 tag.getInt("Resources")));
+        // Clamp every resource bucket to the unallocated remainder. Old saves
+        // have only "Resources": preserve them as explicitly labeled legacy
+        // supply rather than pretending they are newly acquired nutrition.
+        soilPoints = Math.max(0, Math.min(resources, tag.getInt("SoilPoints")));
+        timberPoints = Math.max(0, Math.min(resources - soilPoints, tag.getInt("TimberPoints")));
+        nutrientPoints = Math.max(0, Math.min(resources - soilPoints - timberPoints,
+                tag.getInt("NutrientPoints")));
+        legacyPoints = resources - soilPoints - timberPoints - nutrientPoints;
+        lastPopulation = Math.max(0, tag.getInt("LastPopulation"));
+        peakPopulation = Math.max(lastPopulation, tag.getInt("PeakPopulation"));
+        populationDelta = tag.getInt("PopulationDelta");
+        populationSamples = Math.max(0L, tag.getLong("PopulationSamples"));
+        meanPopulation = Math.max(0.0, Math.min(64.0, tag.getDouble("MeanPopulation")));
         nextSpawnTick = Math.max(0L, tag.getLong("NextSpawnTick"));
         births = Math.max(0L, tag.getLong("Births"));
         leaderMarks = Math.max(0, Math.min(3, tag.getInt("LeaderMarks")));
@@ -66,6 +99,14 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt("Resources", resources);
+        tag.putInt("SoilPoints", soilPoints);
+        tag.putInt("TimberPoints", timberPoints);
+        tag.putInt("NutrientPoints", nutrientPoints);
+        tag.putInt("LastPopulation", lastPopulation);
+        tag.putInt("PeakPopulation", peakPopulation);
+        tag.putInt("PopulationDelta", populationDelta);
+        tag.putLong("PopulationSamples", populationSamples);
+        tag.putDouble("MeanPopulation", meanPopulation);
         tag.putLong("NextSpawnTick", nextSpawnTick);
         tag.putLong("Births", births);
         tag.putInt("LeaderMarks", leaderMarks);
@@ -75,7 +116,14 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     public int deposit(SwarmNestColonyPolicy.Kind kind, int availableItems) {
         int accepted = SwarmNestColonyPolicy.acceptAmount(resources, availableItems, kind);
         if (accepted > 0) {
-            resources += accepted * SwarmNestColonyPolicy.value(kind);
+            int points = accepted * SwarmNestColonyPolicy.value(kind);
+            resources += points;
+            switch (kind) {
+                case SOIL -> soilPoints += points;
+                case TIMBER -> timberPoints += points;
+                case NUTRIENT -> nutrientPoints += points;
+                case NONE -> throw new IllegalStateException("NONE cannot be deposited");
+            }
             setChanged();
         }
         return accepted;
@@ -125,6 +173,23 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         List<PathfinderMob> members = members(level);
         assignVisibleLeaders(members);
 
+        int workerCount = 0, guardCount = 0, scoutCount = 0, reserveCount = 0;
+        for (PathfinderMob member : members) {
+            if (member instanceof Zombie) workerCount++;
+            else if (member instanceof Skeleton) guardCount++;
+            else if (member.getType() == EntityType.SPIDER) scoutCount++;
+            else if (member.getType() == EntityType.CREEPER) reserveCount++;
+        }
+        var science = SwarmColonySciencePolicy.evaluate(
+                workerCount, guardCount, scoutCount, reserveCount,
+                SwarmConfig.NEST_MAX_POPULATION.get(),
+                nutrientPoints + legacyPoints,
+                SwarmConfig.NEST_WORKER_TARGET_SHARE.get(),
+                SwarmConfig.NEST_GUARD_TARGET_SHARE.get(),
+                SwarmConfig.NEST_RESPONSE_THRESHOLD.get());
+        recordPopulationSample(science.population());
+        SwarmNestScienceTelemetry.record(level, worldPosition, this, science);
+
         BlockPos birthSite = findSpawnSite(level);
         boolean playerClose = level.players().stream().anyMatch(
                 player -> player.distanceToSqr(
@@ -139,18 +204,26 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 level.hasChunkAt(worldPosition),
                 observed, playerClose,
                 birthSite != null,
-                resources, members.size(),
+                nutrientPoints + legacyPoints, members.size(),
                 SwarmConfig.NEST_MAX_POPULATION.get(), tick, nextSpawnTick)) {
             return;
         }
 
-        // Deterministic family rotation. All children are ordinary vanilla
-        // mobs; the nest is not an unbounded monster factory.
-        EntityType<? extends Monster> chosen = switch ((int) (births % 4L)) {
-            case 0 -> EntityType.ZOMBIE;
-            case 1 -> EntityType.SKELETON;
-            case 2 -> EntityType.SPIDER;
-            default -> EntityType.CREEPER;
+        // Recruitment follows local workforce deficits rather than an
+        // imaginary queen command. Operators can restore simple rotation.
+        var recruit = SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.get()
+                ? science.recommendedRecruit()
+                : switch ((int) (births % 4L)) {
+                    case 0 -> SwarmColonySciencePolicy.Job.WORKER;
+                    case 1 -> SwarmColonySciencePolicy.Job.GUARD;
+                    case 2 -> SwarmColonySciencePolicy.Job.SCOUT;
+                    default -> SwarmColonySciencePolicy.Job.RESERVE;
+                };
+        EntityType<? extends Monster> chosen = switch (recruit) {
+            case WORKER -> EntityType.ZOMBIE;
+            case GUARD -> EntityType.SKELETON;
+            case SCOUT -> EntityType.SPIDER;
+            case RESERVE -> EntityType.CREEPER;
         };
         Monster child = chosen.create(level);
         if (child == null) return;
@@ -162,11 +235,28 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
         if (level.addFreshEntity(child)) {
             child.getPersistentData().putLong("SwarmColonyNest", worldPosition.asLong());
+            // Reproduction consumes nutritional points first. Historical
+            // unlabeled stock may fund older saves, but fresh dirt/timber may not.
+            int nutrientSpent = Math.min(nutrientPoints, SwarmNestColonyPolicy.SPAWN_COST);
+            nutrientPoints -= nutrientSpent;
+            legacyPoints -= SwarmNestColonyPolicy.SPAWN_COST - nutrientSpent;
             resources -= SwarmNestColonyPolicy.SPAWN_COST;
             births++;
             nextSpawnTick = tick + SwarmNestColonyPolicy.SPAWN_COOLDOWN_TICKS;
             setChanged();
         }
+    }
+
+    private void recordPopulationSample(int actualCount) {
+        int population = Math.max(0, actualCount);
+        populationDelta = populationSamples == 0L ? 0 : population - lastPopulation;
+        lastPopulation = population;
+        peakPopulation = Math.max(peakPopulation, population);
+        // A compact exponential mean is cheaper than retaining historical samples.
+        meanPopulation = populationSamples == 0L
+                ? population : 0.25 * population + 0.75 * meanPopulation;
+        populationSamples++;
+        setChanged();
     }
 
     private void absorbDroppedResources(ServerLevel level) {
