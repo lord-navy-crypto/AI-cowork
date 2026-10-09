@@ -4540,6 +4540,7 @@ public final class SwarmRuntimeGameTests {
             goal.start();
             if (!SwarmNestScoutSignal.recentFor(
                     original, helper.absolutePos(corePos), helper.getLevel().getGameTime())
+                    || nest.scoutBoard().size(helper.getLevel().getGameTime()) != 1
                     || original.getItem().getCount() != 2 || !original.isAlive()
                     || nest.resources() != 0) {
                 helper.fail("Spider sensing must mark, not consume, the real item");
