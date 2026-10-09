@@ -146,6 +146,29 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         return accepted;
     }
 
+    /**
+     * Server-authoritative and matter-conserving delivery of a real world
+     * item entity. Reuse the exact intake path for autonomous workers and
+     * passive intake; never allocate a free replacement item.
+     */
+    public int acceptDroppedItem(ItemEntity item, int maxItems) {
+        if (item == null || !item.isAlive() || item.getItem().isEmpty()
+                || maxItems <= 0 || level == null || level.isClientSide
+                || item.level() != level) {
+            return 0;
+        }
+        ItemStack stack = item.getItem();
+        int accepted = deposit(classify(stack), Math.min(maxItems, stack.getCount()));
+        if (accepted <= 0) return 0;
+        stack.shrink(accepted);
+        if (stack.isEmpty()) {
+            item.discard();
+        } else {
+            item.setItem(stack);
+        }
+        return accepted;
+    }
+
     public static SwarmNestColonyPolicy.Kind classify(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return SwarmNestColonyPolicy.Kind.NONE;
         if (stack.is(ItemTags.LOGS)) return SwarmNestColonyPolicy.Kind.TIMBER;
@@ -194,6 +217,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
 
         absorbDroppedResources(level);
         List<PathfinderMob> members = members(level);
+        enrollNearbyWorkers(members);
         assignVisibleLeaders(members);
 
         // When enabled, each module gets two actual shell blocks. Verify
@@ -409,6 +433,21 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    private void enrollNearbyWorkers(List<PathfinderMob> members) {
+        // Colony residence is ordinary persistent entity NBT, but choosing
+        // a home has no ticking world registry and creates no chunk tickets.
+        // Only unassigned idle workers may join; an active fighter never
+        // loses its combat target or gets a new hauling order.
+        for (PathfinderMob member : members) {
+            if (!(member instanceof Zombie) || member.isNoAi()
+                    || member.getTarget() != null) continue;
+            var data = member.getPersistentData();
+            if (!data.contains("SwarmColonyNest")) {
+                data.putLong("SwarmColonyNest", worldPosition.asLong());
+            }
+        }
+    }
+
     private void absorbDroppedResources(ServerLevel level) {
         // Small, local pickup of EXISTING dropped items: no free materials,
         // terrain harvesting, animal targeting, or arbitrary inventory reads.
@@ -417,13 +456,10 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 ItemEntity.class, area, item -> item.isAlive() && !item.getItem().isEmpty()
         );
         for (ItemEntity item : drops) {
-            SwarmNestColonyPolicy.Kind kind = classify(item.getItem());
-            int accepted = deposit(kind, item.getItem().getCount());
-            if (accepted == 0) continue;
-            ItemStack remaining = item.getItem();
-            remaining.shrink(accepted);
-            if (remaining.isEmpty()) item.discard();
-            else item.setItem(remaining);
+            // A carrier's reserved item is still a physical entity but must
+            // not be vacuumed up before that worker completes its delivery.
+            if (SwarmNestHaulLease.isClaimed(item, level.getGameTime())) continue;
+            acceptDroppedItem(item, item.getItem().getCount());
         }
     }
 
