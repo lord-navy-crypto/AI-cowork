@@ -163,8 +163,7 @@ public final class SwarmIdleNestGoal extends Goal {
                 level.getBlockState(candidate).isAir(),
                 level.getBlockState(candidate.above()).isAir(),
                 !level.getFluidState(candidate).isEmpty()
-                        ? false
-                        : level.getFluidState(candidate.below()).isEmpty()
+                        || !level.getFluidState(candidate.below()).isEmpty()
         );
     }
 
