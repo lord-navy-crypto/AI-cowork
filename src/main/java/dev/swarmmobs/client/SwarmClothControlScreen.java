@@ -247,6 +247,72 @@ public final class SwarmClothControlScreen {
                 12,
                 "Growth pauses when the local supported monster count reaches this cap.");
 
+        toggle(category, entries, values,
+                "Adaptive insect-inspired recruiting",
+                "nestAdaptiveRecruitment",
+                "nest_adaptive_toggle",
+                true,
+                "Use local job deficits and response thresholds to choose next monster type.");
+
+        doubleField(category, entries, values,
+                "Colony target: Zombie workers (share 0-1)",
+                "nestWorkerShare", "nest_worker_share_delta", 0.40,
+                "Desired worker share; the remaining population includes guards, scouts and reserves.");
+
+        doubleField(category, entries, values,
+                "Colony target: Skeleton guards (share 0-1)",
+                "nestGuardShare", "nest_guard_share_delta", 0.25,
+                "Desired guard share; combined ratios are normalized by local pressure.");
+
+        doubleField(category, entries, values,
+                "Colony response threshold theta",
+                "nestResponseThreshold", "nest_response_threshold_delta", 0.55,
+                "Experimental response s^2/(s^2+theta^2), inspired by social-insect models.");
+
+        status(category, entries,
+                bool(values, "colonyScienceAvailable")
+                        ? "Colony science: last sampled core @ "
+                                + text(values, "colonyScienceLocation", "unknown")
+                                + "  sample age " + integer(values, "colonyScienceAgeTicks") + " ticks"
+                        : "Colony science: no active loaded core sampled yet");
+
+        if (bool(values, "colonyScienceAvailable")) {
+            status(category, entries,
+                    "Population: " + integer(values, "colonySciencePopulation")
+                            + " / " + integer(values, "nestMaxPopulation")
+                            + " | occupancy " + decimal(values, "colonyScienceOccupancy")
+                            + " | peak " + integer(values, "colonySciencePeak"));
+
+            status(category, entries,
+                    "Population trend per sample: " + integer(values, "colonyScienceDelta")
+                            + " | EMA " + decimal(values, "colonyScienceMean")
+                            + " | samples " + integer(values, "colonyScienceSamples"));
+
+            status(category, entries,
+                    "Composition: zombie workers " + integer(values, "colonyScienceWorkers")
+                            + ", skeleton guards " + integer(values, "colonyScienceGuards")
+                            + ", spider scouts " + integer(values, "colonyScienceScouts")
+                            + ", creeper reserves " + integer(values, "colonyScienceReserves"));
+
+            status(category, entries,
+                    "Stored points: soil " + integer(values, "colonyScienceSoil")
+                            + ", timber " + integer(values, "colonyScienceTimber")
+                            + ", nutrients " + integer(values, "colonyScienceNutrient")
+                            + ", legacy " + integer(values, "colonyScienceLegacy")
+                            + " / total " + integer(values, "colonyScienceTotal"));
+
+            status(category, entries,
+                    "Nutrient readiness: " + decimal(values, "colonyScienceFoodReadiness")
+                            + " | births " + integer(values, "colonyScienceBirths")
+                            + " | suggested recruit " + text(values, "colonyScienceNextRecruit", "NONE"));
+
+            status(category, entries,
+                    "Response indices [0..1]: worker " + decimal(values, "colonyScienceWorkerResponse")
+                            + " guard " + decimal(values, "colonyScienceGuardResponse")
+                            + " scout " + decimal(values, "colonyScienceScoutResponse")
+                            + " reserve " + decimal(values, "colonyScienceReserveResponse"));
+        }
+
         intField(category, entries, values,
                 "Nest survey interval (ticks)",
                 "nestBuildInterval",
