@@ -4002,7 +4002,11 @@ public final class SwarmRuntimeGameTests {
         int acceptedFood = nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 1);
         int rejected = nest.deposit(SwarmNestColonyPolicy.Kind.NONE, 100);
         if (acceptedLogs != 2 || acceptedFood != 1 || rejected != 0
-                || nest.resources() != 10) {
+                || nest.resources() != 10
+                || nest.soilPoints() != 0
+                || nest.timberPoints() != 6
+                || nest.nutrientPoints() != 4
+                || nest.legacyPoints() != 0) {
             helper.fail("Nest storage did not conserve deposited material");
             return;
         }
@@ -4011,6 +4015,7 @@ public final class SwarmRuntimeGameTests {
         // 10 + 29 * 4 = 126. Two spare units are insufficient for
         // another four-unit nutrient item; no fractional matter is created.
         if (acceptedExtra != 29 || nest.resources() != 126
+                || nest.timberPoints() != 6 || nest.nutrientPoints() != 120
                 || nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 1) != 0) {
             helper.fail("Nest resources exceeded their fixed storage capacity");
             return;
@@ -4053,15 +4058,28 @@ public final class SwarmRuntimeGameTests {
                     .set(true, helper.getLevel().getServer());
             helper.getLevel().getServer().setDifficulty(Difficulty.HARD, true);
 
-            // Three actual nutrient items are required for one 12-point birth.
+            // Construction supplies must NEVER be convertible into nutrition.
+            if (nest.deposit(SwarmNestColonyPolicy.Kind.SOIL, 12) != 12) {
+                helper.fail("Nest could not store natural-soil building supplies");
+                return;
+            }
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.births() != 0 || nest.nutrientPoints() != 0
+                    || nest.soilPoints() != 12) {
+                helper.fail("A soil-only colony illegally generated a new monster");
+                return;
+            }
+
+            // Three real nutrient items provide precisely one 12-point birth.
             if (nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 3) != 3) {
                 helper.fail("Nest could not accept required nutrient input");
                 return;
             }
 
             nest.runColonyCycle(helper.getLevel());
-            if (nest.births() != 1L || nest.resources() != 0) {
-                helper.fail("One nutrient-funded colony birth did not consume exactly 12 points"
+            if (nest.births() != 1L || nest.resources() != 12
+                    || nest.soilPoints() != 12 || nest.nutrientPoints() != 0) {
+                helper.fail("One nutrient-funded colony birth failed to conserve construction materials"
                         + " births=" + nest.births() + " reserve=" + nest.resources());
                 return;
             }
