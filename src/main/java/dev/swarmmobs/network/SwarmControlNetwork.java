@@ -224,6 +224,9 @@ public final class SwarmControlNetwork {
             case "nest_response_threshold_delta" -> SwarmConfig.NEST_RESPONSE_THRESHOLD.set(clamp(
                     SwarmConfig.NEST_RESPONSE_THRESHOLD.get() + value, 0.10, 3.0
             ));
+            case "nest_visible_expansion_toggle" ->
+                    SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(
+                            !SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get());
             case "nest_lifecycle_toggle" ->
                     SwarmConfig.NEST_LIFECYCLE_ENABLED.set(!SwarmConfig.NEST_LIFECYCLE_ENABLED.get());
             case "nest_max_population_delta" -> SwarmConfig.NEST_MAX_POPULATION.set((int) clamp(
@@ -242,6 +245,7 @@ public final class SwarmControlNetwork {
             case "nest_baseline" -> {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(false);
                 SwarmConfig.NEST_MAX_POPULATION.set(12);
                 SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
                 SwarmConfig.NEST_WORKER_TARGET_SHARE.set(0.40);
@@ -442,6 +446,7 @@ public final class SwarmControlNetwork {
             case "baseline_all" -> {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(false);
                 SwarmConfig.NEST_MAX_POPULATION.set(12);
                 SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
                 SwarmConfig.NEST_WORKER_TARGET_SHARE.set(0.40);
@@ -620,6 +625,8 @@ public final class SwarmControlNetwork {
                 pair("liveCreepers", creepers),
                 pair("nestEnabled", SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()),
                 pair("nestLifecycleEnabled", SwarmConfig.NEST_LIFECYCLE_ENABLED.get()),
+                pair("nestVisibleExpansionEnabled",
+                        SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()),
                 pair("nestMaxPopulation", SwarmConfig.NEST_MAX_POPULATION.get()),
                 pair("nestAdaptiveRecruitment", SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.get()),
                 pair("nestWorkerShare", SwarmConfig.NEST_WORKER_TARGET_SHARE.get()),
@@ -632,6 +639,7 @@ public final class SwarmControlNetwork {
                         ? colony.x() + "," + colony.y() + "," + colony.z() : "unavailable"),
                 pair("colonySciencePopulation", colony.population()),
                 pair("colonyScienceChamberLevel", colony.chamberLevel()),
+                pair("colonyScienceVisibleShellLevel", colony.visibleChamberLevel()),
                 pair("colonyScienceCapacity", colony.colonyCapacity()),
                 pair("colonySciencePeak", colony.peakPopulation()),
                 pair("colonyScienceDelta", colony.deltaPopulation()),
