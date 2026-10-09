@@ -18,7 +18,9 @@ import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
+import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
+import dev.swarmmobs.colony.SwarmNestScoutSignal;
 import net.minecraft.world.entity.item.ItemEntity;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
@@ -46,6 +48,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.monster.Spider;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
@@ -4487,4 +4490,68 @@ public final class SwarmRuntimeGameTests {
         }
     }
 
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_spider_scout",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void roamingSpiderObservesRealItemForItsOwnNest(
+            GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(0, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        var core = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(core instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Spider scout fixture missing core");
+            return;
+        }
+        Spider scout = helper.spawn(EntityType.SPIDER, new BlockPos(3, 1, 2));
+        scout.setNoGravity(true);
+        scout.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(corePos).asLong());
+        Vec3 origin = helper.absoluteVec(new Vec3(4.9, 1.2, 2.5));
+        ItemEntity original = new ItemEntity(
+                helper.getLevel(), origin.x, origin.y, origin.z,
+                new ItemStack(Items.OAK_LOG, 2));
+        helper.getLevel().addFreshEntity(original);
+
+        boolean enabled = SwarmConfig.ENABLED.get();
+        boolean lifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean griefing = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+
+            boolean installed = scout.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(wrapped -> wrapped.getGoal()
+                            instanceof SwarmSpiderColonyScoutGoal);
+            if (!installed) {
+                helper.fail("Spider did not receive colony scouting goal");
+                return;
+            }
+            var goal = new SwarmSpiderColonyScoutGoal(scout);
+            if (!goal.canUse()) {
+                helper.fail("Loaded idle Spider did not schedule bounded item survey");
+                return;
+            }
+            goal.start();
+            if (!SwarmNestScoutSignal.recentFor(
+                    original, helper.absolutePos(corePos), helper.getLevel().getGameTime())
+                    || original.getItem().getCount() != 2 || !original.isAlive()
+                    || nest.resources() != 0) {
+                helper.fail("Spider sensing must mark, not consume, the real item");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(enabled);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(lifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(griefing, helper.getLevel().getServer());
+        }
+    }
 }
