@@ -3922,17 +3922,30 @@ public final class SwarmRuntimeGameTests {
             // The standard GameTest floor is not natural soil. Make exactly
             // one candidate site suitable for a persistent nest marker.
             helper.setBlock(new BlockPos(4, 0, 2), Blocks.DIRT);
-            SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(true);
+            SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
             SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
-            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
-                    .set(true, helper.getLevel().getServer());
 
             SwarmIdleNestGoal goal = founder.goalSelector.getAvailableGoals().stream()
                     .map(wrapped -> wrapped.getGoal())
                     .filter(SwarmIdleNestGoal.class::isInstance)
                     .map(SwarmIdleNestGoal.class::cast)
                     .findFirst().orElse(null);
-            if (goal == null || !goal.canUse()) {
+            if (goal == null || goal.canUse()) {
+                helper.fail("Disabled nesting incorrectly attempted world changes");
+                return;
+            }
+
+            SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(false, helper.getLevel().getServer());
+            if (goal.canUse()) {
+                helper.fail("Nest founding ignored mobGriefing=false");
+                return;
+            }
+
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            if (!goal.canUse()) {
                 helper.fail("Eligible idle group could not claim a natural-soil nest site");
                 return;
             }
