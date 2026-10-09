@@ -227,6 +227,14 @@ public final class SwarmControlNetwork {
             case "nest_visible_expansion_toggle" ->
                     SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(
                             !SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get());
+            case "nest_haul_toggle" ->
+                    SwarmConfig.NEST_HAULING_ENABLED.set(!SwarmConfig.NEST_HAULING_ENABLED.get());
+            case "nest_haul_radius_delta" -> SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set((int) clamp(
+                    SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get() + value, 4.0, 16.0));
+            case "nest_haul_stack_delta" -> SwarmConfig.NEST_HAUL_MAX_STACK.set((int) clamp(
+                    SwarmConfig.NEST_HAUL_MAX_STACK.get() + value, 1.0, 64.0));
+            case "nest_haul_interval_delta" -> SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set((int) clamp(
+                    SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.get() + value, 40.0, 400.0));
             case "nest_lifecycle_toggle" ->
                     SwarmConfig.NEST_LIFECYCLE_ENABLED.set(!SwarmConfig.NEST_LIFECYCLE_ENABLED.get());
             case "nest_max_population_delta" -> SwarmConfig.NEST_MAX_POPULATION.set((int) clamp(
@@ -245,6 +253,10 @@ public final class SwarmControlNetwork {
             case "nest_baseline" -> {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_HAULING_ENABLED.set(false);
+                SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
+                SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
+                SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
                 SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(false);
                 SwarmConfig.NEST_MAX_POPULATION.set(12);
                 SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
@@ -446,6 +458,10 @@ public final class SwarmControlNetwork {
             case "baseline_all" -> {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_HAULING_ENABLED.set(false);
+                SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
+                SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
+                SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
                 SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(false);
                 SwarmConfig.NEST_MAX_POPULATION.set(12);
                 SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
@@ -625,6 +641,12 @@ public final class SwarmControlNetwork {
                 pair("liveCreepers", creepers),
                 pair("nestEnabled", SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()),
                 pair("nestLifecycleEnabled", SwarmConfig.NEST_LIFECYCLE_ENABLED.get()),
+                pair("nestHaulingEnabled", SwarmConfig.NEST_HAULING_ENABLED.get()),
+                pair("nestHaulSearchRadius", SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get()),
+                pair("nestHaulMaxStack", SwarmConfig.NEST_HAUL_MAX_STACK.get()),
+                pair("nestHaulAttemptInterval", SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.get()),
+                pair("colonyHaulItems", colony.hauledItems()),
+                pair("colonyHaulTrips", colony.haulTrips()),
                 pair("nestVisibleExpansionEnabled",
                         SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()),
                 pair("nestMaxPopulation", SwarmConfig.NEST_MAX_POPULATION.get()),
