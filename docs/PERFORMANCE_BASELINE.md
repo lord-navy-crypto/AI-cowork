@@ -70,3 +70,25 @@ fallback. Never run live world/pathfinding access off the server thread.
 - This quota does **not** cover vanilla path work initiated by
   `PathNavigation.moveTo` or other Minecraft AI goals. Those require
   separate profiling before attempting to throttle them.
+
+## Navigation command deduplication
+
+The `SwarmApproachGoal` still refreshes its local tactical state, but it
+avoids issuing a redundant `PathNavigation.moveTo` when the commanded
+position and movement speed are effectively unchanged.
+
+- Significant destination changes (>0.25 horizontal blocks or >0.5 Y blocks)
+  and speed changes (>0.05) issue a fresh command immediately.
+- When navigation reports completion (including a failed path), unchanged
+  destinations are retried no more frequently than every 8 ticks.
+- While an existing path is active, unchanged destinations refresh at least
+  every 20 ticks to account for dynamic terrain.
+- Starting a new SwarmApproachGoal always issues a fresh movement request.
+- Combat handoff remains under the same existing GoalSelector conditions.
+- The Cloth Navigation tab now reports navigation commands issued/skipped,
+  completed-path retries and active-path periodic refreshes. These are
+  behavioral diagnostics and do not directly measure milliseconds saved.
+
+Benchmark before/after with the same moving-player trajectory and a blocked
+wall case. A change in path-call counts alone does not prove higher TPS; verify
+that it does not delay reactive steering or trapped-mob recovery.
