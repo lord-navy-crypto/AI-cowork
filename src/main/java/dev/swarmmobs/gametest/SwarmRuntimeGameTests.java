@@ -3998,6 +3998,22 @@ public final class SwarmRuntimeGameTests {
             return;
         }
 
+        // Resource-classification checks use real vanilla items, including
+        // the animal drops players expect colony foragers to collect later.
+        if (SwarmNestBlockEntity.classify(new ItemStack(Items.MUTTON))
+                    != SwarmNestColonyPolicy.Kind.NUTRIENT
+                || SwarmNestBlockEntity.classify(new ItemStack(Items.RABBIT))
+                    != SwarmNestColonyPolicy.Kind.NUTRIENT
+                || SwarmNestBlockEntity.classify(new ItemStack(Items.COOKED_BEEF))
+                    != SwarmNestColonyPolicy.Kind.NUTRIENT
+                || SwarmNestBlockEntity.classify(new ItemStack(Items.OAK_LOG))
+                    != SwarmNestColonyPolicy.Kind.TIMBER
+                || SwarmNestBlockEntity.classify(new ItemStack(Items.DIRT))
+                    != SwarmNestColonyPolicy.Kind.SOIL) {
+            helper.fail("Vanilla food, wood and soil classification drifted");
+            return;
+        }
+
         int acceptedLogs = nest.deposit(SwarmNestColonyPolicy.Kind.TIMBER, 2);
         int acceptedFood = nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 1);
         int rejected = nest.deposit(SwarmNestColonyPolicy.Kind.NONE, 100);
