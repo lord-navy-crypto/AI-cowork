@@ -4005,8 +4005,10 @@ public final class SwarmRuntimeGameTests {
         }
 
         int acceptedExtra = nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 1000);
-        if (acceptedExtra != 29
-                || nest.resources() != SwarmNestColonyPolicy.MAX_STORED_RESOURCES) {
+        // 10 + 29 * 4 = 126. Two spare units are insufficient for
+        // another four-unit nutrient item; no fractional matter is created.
+        if (acceptedExtra != 29 || nest.resources() != 126
+                || nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 1) != 0) {
             helper.fail("Nest resources exceeded their fixed storage capacity");
             return;
         }
