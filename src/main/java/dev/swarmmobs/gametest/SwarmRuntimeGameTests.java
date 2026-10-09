@@ -3217,7 +3217,10 @@ public final class SwarmRuntimeGameTests {
         skeletonB.setTarget(player);
         skeletonC.setTarget(player);
 
-        helper.runAfterDelay(24, () -> {
+        // Formation hysteresis (20 ticks) and specialization hold (30 ticks)
+        // are intentionally sequential when peers acquire the target on
+        // staggered planning ticks. Test the settled team, not initial startup.
+        helper.runAfterDelay(70, () -> {
             java.util.List<Skeleton> skeletons = java.util.List.of(
                     skeletonA,
                     skeletonB,
