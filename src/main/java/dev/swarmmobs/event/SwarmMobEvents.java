@@ -23,6 +23,7 @@ import dev.swarmmobs.algorithm.SwarmSearchPlanner;
 import dev.swarmmobs.algorithm.SwarmNeighborSelectionPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmTargetSquadPolicy;
+import dev.swarmmobs.algorithm.SwarmVisibleTargetPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.TargetPredictionPolicy;
@@ -647,7 +648,9 @@ public final class SwarmMobEvents {
             records.add(message.observation());
         }
 
-        Player direct = findDirectObservation(level, self);
+        Player direct = findDirectObservation(
+                level, self, state.directObservation() ? state.targetId() : null
+        );
         if (direct != null) {
             Vec3 look = direct.getLookAngle();
             Vec3 velocity = direct.getDeltaMovement();
@@ -743,7 +746,8 @@ public final class SwarmMobEvents {
 
     private static Player findDirectObservation(
             ServerLevel level,
-            PathfinderMob self
+            PathfinderMob self,
+            UUID incumbentId
     ) {
         double radius = SwarmConfig.TARGET_RADIUS.get();
         double radiusSqr = radius * radius;
@@ -754,10 +758,14 @@ public final class SwarmMobEvents {
                         && self.distanceToSqr(player) <= radiusSqr
         );
 
-        return players.stream()
-                .filter(self::hasLineOfSight)
-                .min(Comparator.comparingDouble(self::distanceToSqr))
-                .orElse(null);
+        // Only candidates with current real line of sight are eligible. A
+        // relayed or occluded old player must never receive sticky priority.
+        return SwarmVisibleTargetPolicy.choose(
+                players.stream().filter(self::hasLineOfSight).toList(),
+                incumbentId,
+                Player::getUUID,
+                self::distanceToSqr
+        );
     }
 
     private static Player resolvePlayer(ServerLevel level, UUID id) {
