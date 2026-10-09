@@ -11,6 +11,8 @@ import dev.swarmmobs.agent.SwarmNavigationMode;
 import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.TargetObservation;
+import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
+import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
@@ -3708,5 +3710,71 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_budget_deferral", templateNamespace = SwarmMobs.MOD_ID,
+            template = TEMPLATE, timeoutTicks = 80)
+    public static void budgetDeniedObstacleDoesNotIssueUnverifiedDirectMove(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        zombie.setNoGravity(true);
+
+        // The forward probe must hit this wall. Both lateral candidates near
+        // z=1 and z=4 stay open on the 5x5 test floor.
+        helper.setBlock(new BlockPos(3, 1, 2), Blocks.STONE);
+        helper.setBlock(new BlockPos(3, 2, 2), Blocks.STONE);
+
+        helper.runAfterDelay(2, () -> {
+            if (!SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.get()
+                    || !SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()) {
+                helper.fail("Path-budget integration test requires both navigation features enabled");
+                return;
+            }
+
+            var level = helper.getLevel();
+            SwarmApproachGoal approachGoal = zombie.goalSelector.getAvailableGoals().stream()
+                    .map(wrapped -> wrapped.getGoal())
+                    .filter(SwarmApproachGoal.class::isInstance)
+                    .map(SwarmApproachGoal.class::cast)
+                    .findFirst()
+                    .orElse(null);
+            if (approachGoal == null) {
+                helper.fail("Missing Zombie SwarmApproachGoal");
+                return;
+            }
+            zombie.goalSelector.removeGoal(approachGoal);
+
+            SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            state.rememberTarget(UUID.randomUUID(), helper.getTick(), false);
+            state.updateLocalPlan(
+                    0, 0, SwarmRole.CHASER,
+                    zombie.getX() + 3.0, zombie.getZ(),
+                    0.0, 0.0
+            );
+
+            int cap = SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.get();
+            var budget = SwarmPathBudgetRegistry.snapshot(level);
+            int remaining = Math.max(0, cap - budget.reservedTokens());
+            if (remaining > 0 && !SwarmPathBudgetRegistry.reserve(level, zombie, remaining)) {
+                helper.fail("Could not reserve remaining path budget for saturation fixture");
+                return;
+            }
+            long issuedBefore = SwarmNavigationCommandTelemetry.snapshot(level).issued();
+            approachGoal.start();
+            long issuedAfter = SwarmNavigationCommandTelemetry.snapshot(level).issued();
+            if (issuedAfter != issuedBefore) {
+                approachGoal.stop();
+                helper.fail("Budget denial issued an unverified direct move command");
+                return;
+            }
+            if (state.plannerContext() != SwarmPlannerContext.NONE) {
+                approachGoal.stop();
+                helper.fail("Budget denial published fake path feasibility telemetry");
+                return;
+            }
+
+            approachGoal.stop();
+            helper.succeed();
+        });
+    }
 
 }
