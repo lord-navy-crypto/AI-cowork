@@ -134,6 +134,10 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         }
         if (best != null) {
             if (!SwarmNestHaulLease.tryClaim(best, workerId, tick)) return false;
+            // Direct sight of the actual item outranks a remote stale lead.
+            // Remove its shared waypoint so another worker does not waste
+            // navigation budget chasing cargo that is already claimed.
+            nest.scoutBoard().discard(best.getUUID());
             item = best;
             scoutLead = null;
             home = targetHome;
