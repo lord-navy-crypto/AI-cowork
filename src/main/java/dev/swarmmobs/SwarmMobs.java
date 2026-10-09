@@ -8,6 +8,7 @@ import dev.swarmmobs.gametest.SwarmGameTestRegistration;
 import dev.swarmmobs.network.SwarmControlNetwork;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import dev.swarmmobs.registry.SwarmNestBlockEntities;
+import dev.swarmmobs.registry.SwarmNestItems;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -25,6 +26,7 @@ public final class SwarmMobs {
         SwarmAttachments.ATTACHMENT_TYPES.register(modBus);
         SwarmNestBlocks.BLOCKS.register(modBus);
         SwarmNestBlockEntities.TYPES.register(modBus);
+        SwarmNestItems.ITEMS.register(modBus);
         modBus.addListener(SwarmGameTestRegistration::register);
         modBus.addListener(SwarmControlNetwork::register);
         modContainer.registerConfig(ModConfig.Type.SERVER, SwarmConfig.SPEC);
