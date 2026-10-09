@@ -3780,4 +3780,107 @@ public final class SwarmRuntimeGameTests {
         });
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_two_player_squads", templateNamespace = SwarmMobs.MOD_ID,
+            template = TEMPLATE, timeoutTicks = 110)
+    public static void twoPlayersCreateIndependentTacticalSquadsThenMerge(GameTestHelper helper) {
+        if (!SwarmConfig.ENABLED.get()) {
+            helper.fail("Two-player tactical test requires swarm master enabled");
+            return;
+        }
+
+        Skeleton skeleton = helper.spawn(EntityType.SKELETON, new BlockPos(1, 1, 1));
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 1));
+        var creeper = helper.spawn(EntityType.CREEPER, new BlockPos(4, 1, 1));
+        for (var mob : java.util.List.of(skeleton, zombie, creeper)) {
+            mob.setNoGravity(true);
+            // Stationary members make this a test of live goal planning rather
+            // than which player the pathfinder happened to walk toward first.
+            mob.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(0.0);
+        }
+
+        TestPlayerHandle alpha = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        TestPlayerHandle beta = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        ServerPlayer playerA = alpha.player();
+        ServerPlayer playerB = beta.player();
+        playerA.setNoGravity(true);
+        playerB.setNoGravity(true);
+        var aPos = helper.absoluteVec(new Vec3(1.5, 3.0, 4.5));
+        var bPos = helper.absoluteVec(new Vec3(4.5, 3.0, 4.5));
+        playerA.setPos(aPos.x, aPos.y, aPos.z);
+        playerB.setPos(bPos.x, bPos.y, bPos.z);
+
+        helper.runAfterDelay(27, () -> {
+            var skeletonState = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+            var zombieState = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            var creeperState = creeper.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!playerA.getUUID().equals(skeletonState.targetId())
+                    || !playerA.getUUID().equals(zombieState.targetId())
+                    || !playerB.getUUID().equals(creeperState.targetId())) {
+                alpha.close();
+                beta.close();
+                helper.fail("Nearby monsters failed to choose their respective closer players");
+                return;
+            }
+            if (skeletonState.tacticalPeerCount() != 1
+                    || skeletonState.tacticalBreacherCount() != 0
+                    || zombieState.tacticalPeerCount() != 1
+                    || creeperState.tacticalPeerCount() != 0) {
+                alpha.close();
+                beta.close();
+                helper.fail("Different target Creeper leaked into Skeleton/Zombie tactical squad"
+                        + " skeleton peers=" + skeletonState.tacticalPeerCount()
+                        + " breachers=" + skeletonState.tacticalBreacherCount()
+                        + " zombie peers=" + zombieState.tacticalPeerCount()
+                        + " creeper peers=" + creeperState.tacticalPeerCount());
+                return;
+            }
+            // The physical neighborhood is still shared, which is essential
+            // for separation and communication despite different target IDs.
+            if (skeletonState.neighborCount() < 2 || creeperState.neighborCount() < 2) {
+                alpha.close();
+                beta.close();
+                helper.fail("Target-scoped tactical filtering incorrectly removed physical neighbors");
+                return;
+            }
+
+            // Move B out of direct perception. All three now see A, so their
+            // next planning cycles should form one target-scoped mixed squad.
+            playerB.setPos(bPos.x + 80.0, bPos.y, bPos.z + 80.0);
+        });
+
+        helper.runAfterDelay(58, () -> {
+            var skeletonState = skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+            var zombieState = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+            var creeperState = creeper.getData(SwarmAttachments.AGENT_STATE.get());
+
+            if (!playerA.getUUID().equals(skeletonState.targetId())
+                    || !playerA.getUUID().equals(zombieState.targetId())
+                    || !playerA.getUUID().equals(creeperState.targetId())) {
+                alpha.close();
+                beta.close();
+                helper.fail("Mixed swarm did not converge on remaining directly visible player");
+                return;
+            }
+            if (skeletonState.tacticalPeerCount() != 2
+                    || skeletonState.tacticalBreacherCount() != 1
+                    || zombieState.tacticalPeerCount() != 2
+                    || creeperState.tacticalPeerCount() != 2) {
+                alpha.close();
+                beta.close();
+                helper.fail("Same-target mixed squad did not merge after target change"
+                        + " skeleton peers=" + skeletonState.tacticalPeerCount()
+                        + " breachers=" + skeletonState.tacticalBreacherCount()
+                        + " zombie peers=" + zombieState.tacticalPeerCount()
+                        + " creeper peers=" + creeperState.tacticalPeerCount());
+                return;
+            }
+
+            alpha.close();
+            beta.close();
+            helper.succeed();
+        });
+    }
+
 }
