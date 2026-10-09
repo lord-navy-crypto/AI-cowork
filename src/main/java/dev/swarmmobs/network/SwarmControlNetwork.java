@@ -212,6 +212,11 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
             }
 
+            case "nest_lifecycle_toggle" ->
+                    SwarmConfig.NEST_LIFECYCLE_ENABLED.set(!SwarmConfig.NEST_LIFECYCLE_ENABLED.get());
+            case "nest_max_population_delta" -> SwarmConfig.NEST_MAX_POPULATION.set((int) clamp(
+                    SwarmConfig.NEST_MAX_POPULATION.get() + value, 3.0, 32.0
+            ));
             case "nest_toggle" ->
                     SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(!SwarmConfig.NEST_CONSTRUCTION_ENABLED.get());
             case "nest_interval_delta" -> SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set((int) clamp(
@@ -224,6 +229,8 @@ public final class SwarmControlNetwork {
             ));
             case "nest_baseline" -> {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
+                SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_MAX_POPULATION.set(12);
                 SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
                 SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
             }
@@ -418,6 +425,8 @@ public final class SwarmControlNetwork {
 
             case "baseline_all" -> {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
+                SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_MAX_POPULATION.set(12);
                 SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
                 SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
                 SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
@@ -588,6 +597,8 @@ public final class SwarmControlNetwork {
                 pair("liveSpiders", spiders),
                 pair("liveCreepers", creepers),
                 pair("nestEnabled", SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()),
+                pair("nestLifecycleEnabled", SwarmConfig.NEST_LIFECYCLE_ENABLED.get()),
+                pair("nestMaxPopulation", SwarmConfig.NEST_MAX_POPULATION.get()),
                 pair("nestBuildInterval", SwarmConfig.NEST_BUILD_INTERVAL_TICKS.get()),
                 pair("nestMinPopulation", SwarmConfig.NEST_MIN_GROUP_SIZE.get()),
                 pair("nestCoresFoundedByLoadedAgents",
