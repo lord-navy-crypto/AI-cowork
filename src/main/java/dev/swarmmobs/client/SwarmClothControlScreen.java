@@ -279,9 +279,13 @@ public final class SwarmClothControlScreen {
         if (bool(values, "colonyScienceAvailable")) {
             status(category, entries,
                     "Population: " + integer(values, "colonySciencePopulation")
-                            + " / " + integer(values, "nestMaxPopulation")
+                            + " / " + integer(values, "colonyScienceCapacity")
                             + " | occupancy " + decimal(values, "colonyScienceOccupancy")
                             + " | peak " + integer(values, "colonySciencePeak"));
+
+            status(category, entries,
+                    "Chamber level: " + integer(values, "colonyScienceChamberLevel")
+                            + " | module cost: 8 soil + 6 timber points when near full.");
 
             status(category, entries,
                     "Population trend per sample: " + integer(values, "colonyScienceDelta")
