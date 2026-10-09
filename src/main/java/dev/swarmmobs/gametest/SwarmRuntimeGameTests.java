@@ -4018,4 +4018,75 @@ public final class SwarmRuntimeGameTests {
         helper.succeed();
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_growth",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void resourceFedColonyBirthIsBoundedAndConsumesSupplies(GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(2, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(new BlockPos(4, 0, 2), Blocks.DIRT);
+
+        var blockEntity = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(blockEntity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Functional Nest Core was not registered as a BlockEntity");
+            return;
+        }
+
+        boolean oldLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        int oldCap = SwarmConfig.NEST_MAX_POPULATION.get();
+        boolean oldSpawning = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_DOMOBSPAWNING);
+        Difficulty oldDifficulty = helper.getLevel().getDifficulty();
+        TestPlayerHandle observer = createTickingTestPlayer(helper, GameType.SURVIVAL);
+
+        try {
+            // The simulated player is 18 blocks away: within the 48-block
+            // activity range, outside the 12-block no-spawn safety radius.
+            ServerPlayer player = observer.player();
+            player.setNoGravity(true);
+            Vec3 location = helper.absoluteVec(new Vec3(20.0, 1.0, 2.0));
+            player.setPos(location.x, location.y, location.z);
+
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_MAX_POPULATION.set(12);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING)
+                    .set(true, helper.getLevel().getServer());
+            helper.getLevel().getServer().setDifficulty(Difficulty.HARD, true);
+
+            // Three actual nutrient items are required for one 12-point birth.
+            if (nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 3) != 3) {
+                helper.fail("Nest could not accept required nutrient input");
+                return;
+            }
+
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.births() != 1L || nest.resources() != 0) {
+                helper.fail("One nutrient-funded colony birth did not consume exactly 12 points"
+                        + " births=" + nest.births() + " reserve=" + nest.resources());
+                return;
+            }
+
+            nest.runColonyCycle(helper.getLevel());
+            if (nest.births() != 1L) {
+                helper.fail("Colony cooldown failed to prevent immediate repeat spawning");
+                return;
+            }
+
+            nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 3);
+            SwarmConfig.NEST_MAX_POPULATION.set(3);
+            if (nest.births() != 1L) {
+                helper.fail("Unexpected birth before next lifecycle cycle");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            observer.close();
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(oldLifecycle);
+            SwarmConfig.NEST_MAX_POPULATION.set(oldCap);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING)
+                    .set(oldSpawning, helper.getLevel().getServer());
+            helper.getLevel().getServer().setDifficulty(oldDifficulty, true);
+        }
+    }
+
 }
