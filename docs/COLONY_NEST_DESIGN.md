@@ -237,3 +237,55 @@ Important distinction: the nest already **absorbs nearby dropped log items**
 but Zombies are not yet implemented as reliable log collectors with
 transport and delivery. A future worker task can implement all three
 steps and produce telemetry, without granting them a hidden crafting API.
+
+## Idle Zombie worker logistics — real dropped-item transport
+
+This incremental mechanic is now implemented as a **separate opt-in Goal**,
+`SwarmZombieColonyHaulGoal`, prioritised below engineering and close-range
+combat. Setting `nestHaulingEnabled=true` additionally requires
+`nestLifecycleEnabled=true`, the master swarm switch, and the
+`mobGriefing` gamerule. Defaults remain OFF.
+
+The colony core records its home position in nearby idle Zombie workers'
+persistent entity NBT. No global chunk-searching hive mind is involved.
+Each worker surveys existing item entities in a capped eight-block radius
+by default, no more than once every 100 ticks (plus entity staggering), and
+a dimension-wide survey budget allows one such scan every four ticks.
+
+**What the worker actually does:**
+1. Check its loaded home block entity, current task/target, current capacity,
+   and distance from the dropped source to players; do NOT take items within
+   six blocks of non-spectator players.
+2. Select one eligible dropped item entity (<=16 items by default), claim
+   it with a short-lived worker lease, and navigate toward its position.
+3. After reaching its pickup radius, escort **the same ItemEntity** back
+   to the core, updating its physical position periodically. The item remains
+   observable and may still be taken by normal Minecraft mechanics.
+4. After arriving, use the core's existing accounting function to consume
+   only accepted real items, increase the appropriate soil/timber/nutrient
+   reserve and persist cumulative *hauledItems* and *haulTrips* counters.
+5. When interrupted by a player target, task disablement, despawn or timeout,
+   release its claim and leave any remaining actual item entity in the world.
+   No invisible carrying inventory or newly minted replacement item exists.
+
+The system respects a maximum task duration of 260 ticks, navigation
+command retries no more frequently than 24 ticks per active worker, and
+a global budget of one new hauling navigation request every two ticks
+per dimension. Remote nest chunks are never force-loaded.
+
+### Still outside this increment
+
+- Zombies do NOT yet cut trees, harvest dirt, craft planks, hunt animals or
+  teleport materials from unloaded chunks.
+- Item stacks larger than the configured hauling limit are ignored rather
+  than split into hidden partial cargo.
+- Player-set protections are simple radius/game-rule gates; third-party
+  land-claim permission integrations have not been implemented.
+- There is no promised MSPT/TPS gain until the system is measured with
+  10/50/100/200 monsters and spark or equivalent profiling.
+
+### Runtime checks
+
+A real GameTest must verify that delivering two existing oak-log items
+produces exactly six timber points and one successful trip, and that
+interrupting a dirt delivery leaves the full dropped stack available.
