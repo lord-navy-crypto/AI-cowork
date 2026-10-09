@@ -166,3 +166,51 @@ scan unloaded chunks or add a per-tick global registry.
 - Different mixes of actual mobs cause measurably different next recruits.
 - Single GameTest server regression and JAR build must pass; this is NOT
   a substitute for 50/100/200-mob real MSPT benchmarking.
+
+## Physical nest expansion (new opt-in experiment)
+
+Scientific inspiration: Khuong et al., *PNAS* 2016,
+https://doi.org/10.1073/pnas.1509829113 demonstrated local material
+deposition and stigmergic feedback in ant nest construction. The Minecraft
+mechanic below is **not** a biologically calibrated reconstruction.
+
+When `nestVisibleExpansionEnabled=true`, the core attempts to express
+each newly completed abstract chamber as a pair of **actual world blocks**:
+
+- One mud-brick soil masonry element and one stripped-oak timber support.
+- Positions are deterministic within a two-block-radius footprint.
+  Up to four chambers fill eight positions at ground level; subsequent
+  chambers place supported upper-tier pieces (14 maximum pieces).
+- Existing `SOIL_COST=8` and `TIMBER_COST=6` resource points finance both
+  the room-capacity increase **and** its two visible representatives.
+  Materials are never billed twice.
+- Every proposed position must already be loaded, within world bounds,
+  completely air/dry, without a living entity, and on a natural solid
+  foundation (upper tier must stand on already constructed shell).
+- Both candidates are checked before changing the world; construction
+  respects `mobGriefing` and is rejected near players. Existing blocks
+  are NEVER replaced, and a failure leaves the room level and resource
+  stores intact. No excavation or new chunk loading takes place.
+- The visible construction option is OFF by default, independently of
+  `nestLifecycleEnabled`. When enabled on an old core that previously
+  paid for abstract rooms, at most one already-paid room is visualized
+  per 200-tick colony cycle with no second resource charge.
+- Control Panel -> Coordination shows both actual *visible shell level*
+  and the internal *abstract chamber level*. Obstructions can cause an
+  intentional mismatch; this is not automatically treated as a bug.
+- Scope is intentionally a compact **prototype mound/shell**, not a
+  functional tunnel network, an excavated chamber or a large beehive.
+
+### Distinct resource purposes
+
+- **Soil:** structural masonry and future corridor foundations;
+  does NOT increase population or count as food.
+- **Timber:** load-bearing frames and planned storage/maintenance modules;
+  does NOT increase population or count as food.
+- **Meat/organic nutrients:** new-colony-member production and future
+  brood/nutrition pressure; does NOT substitute for building materials.
+
+We explicitly separate the current measured engineering ratios (game design)
+from ant/honeybee experimental biology. A future 'forager' should physically
+collect item drops in loaded chunks and deliver them, with no duplicate
+item creation or forced animal hunting/excavation.
