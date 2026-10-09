@@ -49,6 +49,14 @@ public final class SwarmColonySciencePolicy {
         int limit = Math.max(1, capacity);
         double workerShare = clamp(workerTargetShare, 0.15, 0.65);
         double guardShare = clamp(guardTargetShare, 0.10, 0.50);
+        // User-editable targets cannot eliminate scouts and reserves by
+        // accidentally summing above 100%. Preserve at least 20% combined.
+        double combined = workerShare + guardShare;
+        if (combined > 0.80) {
+            double scale = 0.80 / combined;
+            workerShare *= scale;
+            guardShare *= scale;
+        }
         double remaining = Math.max(0.0, 1.0 - workerShare - guardShare);
         double scoutShare = remaining * 0.60;
         double reserveShare = remaining - scoutShare;
