@@ -4554,4 +4554,92 @@ public final class SwarmRuntimeGameTests {
                     .set(griefing, helper.getLevel().getServer());
         }
     }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_remote_scout_handoff",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void spiderReportDispatchesOneZombieBeyondDirectItemSearch(
+            GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(0, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        var entity = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(entity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Remote scout dispatch fixture has no core");
+            return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(0, 1, 0));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(corePos).asLong());
+        Vec3 dropPos = helper.absoluteVec(new Vec3(4.99, 1.2, 2.5));
+        ItemEntity realItem = new ItemEntity(
+                helper.getLevel(), dropPos.x, dropPos.y, dropPos.z,
+                new ItemStack(Items.OAK_LOG, 2));
+        helper.getLevel().addFreshEntity(realItem);
+
+        boolean wasEnabled = SwarmConfig.ENABLED.get();
+        boolean wasLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean wasHauling = SwarmConfig.NEST_HAULING_ENABLED.get();
+        int wasRadius = SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get();
+        boolean wasGriefing = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(4);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            if (!nest.reportScoutItem(realItem, helper.getLevel().getGameTime())) {
+                helper.fail("Loaded core did not accept Spider-like real resource report");
+                return;
+            }
+            var goal = new SwarmZombieColonyHaulGoal(worker);
+            if (!goal.canUse()) {
+                helper.fail("Worker did not reserve remote scout report");
+                return;
+            }
+            if (nest.scoutBoard().reserve(UUID.randomUUID(),
+                    worker.blockPosition(), helper.getLevel().getGameTime(), 28) != null) {
+                helper.fail("Two workers reserved the same remote item lead");
+                goal.stop();
+                return;
+            }
+            goal.start();
+            if (!goal.canContinueToUse()) {
+                helper.fail("Remote waypoint was incorrectly rejected without nearby item");
+                goal.stop();
+                return;
+            }
+            // Explicit position changes test lookup + exact cargo conservation.
+            // An independent natural-pathfinding GameTest is still needed.
+            worker.setPos(dropPos.x - .3, dropPos.y, dropPos.z);
+            goal.tick();
+            if (!realItem.isAlive() || !SwarmNestHaulLease.isClaimed(
+                    realItem, helper.getLevel().getGameTime())) {
+                helper.fail("Remote report did not resolve and claim original world item");
+                goal.stop();
+                return;
+            }
+            Vec3 dock = helper.absoluteVec(new Vec3(1.1, 1.0, 2.5));
+            worker.setPos(dock.x, dock.y, dock.z);
+            goal.tick();
+            goal.stop();
+            if (realItem.isAlive() || nest.resources() != 6
+                    || nest.timberPoints() != 6 || nest.hauledItems() != 2
+                    || nest.haulTrips() != 1
+                    || nest.scoutBoard().size(helper.getLevel().getGameTime()) != 0) {
+                helper.fail("Spider waypoint did not deliver exactly two real logs");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(wasEnabled);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(wasLifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(wasHauling);
+            SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(wasRadius);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(wasGriefing, helper.getLevel().getServer());
+        }
+    }
 }
