@@ -95,3 +95,20 @@ position and movement speed are effectively unchanged.
 Benchmark before/after with the same moving-player trajectory and a blocked
 wall case. A change in path-call counts alone does not prove higher TPS; verify
 that it does not delay reactive steering or trapped-mob recovery.
+
+## Budget-denial navigation correctness (follow-up fix)
+
+- A denied obstacle-evidence reservation now defers the **entire movement
+  update** instead of falling back to a new unverified direct route through
+  the blocked forward probe. An already-active path is left untouched.
+- Recovery budget deferrals remain distinct from recovery failures.
+- A waiting mob cancels its queued demand when its obstacle disappears,
+  all candidate locations are terrain-blocked (no path evidence needed), its
+  recovery set is empty, or its movement goal is stopped.
+- The Runtime GameTest intentionally saturates the evidence budget in front
+  of a real block wall and verifies that denial cannot issue a new movement
+  command or publish fabricated path feasibility data.
+
+The queue cancellation protects other mobs' reserved capacity; it is not a
+Minecraft vanilla-pathfinding rate limit. If no existing path is active, the
+agent can stay still until quota becomes available on a subsequent tick.
