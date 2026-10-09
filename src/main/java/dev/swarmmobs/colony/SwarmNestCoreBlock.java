@@ -1,6 +1,7 @@
 package dev.swarmmobs.colony;
 
 import dev.swarmmobs.registry.SwarmNestBlockEntities;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -13,7 +14,14 @@ import org.jetbrains.annotations.Nullable;
 
 /** World-persistent, resource-limited monster colony core. */
 public final class SwarmNestCoreBlock extends BaseEntityBlock {
+    public static final MapCodec<SwarmNestCoreBlock> CODEC = simpleCodec(SwarmNestCoreBlock::new);
+
     public SwarmNestCoreBlock(Properties properties) { super(properties); }
+
+    @Override
+    protected MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
