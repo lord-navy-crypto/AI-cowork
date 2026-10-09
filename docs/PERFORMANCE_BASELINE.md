@@ -165,3 +165,28 @@ Runtime Command Center -> Coordination now reports:
 
 This diagnostic is not an absolute count of disconnected squads: agents
 sharing one target far apart might belong to different local subgroups.
+
+## Player target churn and squad hysteresis (v0.13)
+
+A mob's formation slot, pending tactical role, and temporary task lease now
+belong to **one selected player target UUID**. When that UUID changes:
+
+- Formation slot and tactical role hysteresis are reinitialized for the new
+  squad immediately (no inherited 12-30 tick hold from the old player).
+- Old temporary task/specialization leases are released, allowing the new
+  target to assign a suitable Spider flank or Zombie engineering role.
+- Accumulated task experience and lifetime reassignment counters are retained.
+- Unchanged target UUIDs preserve ordinary anti-jitter hysteresis.
+- When target memory is forgotten, old tactical squad counters and binding
+  clear together.
+
+For nearby visible players, direct observation also applies a **15% linear
+distance retention window**: if the already directly observed incumbent is
+still visible and remains within 1.15x the closest player's range, the mob
+keeps its current target instead of oscillating from tiny distance reversals.
+A competing player substantially closer wins immediately, and any invisible,
+spectator, creative-mode or absent incumbent loses this preference.
+
+This does not pin a target forever, override sensing dropout, or force mobs
+to act on exact positions from relayed observations. The policy is limited
+to the direct visible-player selection path.
