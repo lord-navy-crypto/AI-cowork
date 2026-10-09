@@ -39,6 +39,19 @@ jobs:
         run: timeout 8m gradle runGameTestServer --no-daemon --stacktrace --warning-mode all
       - name: Build
         run: gradle build --stacktrace --warning-mode all
+      - name: Verify custom Nest Core assets
+        if: ${{ hashFiles('src/main/java/dev/swarmmobs/colony/SwarmNestCoreBlock.java') != '' }}
+        run: |
+          set -eu
+          JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)
+          test -n "$JAR"
+          jar tf "$JAR" > /tmp/swarm-nest-jar-contents.txt
+          grep -qx 'assets/swarmmobs/textures/block/nest_core_side.png' /tmp/swarm-nest-jar-contents.txt
+          grep -qx 'assets/swarmmobs/textures/block/nest_core_top.png' /tmp/swarm-nest-jar-contents.txt
+          grep -qx 'assets/swarmmobs/models/block/nest_core.json' /tmp/swarm-nest-jar-contents.txt
+          grep -qx 'assets/swarmmobs/models/item/nest_core.json' /tmp/swarm-nest-jar-contents.txt
+          echo "Verified original Nest Core PNGs and block/item models inside JAR"
+
       - name: Upload jar
         uses: actions/upload-artifact@v6
         with:
