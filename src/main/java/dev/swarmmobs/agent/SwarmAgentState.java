@@ -20,6 +20,8 @@ public final class SwarmAgentState {
     private long nextPlanTick;
     private boolean planningScheduleInitialized;
     private boolean directObservation;
+    private int tacticalPeerCount;
+    private int tacticalBreacherCount;
     private int neighborCount;
     private int formationSlot;
     private boolean formationSlotInitialized;
@@ -156,6 +158,22 @@ public final class SwarmAgentState {
     public int neighborCount() {
         return neighborCount;
     }
+    
+    /** Same-target nearby members, excluding self. */
+    public int tacticalPeerCount() {
+        return tacticalPeerCount;
+    }
+
+    /** Same-target nearby Creeper breachers, excluding self. */
+    public int tacticalBreacherCount() {
+        return tacticalBreacherCount;
+    }
+
+    public void updateTacticalSquadTelemetry(int peers, int breachers) {
+        this.tacticalPeerCount = Math.max(0, peers);
+        this.tacticalBreacherCount = Math.max(0, Math.min(this.tacticalPeerCount, breachers));
+    }
+
 
     public int formationSlot() {
         return formationSlot;
