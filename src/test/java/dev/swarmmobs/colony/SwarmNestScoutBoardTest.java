@@ -82,6 +82,19 @@ class SwarmNestScoutBoardTest {
     }
 
     @Test
+    void physicalPickupCanInvalidateRemoteLeadWithoutLeavingAnyClaim() {
+        var board = new SwarmNestScoutBoard();
+        UUID item = UUID.randomUUID(), first = UUID.randomUUID();
+        assertTrue(board.publish(item, new SwarmNestScoutBoard.Position(12, 64, 0),
+                SwarmNestColonyPolicy.Kind.TIMBER, 30, HOME));
+        assertNotNull(board.reserve(first, HOME, 31, 20));
+        board.discard(item);
+        assertFalse(board.renew(item, first, 32));
+        assertNull(board.reserve(UUID.randomUUID(), HOME, 32, 20));
+        assertEquals(0, board.size(32));
+    }
+
+    @Test
     void dropsOutsideWorkerReachRemainUnassigned() {
         var board = new SwarmNestScoutBoard();
         board.publish(UUID.randomUUID(), new SwarmNestScoutBoard.Position(25, 64, 0),
