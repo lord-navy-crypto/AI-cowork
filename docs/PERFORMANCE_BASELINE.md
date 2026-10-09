@@ -135,3 +135,33 @@ the squad's allocation.
 This does **not** prevent target observations from moving between local
 agents: the ordinary message pipeline may still cause a mob to switch
 targets, at which point it joins the new target's local tactical squad.
+
+## Live dual-player tactical isolation regression
+
+The `swarm_runtime_two_player_squads` Minecraft GameTest now creates
+**two independent fake players** (unique usernames) plus live Skeleton,
+Zombie, and Creeper entities. It checks two consecutive real planning phases:
+
+1. Skeleton and Zombie initially perceive player A while Creeper perceives
+   player B. The Skeleton's tactical peer count must be one, with **zero**
+   same-target breachers, even though Creeper is a nearby physical neighbor.
+   Creeper initially has zero same-target allies.
+2. Player B becomes Spectator without leaving the loaded GameTest region.
+   All three monsters should select the remaining eligible player A, and the
+   resulting tactical squad should contain two peers per member. Skeleton
+   should then report one same-target Creeper breacher.
+
+Movement-speed zero keeps each member positioned consistently for sensing
+and target-composition assertions. Live `EntityTickEvent.Post` planning,
+attachments, fake player validity and actual entity neighborhoods are used.
+
+Runtime Command Center -> Coordination now reports:
+- `liveTacticalAlliedAgents`: count of live swarm members who currently
+  have at least one **same-target** local peer.
+- `liveTacticalPeerLinks`: sum of directed local same-target peer observations
+  (a pair observed in both directions counts as two).
+- `liveTacticalBreacherSupport`: number of members with at least one
+  same-target nearby breacher; different-target Creepers do not count.
+
+This diagnostic is not an absolute count of disconnected squads: agents
+sharing one target far apart might belong to different local subgroups.
