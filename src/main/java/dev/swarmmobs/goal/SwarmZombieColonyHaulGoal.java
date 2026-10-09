@@ -45,6 +45,8 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
     private long nextSearchTick = Long.MIN_VALUE;
     private long lastMoveTick = Long.MIN_VALUE;
     private long startTick;
+    private long lastProgressTick;
+    private double bestRemainingDistanceSq = Double.POSITIVE_INFINITY;
 
     public SwarmZombieColonyHaulGoal(Zombie zombie) {
         this.zombie = zombie;
@@ -64,7 +66,12 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 + Math.floorMod(zombie.getId(), 23);
 
         var persistent = zombie.getPersistentData();
-        if (!persistent.contains("SwarmColonyNest")) return false;
+        if (!persistent.contains("SwarmColonyNest")
+                || (persistent.contains("SwarmColonyDimension")
+                        && !level.dimension().location().toString()
+                                .equals(persistent.getString("SwarmColonyDimension")))) {
+            return false;
+        }
         BlockPos targetHome = BlockPos.of(persistent.getLong("SwarmColonyNest"));
         if (!level.hasChunkAt(targetHome)
                 || !(level.getBlockEntity(targetHome) instanceof SwarmNestBlockEntity nest)
@@ -83,7 +90,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         int radius = SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get();
         String workerId = zombie.getUUID().toString();
         ItemEntity best = null;
-        double bestDistance = Double.POSITIVE_INFINITY;
+        double bestScore = Double.POSITIVE_INFINITY;
         for (ItemEntity drop : level.getEntitiesOfClass(
                 ItemEntity.class, zombie.getBoundingBox().inflate(radius),
                 candidate -> candidate.isAlive() && !candidate.getItem().isEmpty())) {
@@ -95,15 +102,23 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                     SwarmNestColonyPolicy.MAX_STORED_RESOURCES - nest.resources())) {
                 continue;
             }
-            if (SwarmNestHaulLease.claimedByAnother(drop, workerId, tick)
+            if (!SwarmNestHaulPolicy.hasRoomFor(
+                    nest.resources(), drop.getItem().getCount(), kind)
+                    || SwarmNestHaulLease.claimedByAnother(drop, workerId, tick)
                     || drop.distanceToSqr(targetHome.getX() + .5,
                             targetHome.getY() + .5, targetHome.getZ() + .5) < 16.0) {
                 // Passive intake already owns drops very close to the core.
                 continue;
             }
-            double d2 = zombie.distanceToSqr(drop);
-            if (d2 < bestDistance) {
-                bestDistance = d2;
+            // Nearby items still win unless the colony actually lacks a
+            // category for construction or reproduction. Pure score, no
+            // additional pathfinding queries and no spider-wide scans.
+            double score = SwarmNestHaulPolicy.pickupScore(kind,
+                    zombie.distanceToSqr(drop), nest.soilPoints(),
+                    nest.timberPoints(), nest.nutrientPoints(), nest.legacyPoints(),
+                    nest.chamberLevel(), SwarmConfig.NEST_MAX_POPULATION.get());
+            if (score < bestScore) {
+                bestScore = score;
                 best = drop;
             }
         }
@@ -119,8 +134,11 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         if (!(zombie.level() instanceof ServerLevel level)
                 || !idle(level) || phase == Phase.NONE || home == null || item == null
                 || !level.hasChunkAt(home)
-                || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity)
-                || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())) {
+                || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
+                || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())
+                || !SwarmNestHaulPolicy.hasRoomFor(nest.resources(),
+                        item.getItem().getCount(),
+                        SwarmNestBlockEntity.classify(item.getItem()))) {
             return false;
         }
         return SwarmNestHaulPolicy.canContinue(
@@ -132,6 +150,8 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
     public void start() {
         startTick = zombie.level().getGameTime();
         lastMoveTick = Long.MIN_VALUE;
+        lastProgressTick = startTick;
+        bestRemainingDistanceSq = Double.POSITIVE_INFINITY;
     }
 
     @Override
@@ -150,9 +170,12 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         if (phase == Phase.TO_ITEM) {
             if (zombie.distanceToSqr(item) <= 2.25) {
                 phase = Phase.TO_NEST;
+                // Track progress independently on the return route.
+                lastProgressTick = tick;
+                bestRemainingDistanceSq = Double.POSITIVE_INFINITY;
                 zombie.getNavigation().stop();
             } else {
-                navigate(level, item.getX(), item.getY(), item.getZ(), tick);
+                follow(level, item.getX(), item.getY(), item.getZ(), tick);
                 return;
             }
         }
@@ -183,8 +206,24 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 zombie.getNavigation().stop();
                 return;
             }
-            navigate(level, home.getX() + .5, home.getY(), home.getZ() + .5, tick);
+            follow(level, home.getX() + .5, home.getY(), home.getZ() + .5, tick);
         }
+    }
+
+    private void follow(ServerLevel level, double x, double y, double z, long tick) {
+        double remaining = zombie.distanceToSqr(x, y, z);
+        if (SwarmNestHaulPolicy.progress(bestRemainingDistanceSq, remaining)) {
+            bestRemainingDistanceSq = remaining;
+            lastProgressTick = tick;
+        }
+        if (SwarmNestHaulPolicy.stalled(tick, lastProgressTick)) {
+            // Unreachable paths must not monopolize a lease until full task
+            // expiry. Goal.stop releases the unconsumed physical item.
+            phase = Phase.NONE;
+            zombie.getNavigation().stop();
+            return;
+        }
+        navigate(level, x, y, z, tick);
     }
 
     private void navigate(ServerLevel level, double x, double y, double z, long tick) {
