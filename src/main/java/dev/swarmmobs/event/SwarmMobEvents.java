@@ -20,6 +20,7 @@ import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
 import dev.swarmmobs.algorithm.SwarmTaskDemandPolicy;
 import dev.swarmmobs.algorithm.SwarmTaskSaturationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
+import dev.swarmmobs.algorithm.SwarmNeighborSelectionPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
@@ -106,8 +107,9 @@ public final class SwarmMobEvents {
 
         state.scheduleNextPlan(gameTick, interval);
 
-        List<PathfinderMob> movementNeighbors = findMovementNeighbors(level, mob);
-        List<PathfinderMob> communicationNeighbors = findCommunicationNeighbors(level, mob);
+        var neighbors = findNearbyPeers(level, mob);
+        List<PathfinderMob> movementNeighbors = neighbors.movement();
+        List<PathfinderMob> communicationNeighbors = neighbors.communication();
 
         receiveNeighborMessages(
                 mob,
@@ -523,54 +525,40 @@ public final class SwarmMobEvents {
         return hit.getType() == HitResult.Type.MISS;
     }
 
-    private static List<PathfinderMob> findMovementNeighbors(
+    /**
+     * One entity query feeds two independently capped channels. In particular a
+     * wide communication radius must not crowd out the nearest movement peers.
+     */
+    private static SwarmNeighborSelectionPolicy.Selection<PathfinderMob> findNearbyPeers(
             ServerLevel level,
             PathfinderMob self
     ) {
-        return findNearbyPeers(
-                level,
-                self,
-                SwarmConfig.NEIGHBOR_RADIUS.get(),
-                SwarmConfig.MAX_NEIGHBORS.get()
-        );
-    }
+        boolean communicationEnabled = SwarmConfig.COMMUNICATION_ENABLED.get();
+        double movementRadius = SwarmConfig.NEIGHBOR_RADIUS.get();
+        double communicationRadius = SwarmConfig.COMMUNICATION_RADIUS.get();
+        double radius = communicationEnabled
+                ? Math.max(movementRadius, communicationRadius)
+                : movementRadius;
+        double radiusSquared = radius * radius;
 
-    private static List<PathfinderMob> findCommunicationNeighbors(
-            ServerLevel level,
-            PathfinderMob self
-    ) {
-        if (!SwarmConfig.COMMUNICATION_ENABLED.get()) {
-            return List.of();
-        }
-
-        return findNearbyPeers(
-                level,
-                self,
-                SwarmConfig.COMMUNICATION_RADIUS.get(),
-                SwarmConfig.MAX_NEIGHBORS.get()
-        );
-    }
-
-    private static List<PathfinderMob> findNearbyPeers(
-            ServerLevel level,
-            PathfinderMob self,
-            double radius,
-            int maxNeighbors
-    ) {
-        double radiusSqr = radius * radius;
-        List<PathfinderMob> nearby = level.getEntitiesOfClass(
+        List<PathfinderMob> candidates = level.getEntitiesOfClass(
                 PathfinderMob.class,
                 self.getBoundingBox().inflate(radius),
                 candidate -> candidate != self
                         && candidate.isAlive()
                         && !candidate.isNoAi()
                         && SwarmAgentProfiles.isSupported(candidate)
-                        && self.distanceToSqr(candidate) <= radiusSqr
+                        && self.distanceToSqr(candidate) <= radiusSquared
         );
 
-        nearby.sort(Comparator.comparingDouble(self::distanceToSqr));
-        int limit = Math.min(Math.max(0, maxNeighbors), nearby.size());
-        return new ArrayList<>(nearby.subList(0, limit));
+        return SwarmNeighborSelectionPolicy.select(
+                candidates,
+                self::distanceToSqr,
+                movementRadius,
+                communicationRadius,
+                SwarmConfig.MAX_NEIGHBORS.get(),
+                communicationEnabled
+        );
     }
 
     private static void receiveNeighborMessages(
