@@ -40,6 +40,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private static final int[] DX = {2, -2, 0, 0, 2, -2, 2, -2};
     private static final int[] DZ = {0, 0, 2, -2, 2, 2, -2};
     private int resources;
+    private int chamberLevel;
     // Individually conserved resource categories. Legacy points keep old
     // 0.14 pre-science worlds compatible without inventing a food source.
     private int soilPoints;
@@ -60,6 +61,11 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     }
 
     public int resources() { return resources; }
+    public int chamberLevel() { return chamberLevel; }
+    public int effectiveCapacity() {
+        return SwarmNestArchitecturePolicy.effectiveCapacity(
+                chamberLevel, SwarmConfig.NEST_MAX_POPULATION.get());
+    }
     public int soilPoints() { return soilPoints; }
     public int timberPoints() { return timberPoints; }
     public int nutrientPoints() { return nutrientPoints; }
@@ -77,6 +83,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         super.loadAdditional(tag, registries);
         resources = Math.max(0, Math.min(SwarmNestColonyPolicy.MAX_STORED_RESOURCES,
                 tag.getInt("Resources")));
+        chamberLevel = Math.max(0, Math.min(SwarmNestArchitecturePolicy.MAX_CHAMBER_LEVEL,
+                tag.getInt("ChamberLevel")));
         // Clamp every resource bucket to the unallocated remainder. Old saves
         // have only "Resources": preserve them as explicitly labeled legacy
         // supply rather than pretending they are newly acquired nutrition.
@@ -99,6 +107,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt("Resources", resources);
+        tag.putInt("ChamberLevel", chamberLevel);
         tag.putInt("SoilPoints", soilPoints);
         tag.putInt("TimberPoints", timberPoints);
         tag.putInt("NutrientPoints", nutrientPoints);
@@ -173,6 +182,19 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         List<PathfinderMob> members = members(level);
         assignVisibleLeaders(members);
 
+        // A local, real-material engineering upgrade: virtual nest chambers
+        // expand carrying capacity without altering protected world terrain.
+        if (SwarmNestArchitecturePolicy.canExtend(
+                chamberLevel, SwarmConfig.NEST_MAX_POPULATION.get(),
+                members.size(), soilPoints, timberPoints)) {
+            soilPoints -= SwarmNestArchitecturePolicy.SOIL_COST;
+            timberPoints -= SwarmNestArchitecturePolicy.TIMBER_COST;
+            resources -= SwarmNestArchitecturePolicy.SOIL_COST
+                    + SwarmNestArchitecturePolicy.TIMBER_COST;
+            chamberLevel++;
+            setChanged();
+        }
+
         int workerCount = 0, guardCount = 0, scoutCount = 0, reserveCount = 0;
         for (PathfinderMob member : members) {
             if (member instanceof Zombie) workerCount++;
@@ -182,7 +204,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
         var science = SwarmColonySciencePolicy.evaluate(
                 workerCount, guardCount, scoutCount, reserveCount,
-                SwarmConfig.NEST_MAX_POPULATION.get(),
+                effectiveCapacity(),
                 nutrientPoints + legacyPoints,
                 SwarmConfig.NEST_WORKER_TARGET_SHARE.get(),
                 SwarmConfig.NEST_GUARD_TARGET_SHARE.get(),
@@ -205,7 +227,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 observed, playerClose,
                 birthSite != null,
                 nutrientPoints + legacyPoints, members.size(),
-                SwarmConfig.NEST_MAX_POPULATION.get(), tick, nextSpawnTick)) {
+                effectiveCapacity(), tick, nextSpawnTick)) {
             return;
         }
 
@@ -254,7 +276,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                     guardCount + (recruit == SwarmColonySciencePolicy.Job.GUARD ? 1 : 0),
                     scoutCount + (recruit == SwarmColonySciencePolicy.Job.SCOUT ? 1 : 0),
                     reserveCount + (recruit == SwarmColonySciencePolicy.Job.RESERVE ? 1 : 0),
-                    SwarmConfig.NEST_MAX_POPULATION.get(),
+                    effectiveCapacity(),
                     nutrientPoints + legacyPoints,
                     SwarmConfig.NEST_WORKER_TARGET_SHARE.get(),
                     SwarmConfig.NEST_GUARD_TARGET_SHARE.get(),
