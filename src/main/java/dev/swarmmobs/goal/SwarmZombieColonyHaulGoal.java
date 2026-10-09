@@ -7,6 +7,7 @@ import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
 import dev.swarmmobs.colony.SwarmNestHaulPolicy;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
+import dev.swarmmobs.colony.SwarmNestScoutBoard;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.registry.SwarmNestBlocks;
@@ -17,6 +18,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
 
 import java.util.EnumSet;
 import java.util.Map;
@@ -32,7 +34,7 @@ import java.util.WeakHashMap;
  * Vanilla close-range combat and high-priority Zombie engineering take over.
  */
 public final class SwarmZombieColonyHaulGoal extends Goal {
-    private enum Phase { NONE, TO_ITEM, TO_NEST }
+    private enum Phase { NONE, TO_SCOUT, TO_ITEM, TO_NEST }
 
     private static final Map<ServerLevel, SwarmNestSurveyBudget> SEARCH_BUDGETS =
             new WeakHashMap<>();
@@ -41,6 +43,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
 
     private final Zombie zombie;
     private ItemEntity item;
+    private SwarmNestScoutBoard.Lead scoutLead;
     private BlockPos home;
     private Phase phase = Phase.NONE;
     private long nextSearchTick = Long.MIN_VALUE;
@@ -129,28 +132,49 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 best = drop;
             }
         }
-        if (best == null || !SwarmNestHaulLease.tryClaim(best, workerId, tick)) return false;
-        item = best;
+        if (best != null) {
+            if (!SwarmNestHaulLease.tryClaim(best, workerId, tick)) return false;
+            item = best;
+            scoutLead = null;
+            home = targetHome;
+            phase = Phase.TO_ITEM;
+            return true;
+        }
+        // Direct sensing failed: use the nest's bounded Spider job board.
+        // No distant ItemEntity lookup occurs here. The worker must actually
+        // reach the reported coordinates before verifying the physical drop.
+        var report = nest.scoutBoard().reserve(zombie.getUUID(),
+                zombie.blockPosition(), tick, SwarmNestScoutBoard.MAX_DISTANCE);
+        if (report == null || !level.hasChunkAt(report.position())) {
+            if (report != null) nest.scoutBoard().release(report.itemId(), zombie.getUUID());
+            return false;
+        }
+        scoutLead = report;
+        item = null;
         home = targetHome;
-        phase = Phase.TO_ITEM;
+        phase = Phase.TO_SCOUT;
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
         if (!(zombie.level() instanceof ServerLevel level)
-                || !idle(level) || phase == Phase.NONE || home == null || item == null
+                || !idle(level) || phase == Phase.NONE || home == null
                 || !level.hasChunkAt(home)
                 || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
-                || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())
-                || !SwarmNestHaulPolicy.hasRoomFor(nest.resources(),
-                        item.getItem().getCount(),
-                        SwarmNestBlockEntity.classify(item.getItem()))) {
+                || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())) {
             return false;
         }
+        boolean cargoValid = phase == Phase.TO_SCOUT
+                ? scoutLead != null && level.hasChunkAt(scoutLead.position())
+                        && SwarmNestColonyPolicy.acceptAmount(nest.resources(), 1,
+                                scoutLead.kind()) > 0
+                : item != null && item.isAlive() && !item.getItem().isEmpty()
+                        && SwarmNestHaulPolicy.hasRoomFor(nest.resources(),
+                                item.getItem().getCount(),
+                                SwarmNestBlockEntity.classify(item.getItem()));
         return SwarmNestHaulPolicy.canContinue(
-                level.getGameTime() - startTick, true,
-                item.isAlive() && !item.getItem().isEmpty(), true);
+                level.getGameTime() - startTick, true, cargoValid, true);
     }
 
     @Override
@@ -163,13 +187,60 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
 
     @Override
     public void tick() {
-        if (!(zombie.level() instanceof ServerLevel level)
-                || item == null || home == null || !item.isAlive()) {
+        if (!(zombie.level() instanceof ServerLevel level) || home == null
+                || (phase != Phase.TO_SCOUT
+                        && (item == null || !item.isAlive()))) {
             phase = Phase.NONE;
             return;
         }
         long tick = level.getGameTime();
         String workerId = zombie.getUUID().toString();
+        if (phase == Phase.TO_SCOUT) {
+            if (scoutLead == null || !level.hasChunkAt(scoutLead.position())
+                    || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
+                    || !nest.scoutBoard().renew(
+                            scoutLead.itemId(), zombie.getUUID(), tick)) {
+                phase = Phase.NONE;
+                return;
+            }
+            BlockPos where = scoutLead.position();
+            double x = where.getX() + .5, y = where.getY(), z = where.getZ() + .5;
+            if (zombie.distanceToSqr(x, y, z) > 9.0) {
+                follow(level, x, y, z, tick);
+                return;
+            }
+            ItemEntity physical = level.getEntitiesOfClass(
+                    ItemEntity.class, new AABB(where).inflate(3.0),
+                    candidate -> candidate.isAlive()
+                            && candidate.getUUID().equals(scoutLead.itemId()))
+                    .stream().findFirst().orElse(null);
+            if (physical == null) {
+                // The observed item was despawned or moved. Never fabricate it.
+                nest.scoutBoard().discard(scoutLead.itemId());
+                phase = Phase.NONE;
+                return;
+            }
+            var kind = SwarmNestBlockEntity.classify(physical.getItem());
+            if (kind != scoutLead.kind()
+                    || !SwarmNestHaulPolicy.eligible(true, true, true,
+                            kind != SwarmNestColonyPolicy.Kind.NONE,
+                            playerNear(level, physical.getX(), physical.getY(),
+                                    physical.getZ(), 6.0),
+                            physical.getItem().getCount(),
+                            SwarmConfig.NEST_HAUL_MAX_STACK.get(),
+                            SwarmNestColonyPolicy.MAX_STORED_RESOURCES - nest.resources())
+                    || !SwarmNestHaulPolicy.hasRoomFor(
+                            nest.resources(), physical.getItem().getCount(), kind)
+                    || !SwarmNestHaulLease.tryClaim(physical, workerId, tick)) {
+                phase = Phase.NONE;
+                return;
+            }
+            item = physical;
+            phase = Phase.TO_ITEM;
+            lastProgressTick = tick;
+            bestRemainingDistanceSq = Double.POSITIVE_INFINITY;
+            zombie.getNavigation().stop();
+        }
         if (tick % 20 == 0 && !SwarmNestHaulLease.tryClaim(item, workerId, tick)) {
             phase = Phase.NONE;
             return;
@@ -207,7 +278,11 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                         home.getX() + .5, home.getY() + .5, home.getZ() + .5);
                 if (cargoToDock <= 9.0
                         && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
-                    nest.acceptHaulDelivery(item, SwarmConfig.NEST_HAUL_MAX_STACK.get());
+                    int accepted = nest.acceptHaulDelivery(
+                            item, SwarmConfig.NEST_HAUL_MAX_STACK.get());
+                    if (accepted > 0 && scoutLead != null) {
+                        nest.scoutBoard().discard(scoutLead.itemId());
+                    }
                 }
                 phase = Phase.NONE;
                 zombie.getNavigation().stop();
@@ -251,8 +326,15 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             // carried stack; an expired claim allows another worker to retry.
             SwarmNestHaulLease.release(item, zombie.getUUID().toString());
         }
+        if (scoutLead != null && home != null
+                && zombie.level() instanceof ServerLevel level
+                && level.hasChunkAt(home)
+                && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
+            nest.scoutBoard().release(scoutLead.itemId(), zombie.getUUID());
+        }
         if (phase != Phase.NONE) zombie.getNavigation().stop();
         item = null;
+        scoutLead = null;
         home = null;
         phase = Phase.NONE;
     }
