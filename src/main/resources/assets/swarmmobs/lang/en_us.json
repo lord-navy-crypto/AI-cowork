@@ -1,4 +1,5 @@
 {
   "key.swarmmobs.open_command_center": "Open Swarm Command Center",
-  "key.categories.swarmmobs": "Swarm Mobs"
+  "key.categories.swarmmobs": "Swarm Mobs",
+  "block.swarmmobs.nest_core": "Swarm Nest Core"
 }
