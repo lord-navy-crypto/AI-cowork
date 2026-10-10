@@ -53,7 +53,7 @@ public final class SwarmClothControlScreen {
             Map<String, String> values
     ) {
         status(category, entries, bool(values, "canEdit")
-                ? "Server-authoritative live controls. Changes are sent to the server when you Save."
+                ? "Server-authoritative live controls. Save writes the SERVER configuration. Reopen to verify persisted values."
                 : "Read-only view. Server operator permission is required to change Swarm settings.");
         status(category, entries,
                 "Agents: " + integer(values, "liveAgents")
@@ -891,7 +891,7 @@ public final class SwarmClothControlScreen {
                 .setTooltip(Component.literal(tooltip))
                 .setSaveConsumer(next -> {
                     if (next != initial) {
-                        SwarmControlClient.sendAction(action, 0.0);
+                        SwarmControlClient.sendAction("set:" + action, next ? 1.0 : 0.0);
                     }
                 })
                 .build());
@@ -912,9 +912,8 @@ public final class SwarmClothControlScreen {
                 .setDefaultValue(defaultValue)
                 .setTooltip(Component.literal(tooltip))
                 .setSaveConsumer(next -> {
-                    int delta = next - initial;
-                    if (delta != 0) {
-                        SwarmControlClient.sendAction(action, delta);
+                    if (next != initial) {
+                        SwarmControlClient.sendAction("set:" + action, next);
                     }
                 })
                 .build());
@@ -935,9 +934,8 @@ public final class SwarmClothControlScreen {
                 .setDefaultValue(defaultValue)
                 .setTooltip(Component.literal(tooltip))
                 .setSaveConsumer(next -> {
-                    double delta = next - initial;
-                    if (Math.abs(delta) > 1.0e-9) {
-                        SwarmControlClient.sendAction(action, delta);
+                    if (Math.abs(next - initial) > 1.0e-9) {
+                        SwarmControlClient.sendAction("set:" + action, next);
                     }
                 })
                 .build());
