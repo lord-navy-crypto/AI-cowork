@@ -22,6 +22,8 @@ import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyGatherGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHuntGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
+import dev.swarmmobs.goal.SwarmZombiePheromoneExploreGoal;
+import dev.swarmmobs.colony.SwarmNestPheromoneField;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -4323,12 +4325,14 @@ public final class SwarmRuntimeGameTests {
         boolean wasEnabled = SwarmConfig.NEST_HAULING_ENABLED.get();
         boolean wasLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
         boolean wasMaster = SwarmConfig.ENABLED.get();
+        boolean wasPheromones = SwarmConfig.NEST_PHEROMONES_ENABLED.get();
         boolean wasGriefing = helper.getLevel().getGameRules()
                 .getBoolean(GameRules.RULE_MOBGRIEFING);
         try {
             SwarmConfig.ENABLED.set(true);
             SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
             SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(true, helper.getLevel().getServer());
 
@@ -4360,7 +4364,15 @@ public final class SwarmRuntimeGameTests {
             goal.stop();
             if (physicalDrop.isAlive() || nest.timberPoints() != 6
                     || nest.resources() != 6 || nest.hauledItems() != 2
-                    || nest.haulTrips() != 1) {
+                    || nest.haulTrips() != 1
+                    || nest.pheromones().reinforcements() < 1
+                    || nest.pheromones().strength(
+                            new SwarmNestPheromoneField.Position(
+                                    helper.absolutePos(new BlockPos(4,1,2)).getX(),
+                                    helper.absolutePos(new BlockPos(4,1,2)).getY(),
+                                    helper.absolutePos(new BlockPos(4,1,2)).getZ()),
+                            SwarmNestPheromoneField.Signal.TIMBER,
+                            helper.getLevel().getGameTime()) <= 0.0) {
                 helper.fail("Worker item delivery failed exact accounting"
                         + " timber=" + nest.timberPoints()
                         + " hauled=" + nest.hauledItems()
@@ -4372,6 +4384,7 @@ public final class SwarmRuntimeGameTests {
             SwarmConfig.NEST_HAULING_ENABLED.set(wasEnabled);
             SwarmConfig.NEST_LIFECYCLE_ENABLED.set(wasLifecycle);
             SwarmConfig.ENABLED.set(wasMaster);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(wasPheromones);
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(wasGriefing, helper.getLevel().getServer());
         }
@@ -5079,5 +5092,139 @@ public final class SwarmRuntimeGameTests {
             return;
         }
         helper.succeed();
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_living_resource_scent",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void spiderMarksRealPigAndRipeCropWithoutProducingPhantomFood(
+            GameTestHelper helper) {
+        BlockPos core = new BlockPos(0,1,2);
+        BlockPos crop = new BlockPos(4,1,2);
+        helper.setBlock(core, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop,Blocks.CARROTS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.CarrotBlock.AGE,7));
+        var entity=helper.getLevel().getBlockEntity(helper.absolutePos(core));
+        if (!(entity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("No loaded nest for spatial scouting");return;
+        }
+        Spider scout=helper.spawn(EntityType.SPIDER,new BlockPos(3,1,2));
+        scout.setNoGravity(true);
+        scout.getPersistentData().putLong("SwarmColonyNest",helper.absolutePos(core).asLong());
+        Pig pig=helper.spawn(EntityType.PIG,new BlockPos(4,1,3));
+        pig.setNoGravity(true);
+        boolean master=SwarmConfig.ENABLED.get();
+        boolean lifecycle=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling=SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean gather=SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean hunt=SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get();
+        boolean pheromones=SwarmConfig.NEST_PHEROMONES_ENABLED.get();
+        boolean grief=helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true,helper.getLevel().getServer());
+            var goal = new SwarmSpiderColonyScoutGoal(scout);
+            if (!goal.canUse()) {
+                helper.fail("Idle Spider could not perform local scent survey");
+                return;
+            }
+            goal.start();
+            long now=helper.getLevel().getGameTime();
+            var p=helper.absolutePos(crop);
+            if (!pig.isAlive() || !helper.getLevel().getBlockState(p).is(Blocks.CARROTS)
+                    || nest.nutrientPoints()!=0 || nest.resources()!=0
+                    || nest.pheromones().observations()<2
+                    || nest.pheromones().strength(
+                        new SwarmNestPheromoneField.Position(p.getX(),p.getY(),p.getZ()),
+                        SwarmNestPheromoneField.Signal.FOOD,now)<=0) {
+                helper.fail("Spider scout must signal real crop/prey without consuming them");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(lifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(gather);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(hunt);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(pheromones);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief,helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_scent_navigation",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void idleZombieFollowsLocalScentButNotAbsentSignals(
+            GameTestHelper helper) {
+        BlockPos core=new BlockPos(0,1,2);
+        BlockPos position=new BlockPos(0,1,0);
+        BlockPos destination=new BlockPos(4,1,0);
+        helper.setBlock(core,SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(destination.below(),Blocks.STONE);
+        var be=helper.getLevel().getBlockEntity(helper.absolutePos(core));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("No core for gradient test");return;
+        }
+        Zombie worker=helper.spawn(EntityType.ZOMBIE,position);
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",helper.absolutePos(core).asLong());
+        boolean master=SwarmConfig.ENABLED.get();
+        boolean lifecycle=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling=SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean pheromones=SwarmConfig.NEST_PHEROMONES_ENABLED.get();
+        boolean exploration=SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.get();
+        boolean grief=helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+            SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true,helper.getLevel().getServer());
+            var signal=new SwarmNestPheromoneField.Position(
+                    helper.absolutePos(destination).getX(),
+                    helper.absolutePos(destination).getY(),
+                    helper.absolutePos(destination).getZ());
+            var scentCore=helper.absolutePos(core);
+            var homePos=new SwarmNestPheromoneField.Position(
+                    scentCore.getX(),scentCore.getY(),scentCore.getZ());
+            if (!nest.pheromones().observe(homePos,signal,
+                    SwarmNestColonyPolicy.Kind.TIMBER,helper.getLevel().getGameTime())) {
+                helper.fail("Failed to emit a loaded local wood source cue");
+                return;
+            }
+            boolean installed=worker.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(w->w.getGoal() instanceof SwarmZombiePheromoneExploreGoal);
+            var goal=new SwarmZombiePheromoneExploreGoal(worker);
+            if (!installed || !goal.canUse()) {
+                helper.fail("Worker did not choose a nearby gradient when food/wood absent");
+                return;
+            }
+            goal.start();
+            goal.stop();
+            if (nest.resources()!=0 || nest.pheromones().size(helper.getLevel().getGameTime())==0) {
+                helper.fail("Gradient walking invented resources or destroyed signal");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(lifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(pheromones);
+            SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(exploration);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief,helper.getLevel().getServer());
+        }
     }
 }
