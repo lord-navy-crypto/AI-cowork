@@ -83,8 +83,18 @@ public final class SwarmNestPheromoneField {
     /** A successful physical delivery reinforces only sampled worker route cells. */
     public boolean reinforce(Position home, Position at,
                              SwarmNestColonyPolicy.Kind kind, long now) {
-        if (!valid(home,at,kind,now)) return false;
-        add(key(at), signal(kind), 1.3, now);
+        return reinforce(home,at,kind,now,1.0);
+    }
+
+    /** A real successful delivery reinforces less when the dock is crowded. */
+    public boolean reinforce(Position home, Position at,
+                             SwarmNestColonyPolicy.Kind kind, long now,
+                             double depositMultiplier) {
+        if (!valid(home,at,kind,now)
+                || !Double.isFinite(depositMultiplier)
+                || depositMultiplier <= 0.0) return false;
+        add(key(at), signal(kind),
+                1.3 * Math.min(1.0,depositMultiplier),now);
         reinforcedSites++;
         return true;
     }
