@@ -43,6 +43,10 @@ public final class SwarmAgentState {
     private long pendingFormationSlotSinceTick = Long.MIN_VALUE;
     private long formationSlotSwitchCount;
     private SwarmRole role = SwarmRole.CHASER;
+    // Runtime-only encounter geometry, used for inspection and acceptance.
+    private String tacticalPattern = "STANDARD";
+    // Updated by local same-target sightings, consulted by vanilla bow handoff.
+    private boolean bowLaneClear = true;
     private boolean roleInitialized;
     private SwarmRole pendingRole;
     private long pendingRoleSinceTick = Long.MIN_VALUE;
@@ -134,6 +138,8 @@ public final class SwarmAgentState {
         }
         tacticalAssignmentTarget = selectedTarget;
         resetSupportPositionState();
+        tacticalPattern = "STANDARD";
+        bowLaneClear = true;
 
         formationSlotInitialized = false;
         pendingFormationSlot = -1;
@@ -279,6 +285,24 @@ public final class SwarmAgentState {
         return neighborCount;
     }
     
+    /** Local gameplay formation mode, derived only from known observations. */
+    public String tacticalPattern() {
+        return tacticalPattern;
+    }
+
+    public void setTacticalPattern(String pattern) {
+        tacticalPattern = pattern == null ? "STANDARD" : pattern;
+    }
+
+    /** Snapshot from the last local combat plan; not a raycast every tick. */
+    public boolean bowLaneClear() {
+        return bowLaneClear;
+    }
+
+    public void setBowLaneClear(boolean clear) {
+        bowLaneClear = clear;
+    }
+
     /** Same-target nearby members, excluding self. */
     public int tacticalPeerCount() {
         return tacticalPeerCount;

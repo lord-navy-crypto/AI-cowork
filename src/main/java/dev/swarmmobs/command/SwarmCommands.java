@@ -665,6 +665,7 @@ public final class SwarmCommands {
                         "Agent #" + nearest.getId()
                                 + " archetype=" + SwarmAgentProfiles.profile(nearest).archetype()
                                 + " role=" + state.role()
+                                + " tacticalPattern=" + state.tacticalPattern()
                                 + " pendingRole=" + (state.pendingRole() == null ? "none" : state.pendingRole())
                                 + " roleReassignments=" + state.roleReassignmentCount()
                                 + " mode=" + state.behaviorMode()
@@ -779,6 +780,7 @@ public final class SwarmCommands {
             return 0;
         }
 
+        java.util.Map<String, Integer> patterns = new java.util.TreeMap<>();
         java.util.EnumMap<dev.swarmmobs.agent.SwarmRole, Integer> roles =
                 new java.util.EnumMap<>(dev.swarmmobs.agent.SwarmRole.class);
         java.util.EnumMap<SwarmAgentArchetype, Integer> archetypes =
@@ -830,6 +832,7 @@ public final class SwarmCommands {
         for (PathfinderMob agent : agents) {
             SwarmAgentState state = agent.getData(SwarmAttachments.AGENT_STATE.get());
             roles.merge(state.role(), 1, Integer::sum);
+            patterns.merge(state.tacticalPattern(), 1, Integer::sum);
             archetypes.merge(SwarmAgentProfiles.profile(agent).archetype(), 1, Integer::sum);
             tasks.merge(state.currentTask(), 1, Integer::sum);
             specializations.merge(state.specialization(), 1, Integer::sum);
@@ -958,7 +961,9 @@ public final class SwarmCommands {
                 specializationSummary
         );
 
-        source.sendSuccess(() -> Component.literal(summary), false);
+        // Aggregate of actual per-agent game tactic states, not claimed wins.
+        String patternsText = patterns.toString();
+        source.sendSuccess(() -> Component.literal(summary + ", patterns=" + patternsText), false);
         return total;
     }
 

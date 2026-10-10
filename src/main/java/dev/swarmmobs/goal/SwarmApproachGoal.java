@@ -112,6 +112,7 @@ public final class SwarmApproachGoal extends Goal {
         if (profile.archetype() == SwarmAgentArchetype.RANGED_SUPPORT) {
             if (mob.getTarget() instanceof Player target
                     && validTarget(target)
+                    && state.bowLaneClear()
                     && SwarmRangedHandoffPolicy.shouldYieldToVanilla(
                             state.directObservation(),
                             state.targetId().equals(target.getUUID()),

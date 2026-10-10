@@ -745,6 +745,7 @@ public final class SwarmControlNetwork {
         int tacticalPeerLinks = 0;
         int agentsWithTacticalBreacher = 0;
         int workAgents = 0, alertAgents = 0, combatAgents = 0, recoveringAgents = 0;
+        int tacticSweep = 0, tacticSurround = 0, tacticStandard = 0, tacticSearch = 0;
         int optimizedSupportAgents = 0;
         long supportLaneSwitches = 0, supportFeasibleSamples = 0,
                 supportUnavailableSamples = 0;
@@ -776,6 +777,14 @@ public final class SwarmControlNetwork {
             if (masterEnabled) {
                 SwarmAgentState tacticalState =
                         mob.getData(SwarmAttachments.AGENT_STATE.get());
+                if (tacticalState.targetId() != null) {
+                    switch (tacticalState.tacticalPattern()) {
+                        case "SWEEP" -> tacticSweep++;
+                        case "SURROUND" -> tacticSurround++;
+                        case "SEARCH" -> tacticSearch++;
+                        default -> tacticStandard++;
+                    }
+                }
                 if (SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()
                         && tacticalState.engagementMode()
                                 == dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
@@ -832,6 +841,10 @@ public final class SwarmControlNetwork {
                 pair("aiLastError", ai.lastError()),
                 pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
+                pair("tacticSweep", tacticSweep),
+                pair("tacticSurround", tacticSurround),
+                pair("tacticStandard", tacticStandard),
+                pair("tacticSearch", tacticSearch),
                 pair("optimizedSupportAgents", optimizedSupportAgents),
                 pair("supportLaneSwitches", Math.min(Integer.MAX_VALUE,supportLaneSwitches)),
                 pair("supportFeasibleSamples", Math.min(Integer.MAX_VALUE,supportFeasibleSamples)),
