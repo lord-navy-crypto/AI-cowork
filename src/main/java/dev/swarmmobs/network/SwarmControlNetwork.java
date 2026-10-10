@@ -238,6 +238,12 @@ public final class SwarmControlNetwork {
             case "nest_animal_hunt_toggle" ->
                     SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(
                             !SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get());
+            case "nest_pheromone_toggle" ->
+                    SwarmConfig.NEST_PHEROMONES_ENABLED.set(
+                            !SwarmConfig.NEST_PHEROMONES_ENABLED.get());
+            case "nest_pheromone_explore_toggle" ->
+                    SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(
+                            !SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.get());
             case "nest_gather_interval_delta" ->
                     SwarmConfig.NEST_GATHER_INTERVAL.set((int) clamp(
                             SwarmConfig.NEST_GATHER_INTERVAL.get() + value,
@@ -275,6 +281,8 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
                 SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
                 SwarmConfig.NEST_GATHER_INTERVAL.set(160);
+                SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+                SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
                 SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
                 SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
                 SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
@@ -485,6 +493,8 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
                 SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
                 SwarmConfig.NEST_GATHER_INTERVAL.set(160);
+                SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+                SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
                 SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
                 SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
                 SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
@@ -672,6 +682,9 @@ public final class SwarmControlNetwork {
                 pair("nestBlockGatherEnabled", SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()),
                 pair("nestAnimalHuntEnabled", SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()),
                 pair("nestGatherInterval", SwarmConfig.NEST_GATHER_INTERVAL.get()),
+                pair("nestPheromonesEnabled", SwarmConfig.NEST_PHEROMONES_ENABLED.get()),
+                pair("nestPheromoneExplorationEnabled",
+                        SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.get()),
                 pair("nestBerryForageInterval", SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.get()),
                 pair("nestHaulSearchRadius", SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get()),
                 pair("nestHaulMaxStack", SwarmConfig.NEST_HAUL_MAX_STACK.get()),
@@ -689,6 +702,10 @@ public final class SwarmControlNetwork {
                 pair("colonyFoodInhibition", colony.foodInhibition()),
                 pair("colonyTimberInhibition", colony.timberInhibition()),
                 pair("colonySoilInhibition", colony.soilInhibition()),
+                pair("colonyPheromoneCells", colony.pheromoneCells()),
+                pair("colonyPheromoneObserved", colony.pheromoneObservations()),
+                pair("colonyPheromoneReinforced", colony.pheromoneReinforcements()),
+                pair("colonyPheromoneStopped", colony.pheromoneStopSignals()),
                 pair("nestVisibleExpansionEnabled",
                         SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()),
                 pair("nestMaxPopulation", SwarmConfig.NEST_MAX_POPULATION.get()),
