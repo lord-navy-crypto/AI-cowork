@@ -106,9 +106,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                                     test.asLong(), zombie.getUUID(), tick)) continue;
                     BlockState state = level.getBlockState(test);
                     var kind = category(level, test, state);
-                    if (!SwarmColonyGatherPolicy.needs(kind,
-                            nest.soilPoints(), nest.timberPoints(),
-                            nest.nutrientPoints() + nest.legacyPoints(), nest.resources())
+                    if (!nest.needsResource(kind)
                             || !validBlock(level, test, state)) continue;
                     double dx2 = zombie.getX() - (test.getX() + .5);
                     double dz2 = zombie.getZ() - (test.getZ() + .5);
@@ -161,9 +159,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                             workerPosition.getX(),workerPosition.getY(),workerPosition.getZ()),
                     SwarmNestOpportunityBoard.Type.BLOCK,tick,
                     SwarmNestOpportunityBoard.MAX_RADIUS,
-                    lead -> SwarmColonyGatherPolicy.needs(lead.kind(),
-                            nest.soilPoints(),nest.timberPoints(),
-                            nest.nutrientPoints()+nest.legacyPoints(),nest.resources())
+                    lead -> nest.needsResource(lead.kind())
                             && !nest.workBoard().claimedByAnother(
                                     BlockPos.asLong(lead.position().x(),
                                             lead.position().y(),lead.position().z()),
@@ -219,9 +215,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
             return false;
         }
         return validBlock(level, site, original)
-                && SwarmColonyGatherPolicy.needs(selectedKind,
-                        nest.soilPoints(), nest.timberPoints(),
-                        nest.nutrientPoints() + nest.legacyPoints(), nest.resources());
+                && nest.needsResource(selectedKind);
     }
 
     @Override
