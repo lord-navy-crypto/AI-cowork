@@ -104,6 +104,9 @@ public final class SwarmAgentState {
     private long recoveryPlanningFailures;
     // Number of active movement episodes invalidated by changed game context.
     private long navigationEpisodeResets;
+    private long navigationCommandRejections;
+    private long skeletonPathRejectFallbacks;
+    private long zombiePathRejectFallbacks;
     private SwarmPlannerContext plannerContext = SwarmPlannerContext.NONE;
     private int plannerCandidateCount;
     private int plannerBlockedCount;
@@ -435,6 +438,14 @@ public final class SwarmAgentState {
         return true;
     }
 
+    /** An outright game path rejection is distinct from measured stalling. */
+    public boolean failRangedSpacingForRejectedPath(long tick) {
+        if (!rangedSpacingActive || tick < 0) return false;
+        finishFailedRangedSpacing(tick);
+        skeletonPathRejectFallbacks++;
+        return true;
+    }
+
     private void finishFailedRangedSpacing(long tick) {
         rangedSpacingActive = false;
         rangedSpacingStartedAt = Long.MIN_VALUE;
@@ -497,6 +508,14 @@ public final class SwarmAgentState {
         if (!zombieShortFlankActive || tick < 0) return false;
         finishFailedShortZombieFlank(tick);
         zombieNoProgressFallbacks++;
+        return true;
+    }
+
+    /** A denied real game path releases short flank without fake progress. */
+    public boolean failShortZombieFlankForRejectedPath(long tick) {
+        if (!zombieShortFlankActive || tick < 0) return false;
+        finishFailedShortZombieFlank(tick);
+        zombiePathRejectFallbacks++;
         return true;
     }
 
@@ -794,6 +813,22 @@ public final class SwarmAgentState {
 
     public long navigationEpisodeResets() {
         return navigationEpisodeResets;
+    }
+
+    public long navigationCommandRejections() {
+        return navigationCommandRejections;
+    }
+
+    public void recordNavigationCommandRejection() {
+        navigationCommandRejections++;
+    }
+
+    public long skeletonPathRejectFallbacks() {
+        return skeletonPathRejectFallbacks;
+    }
+
+    public long zombiePathRejectFallbacks() {
+        return zombiePathRejectFallbacks;
     }
 
     public void recordNavigationEpisodeReset() {
