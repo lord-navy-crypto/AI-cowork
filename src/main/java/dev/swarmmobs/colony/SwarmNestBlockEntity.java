@@ -480,6 +480,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
         if (level.addFreshEntity(child)) {
             child.getPersistentData().putLong("SwarmColonyNest", worldPosition.asLong());
+            child.getPersistentData().putString("SwarmColonyDimension",
+                    level.dimension().location().toString());
             // Reproduction consumes nutritional points first. Historical
             // unlabeled stock may fund older saves, but fresh dirt/timber may not.
             int nutrientSpent = Math.min(nutrientPoints, SwarmNestColonyPolicy.SPAWN_COST);
@@ -605,10 +607,11 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         // stolen by a second core, but a demolished LOADED home can be replaced.
         String dimension = level.dimension().location().toString();
         for (PathfinderMob member : members) {
-            if (!(member instanceof Zombie) && member.getType() != EntityType.SPIDER) {
-                continue;
-            }
-            if (member.isNoAi() || member.getTarget() != null) continue;
+            // All four castes count toward colony capacity, therefore ALL
+            // need a stable home (including guards and breachers). NoAI
+            // specimens may be counted in controlled GameTests and still
+            // require an unambiguous home without taking any active action.
+            if (member.getTarget() != null) continue;
             var data = member.getPersistentData();
             if (data.contains("SwarmColonyNest")) {
                 boolean wrongDimension = data.contains("SwarmColonyDimension")
@@ -650,7 +653,26 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 PathfinderMob.class,
                 new AABB(worldPosition).inflate(POPULATION_RADIUS),
                 mob -> mob.isAlive() && SwarmAgentProfiles.isSupported(mob)
+                        && memberBelongsToThisNest(level, mob)
         );
+    }
+
+    private boolean memberBelongsToThisNest(ServerLevel level, PathfinderMob mob) {
+        var tag = mob.getPersistentData();
+        if (!tag.contains("SwarmColonyNest")) return true;
+        String dimension = level.dimension().location().toString();
+        boolean sameDimension = !tag.contains("SwarmColonyDimension")
+                || dimension.equals(tag.getString("SwarmColonyDimension"));
+        BlockPos registered = BlockPos.of(tag.getLong("SwarmColonyNest"));
+        if (!sameDimension || registered.equals(worldPosition)) return true;
+        // Only inspect a foreign home that is already loaded. Nearby
+        // multiple colony cores cannot both claim one worker's census.
+        boolean loaded = level.hasChunkAt(registered);
+        boolean valid = loaded
+                && level.getBlockState(registered).is(SwarmNestBlocks.NEST_CORE.get())
+                && level.getBlockEntity(registered) instanceof SwarmNestBlockEntity;
+        return SwarmNestMembershipPolicy.eligible(true, true, false,
+                loaded, valid);
     }
 
     /**
