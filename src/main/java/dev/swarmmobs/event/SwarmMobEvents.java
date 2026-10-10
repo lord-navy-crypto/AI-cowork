@@ -40,6 +40,7 @@ import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
 import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyGatherGoal;
+import dev.swarmmobs.goal.SwarmZombiePheromoneExploreGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHuntGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
@@ -102,6 +103,9 @@ public final class SwarmMobEvents {
             mob.goalSelector.addGoal(3, new SwarmZombieColonyHuntGoal(builder));
             mob.goalSelector.addGoal(4, new SwarmZombieColonyGatherGoal(builder));
             mob.goalSelector.addGoal(5, new SwarmZombieBerryForageGoal(builder));
+            // Last-resort short exploration along actual locally sensed
+            // pheromone gradients, not an omniscient direct route to prey.
+            mob.goalSelector.addGoal(6, new SwarmZombiePheromoneExploreGoal(builder));
         }
     }
 
