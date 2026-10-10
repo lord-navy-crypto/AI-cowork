@@ -60,6 +60,9 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private long births;
     private long hauledItems;
     private long haulTrips;
+    // Counts physical berry items spawned by a real ripe bush harvest;
+    // they remain in-world and are NOT credited to nest inventory yet.
+    private long foragedBerries;
     // Only a nonpersistent hint board: no virtual cargo or chunk tickets.
     private final SwarmNestScoutBoard scoutBoard = new SwarmNestScoutBoard();
     private int leaderMarks;
@@ -87,6 +90,13 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     public long births() { return births; }
     public long hauledItems() { return hauledItems; }
     public long haulTrips() { return haulTrips; }
+    public long foragedBerries() { return foragedBerries; }
+    public void recordForagedBerries(int actualSpawnedItems) {
+        if (actualSpawnedItems > 0) {
+            foragedBerries += actualSpawnedItems;
+            setChanged();
+        }
+    }
     public SwarmNestScoutBoard scoutBoard() { return scoutBoard; }
 
     /** Scouts report only real, currently loaded resource entities. */
@@ -131,6 +141,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         births = Math.max(0L, tag.getLong("Births"));
         hauledItems = Math.max(0L, tag.getLong("HauledItems"));
         haulTrips = Math.max(0L, tag.getLong("HaulTrips"));
+        foragedBerries = Math.max(0L, tag.getLong("ForagedBerries"));
         leaderMarks = Math.max(0, Math.min(3, tag.getInt("LeaderMarks")));
     }
 
@@ -152,6 +163,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         tag.putLong("Births", births);
         tag.putLong("HauledItems", hauledItems);
         tag.putLong("HaulTrips", haulTrips);
+        tag.putLong("ForagedBerries", foragedBerries);
         tag.putInt("LeaderMarks", leaderMarks);
     }
 
@@ -216,7 +228,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 || stack.is(Items.MUD) || stack.is(Items.GRAVEL)) {
             return SwarmNestColonyPolicy.Kind.SOIL;
         }
-        if (stack.is(Items.ROTTEN_FLESH) || stack.is(Items.BONE)
+        if (stack.is(Items.SWEET_BERRIES) || stack.is(Items.ROTTEN_FLESH) || stack.is(Items.BONE)
                 || stack.is(Items.SPIDER_EYE) || stack.is(Items.BEEF)
                 || stack.is(Items.PORKCHOP) || stack.is(Items.CHICKEN)
                 || stack.is(Items.MUTTON) || stack.is(Items.RABBIT)
