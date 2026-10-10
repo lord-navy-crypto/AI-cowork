@@ -20,6 +20,7 @@ import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
 import dev.swarmmobs.algorithm.SwarmZombieBowLaneYieldPolicy;
+import dev.swarmmobs.algorithm.SwarmFourSpeciesRoutePolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import dev.swarmmobs.algorithm.SwarmRangedSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSkeletonSightlinePolicy;
@@ -180,6 +181,7 @@ public final class SwarmMobEvents {
         TargetSelection selection = findTarget(level, mob, state, gameTick);
 
         if (selection == null) {
+            state.updateRouteSpacingPlan(false, 0);
             state.updateZombieBowLaneYieldPlan(false);
             state.updateEngagement(false,false,gameTick);
             state.updateTacticalSquadTelemetry(0, 0);
@@ -470,6 +472,7 @@ public final class SwarmMobEvents {
                 coverage.fillingMissingFlank() && tacticalRole == coverage.role());
 
         if (searchMode) {
+            state.updateRouteSpacingPlan(false, 0);
             state.updateZombieBowLaneYieldPlan(false);
             state.updateRangedSpacing(false);
             state.setTacticalPattern("SEARCH");
@@ -877,6 +880,76 @@ public final class SwarmMobEvents {
             } else {
                 state.updateRangedSpacing(false, gameTick);
             }
+
+            // Four-species traffic coordination uses ONLY same-target,
+            // already locally sampled peers. An already-selected Zombie bow
+            // clearance or Skeleton close-range spacing may not be replaced.
+            // This is a short candidate movement, not an attack override.
+            boolean speciesRouteSpacing = false;
+            int speciesRouteSide = 0;
+            boolean creeperFusing = mob instanceof Creeper creeper
+                    && (creeper.isIgnited() || creeper.getSwellDir() > 0);
+            if (selection.direct() && selection.player() != null
+                    && squadCombat && confidence >= 0.70
+                    && SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
+                    && !state.zombieBowLaneYieldPlanned()
+                    && !state.rangedSpacingActive()
+                    && !creeperFusing
+                    && state.currentTask() != SwarmTaskType.ENGINEERING
+                    && state.currentTask() != SwarmTaskType.MATERIAL
+                    && Math.abs(mob.getY() - selection.player().getY()) <= 2.5) {
+                var trafficType = profile.archetype();
+                List<Vec2> nearbyTraffic = tacticalNeighbors.stream()
+                        .filter(peer -> Math.abs(peer.getY() - mob.getY()) <= 2.0)
+                        .filter(peer -> trafficType
+                                == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER
+                                || SwarmAgentProfiles.profile(peer).archetype()
+                                        == trafficType)
+                        .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                        .toList();
+                var possibilities = SwarmFourSpeciesRoutePolicy.propose(
+                        trafficType, new Vec2(mob.getX(), mob.getZ()),
+                        plannedDestination,
+                        new Vec2(selection.player().getX(),
+                                selection.player().getZ()),
+                        tacticalFrame.forward(), nearbyTraffic,
+                        confidence, true, true);
+                if (possibilities.eligible()) {
+                    boolean leftSafe = SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                            level, mob.getY(), possibilities.left());
+                    boolean rightSafe = SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                            level, mob.getY(), possibilities.right());
+                    if (mob instanceof Skeleton) {
+                        List<Vec2> nearFront = tacticalNeighbors.stream()
+                                .filter(peer -> peer instanceof Zombie
+                                        || peer instanceof Creeper)
+                                .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                                .toList();
+                        Vec2 playerSpot = new Vec2(
+                                selection.player().getX(),
+                                selection.player().getZ());
+                        leftSafe = leftSafe
+                                && SwarmFriendlyFireLanePolicy.isClear(
+                                        possibilities.left(), playerSpot, nearFront)
+                                && hasClearSupportShot(level, mob,
+                                        selection.player(), possibilities.left());
+                        rightSafe = rightSafe
+                                && SwarmFriendlyFireLanePolicy.isClear(
+                                        possibilities.right(), playerSpot, nearFront)
+                                && hasClearSupportShot(level, mob,
+                                        selection.player(), possibilities.right());
+                    }
+                    var choice = SwarmFourSpeciesRoutePolicy.choose(
+                            possibilities, leftSafe, rightSafe,
+                            state.routeSpacingSide(), assignedSlot);
+                    if (choice.changed()) {
+                        plannedDestination = choice.destination();
+                        speciesRouteSpacing = true;
+                        speciesRouteSide = choice.side();
+                    }
+                }
+            }
+            state.updateRouteSpacingPlan(speciesRouteSpacing, speciesRouteSide);
 
             state.updateLocalPlan(
                     movementNeighbors.size(),
