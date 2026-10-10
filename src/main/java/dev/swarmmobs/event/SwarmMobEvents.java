@@ -14,6 +14,7 @@ import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
+import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
@@ -494,13 +495,23 @@ public final class SwarmMobEvents {
 
             Vec2 plannedDestination = plan.destination();
 
-            if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
-                    && composition.hasBreacher()) {
-                List<Vec2> breacherPositions = tacticalNeighbors.stream()
-                        .filter(peer -> SwarmAgentProfiles.profile(peer).archetype()
-                                == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER)
+            if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT) {
+                // Only allies on the same active target count. Do not let
+                // another independent squad distort this Skeleton's shots.
+                List<PathfinderMob> frontline = tacticalNeighbors.stream()
+                        .filter(peer -> peer instanceof Zombie || peer instanceof Creeper)
+                        .toList();
+                List<Vec2> breacherPositions = frontline.stream()
+                        .filter(peer -> peer instanceof Creeper)
                         .map(peer -> new Vec2(peer.getX(), peer.getZ()))
                         .toList();
+                List<Vec2> alliedPositions = frontline.stream()
+                        .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                        .toList();
+                // When no Creeper is present, use the Zombie front as the
+                // corridor axis, preserving a separate bow-fire lane.
+                if (breacherPositions.isEmpty()) breacherPositions = alliedPositions;
+                if (!breacherPositions.isEmpty()) {
 
                 Vec2 targetPoint = new Vec2(prediction.x(), prediction.z());
 
@@ -526,13 +537,19 @@ public final class SwarmMobEvents {
                     negativeClear = hasClearSupportShot(level, mob, selection.player(), negativeLane);
                 }
 
-                double preferredSign = SwarmFireSupportLanePolicy.choosePreferredSign(
+                Vec2 targetPointForSafety = new Vec2(prediction.x(), prediction.z());
+                double preferredSign = SwarmFriendlyFireLanePolicy.chooseSide(
                         assignedSlot,
                         positiveClear,
-                        negativeClear
+                        negativeClear,
+                        SwarmFriendlyFireLanePolicy.isClear(
+                                positiveLane,targetPointForSafety,alliedPositions),
+                        SwarmFriendlyFireLanePolicy.isClear(
+                                negativeLane,targetPointForSafety,alliedPositions)
                 );
 
                 plannedDestination = preferredSign > 0.0 ? positiveLane : negativeLane;
+                }
             }
 
             state.updateLocalPlan(
