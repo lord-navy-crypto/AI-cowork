@@ -129,6 +129,13 @@ public final class SwarmClothControlScreen {
                         + " proposed / " + integer(values, "zombieBowLaneAccepted")
                         + " navigator-accepted MOVE commands");
         status(category, entries,
+                "Four-species route spacing: " + integer(values, "speciesSpacingPlanned")
+                        + " live proposals / accepted MOVE commands: Zombie "
+                        + integer(values, "zombieSpacingAccepted")
+                        + ", Skeleton " + integer(values, "skeletonSpacingAccepted")
+                        + ", Spider " + integer(values, "spiderSpacingAccepted")
+                        + ", Creeper " + integer(values, "creeperSpacingAccepted"));
+        status(category, entries,
                 "Measured stalled waypoints: Skeleton " + integer(values, "skeletonNoProgress")
                         + " / Zombie " + integer(values, "zombieNoProgress"));
         status(category, entries,
