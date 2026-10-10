@@ -324,6 +324,40 @@ class SwarmTacticalHandoffStateTest {
         assertEquals(2,state.rangedWaypointHoldSamples());
     }
 
+    @Test void rejectedSkeletonGamePathReleasesBowAndKeepsFailureEvidence() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(60,1));
+        state.updateLocalPlan(0,0,SwarmRole.REAR_PRESSURE,6,9,0,0);
+        state.updateRangedSpacing(true,100);
+        state.recordNavigationCommandRejection();
+        assertTrue(state.failRangedSpacingForRejectedPath(101));
+        assertEquals(1,state.navigationCommandRejections());
+        assertEquals(1,state.skeletonPathRejectFallbacks());
+        assertEquals(1,state.rangedSpacingFallbacks());
+        assertEquals(0,state.rangedNoProgressFallbacks(),
+                "A path never accepted cannot be misreported as a measured stall");
+        assertFalse(state.rangedSpacingActive());
+        assertFalse(state.canUseRangedWaypoint(6,9,151));
+        assertTrue(state.canUseRangedWaypoint(9,9,151));
+        assertFalse(state.failRangedSpacingForRejectedPath(102));
+    }
+
+    @Test void rejectedZombieFlankImmediatelyReturnsVanillaMelee() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(61,1));
+        state.updateLocalPlan(0,0,SwarmRole.FLANK_LEFT,4,8,0,0);
+        assertTrue(state.allowShortZombieFlank(100));
+        state.recordNavigationCommandRejection();
+        assertTrue(state.failShortZombieFlankForRejectedPath(101));
+        assertFalse(state.shortZombieFlankActive());
+        assertEquals(1,state.zombiePathRejectFallbacks());
+        assertEquals(1,state.zombieFlankFallbacks());
+        assertEquals(0,state.zombieNoProgressFallbacks());
+        assertFalse(state.canUseZombieFlankWaypoint(4,8,131));
+        state.bindTacticalTarget(new UUID(61,2));
+        assertTrue(state.canUseZombieFlankWaypoint(4,8,131));
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
