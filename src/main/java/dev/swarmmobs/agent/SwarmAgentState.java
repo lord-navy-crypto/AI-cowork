@@ -64,6 +64,9 @@ public final class SwarmAgentState {
     private long zombieFlankStartedAt = Long.MIN_VALUE;
     private long zombieFlankRetryAfter = Long.MIN_VALUE;
     private long zombieFlankFallbacks;
+    private double zombieFailedWaypointX;
+    private double zombieFailedWaypointZ;
+    private long zombieFailedWaypointUntil = Long.MIN_VALUE;
     // Local crowd-avoidance lane; reset on target switches.
     private int crowdLaneSide;
     private long crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -174,6 +177,7 @@ public final class SwarmAgentState {
         rangedFailedWaypointUntil = Long.MIN_VALUE;
         zombieFlankStartedAt = Long.MIN_VALUE;
         zombieFlankRetryAfter = Long.MIN_VALUE;
+        zombieFailedWaypointUntil = Long.MIN_VALUE;
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
 
@@ -417,6 +421,26 @@ public final class SwarmAgentState {
         return true;
     }
 
+    /**
+     * An optional Zombie flank may not retry its own recent failed square
+     * merely because the shorter retry cooldown ended.
+     */
+    public boolean canUseZombieFlankWaypoint(double x, double z, long tick) {
+        if (!Double.isFinite(x) || !Double.isFinite(z) || tick < 0
+                || tick < zombieFlankRetryAfter) {
+            return false;
+        }
+        return zombieFailedWaypointUntil == Long.MIN_VALUE
+                || tick >= zombieFailedWaypointUntil
+                || Math.hypot(x - zombieFailedWaypointX,
+                        z - zombieFailedWaypointZ) >= 1.5;
+    }
+
+    public boolean hasRecentlyFailedZombieWaypoint(long tick) {
+        return zombieFailedWaypointUntil != Long.MIN_VALUE
+                && tick >= 0 && tick < zombieFailedWaypointUntil;
+    }
+
     /** Called only when a visible game Zombie flank waypoint is worthwhile. */
     public boolean allowShortZombieFlank(long tick) {
         if (tick < 0 || tick < zombieFlankRetryAfter) return false;
@@ -427,6 +451,13 @@ public final class SwarmAgentState {
             zombieFlankStartedAt = Long.MIN_VALUE;
             zombieFlankRetryAfter = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
                     tick, SwarmGameHandoffTimeoutPolicy.ZOMBIE_RETRY_COOLDOWN_TICKS);
+            if (hasDestination && Double.isFinite(destinationX)
+                    && Double.isFinite(destinationZ)) {
+                zombieFailedWaypointX = destinationX;
+                zombieFailedWaypointZ = destinationZ;
+                zombieFailedWaypointUntil = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
+                        tick, 150);
+            }
             zombieFlankFallbacks++;
             return false;
         }
