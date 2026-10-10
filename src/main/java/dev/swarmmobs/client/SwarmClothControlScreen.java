@@ -117,6 +117,10 @@ public final class SwarmClothControlScreen {
                         + "  STANDARD " + integer(values, "tacticStandard")
                         + "  SEARCH " + integer(values, "tacticSearch"));
         status(category, entries,
+                "SEARCH rejoining: " + integer(values, "searchRallying")
+                        + " active agents / " + integer(values, "searchRallyEpisodes")
+                        + " local regrouping episodes");
+        status(category, entries,
                 "Active crowd lane diversions: " + integer(values, "laneDiverted")
                         + "  / total planning samples " + integer(values, "laneDiversionSamples")
                         + "  / blocked fallback " + integer(values, "laneBlockedFallbacks"));
