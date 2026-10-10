@@ -32,6 +32,9 @@ class SwarmTacticalRoundPolicyTest {
     void stableLaneDoesNotOscillateForSmallImprovements() {
         var state=new SwarmAgentState();
         var self=new Vec2(0,0);
+        // The initial safe side is already selected.
+        state.acceptTacticalSupportDecision(choose(self,new Vec2(2,0),
+                new Vec2(-1.8,0),List.of(),0,true,false));
         for(int tick=0;tick<10000;tick+=6) {
             // Alternate tiny estimates: opposite side is marginally
             // shorter but not by a full physical body width.
@@ -78,8 +81,8 @@ class SwarmTacticalRoundPolicyTest {
         assertFalse(blocked.clearanceVerified());
         assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,blocked.phase());
         var invalid=choose(x,new Vec2(Double.NaN,0),neg,List.of(),-1,true,true);
-        assertEquals(0,invalid.side());
-        assertEquals(Double.POSITIVE_INFINITY,invalid.chosenCost());
+        assertEquals(-1,invalid.side()); // use valid alternative safely
+        assertEquals(2.0,invalid.chosenCost(),1e-9);
         var nearFriendly=SwarmTacticalRoundPolicy.chooseSupport(
                 x,pos,neg,List.of(),2.4,0.6,0,0,
                 true,true,false,true);
