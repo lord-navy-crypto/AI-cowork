@@ -207,7 +207,8 @@ public final class SwarmAgentState {
 
     public void classifyTacticalRound(SwarmTacticalRoundPolicy.Phase phase) {
         tacticalPhase = phase == null ? SwarmTacticalRoundPolicy.Phase.HOLD : phase;
-        tacticalSupportSide = 0;
+        // Do not erase the lane memory BEFORE the next optimization sample.
+        // A verified previous lane supplies the relocation-cost hysteresis.
     }
 
     public void resetTacticalRound() {
