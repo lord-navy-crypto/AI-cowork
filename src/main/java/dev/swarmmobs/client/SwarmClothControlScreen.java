@@ -90,6 +90,27 @@ public final class SwarmClothControlScreen {
                         ? "ACTIVE " + text(values, "aiActiveMode", "BASELINE")
                         : (bool(values, "aiEnabled") ? "SHADOW READY" : "OFF")));
 
+        boolean fullColonyTest =
+                bool(values, "nestEnabled")
+                && bool(values, "nestLifecycleEnabled")
+                && bool(values, "nestHaulingEnabled")
+                && bool(values, "nestBlockGatherEnabled")
+                && bool(values, "nestAnimalHuntEnabled")
+                && bool(values, "nestBerryForagingEnabled")
+                && bool(values, "nestCropReplantEnabled")
+                && bool(values, "nestVisibleExpansionEnabled");
+        status(category, entries, "Colony experimental profile: "
+                + (fullColonyTest ? "ALL ACTIVE" : "PARTIALLY ENABLED / OFF")
+                + " (server-verified snapshot)");
+        status(category, entries,
+                "CAUTION: colony harvesting may alter terrain, trees, crops and animals. Use a disposable world.");
+        action(category, entries, "Enable ALL colony experiments (test world)",
+                "playtest_enable", "Tick and Save to enable founding, gathering, hauling, hunting, "
+                        + "breeding and visible expansion; also enables relevant world gamerules.");
+        action(category, entries, "Disable destructive colony experiments",
+                "playtest_disable", "Tick and Save to disable jobs, breeding and shell placement. "
+                        + "Previous world gamerules are not reset.");
+
         status(category, entries,
                 "Tasks: ENG " + integer(values, "taskEngineering")
                         + "  MAT " + integer(values, "taskMaterial")
