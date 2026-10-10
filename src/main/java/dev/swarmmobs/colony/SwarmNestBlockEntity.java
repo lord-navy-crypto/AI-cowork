@@ -5,6 +5,7 @@ import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.registry.SwarmNestBlockEntities;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -228,7 +229,16 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                 || stack.is(Items.MUD) || stack.is(Items.GRAVEL)) {
             return SwarmNestColonyPolicy.Kind.SOIL;
         }
-        if (stack.is(Items.SWEET_BERRIES) || stack.is(Items.ROTTEN_FLESH) || stack.is(Items.BONE)
+        // Any edible vanilla or modded ItemStack is biological food. Broaden
+        // non-edible harvest produce to cover seeds, grains and mushrooms.
+        if (stack.has(DataComponents.FOOD)
+                || stack.is(Items.WHEAT) || stack.is(Items.WHEAT_SEEDS)
+                || stack.is(Items.BEETROOT_SEEDS) || stack.is(Items.MELON_SEEDS)
+                || stack.is(Items.PUMPKIN_SEEDS) || stack.is(Items.COCOA_BEANS)
+                || stack.is(Items.NETHER_WART) || stack.is(Items.BROWN_MUSHROOM)
+                || stack.is(Items.RED_MUSHROOM) || stack.is(Items.SUGAR_CANE)
+                || stack.is(Items.EGG) || stack.is(Items.HONEYCOMB)
+                || stack.is(Items.SWEET_BERRIES) || stack.is(Items.ROTTEN_FLESH) || stack.is(Items.BONE)
                 || stack.is(Items.SPIDER_EYE) || stack.is(Items.BEEF)
                 || stack.is(Items.PORKCHOP) || stack.is(Items.CHICKEN)
                 || stack.is(Items.MUTTON) || stack.is(Items.RABBIT)
