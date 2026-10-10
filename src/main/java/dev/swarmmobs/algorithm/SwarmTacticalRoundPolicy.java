@@ -1,123 +1,98 @@
 package dev.swarmmobs.algorithm;
 
-import dev.swarmmobs.agent.SwarmAgentArchetype;
+import java.util.List;
+import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 
 /**
- * Reactive, local squad positioning phases inspired by robot feedback control.
+ * Measurement-based, sampled support-position controller for Minecraft swarms.
  *
- * "Round" means a stable decision interval, NOT an attack turn. Inputs come
- * from already-sensed same-target peers and existing navigation evidence.
- * We deliberately never change vanilla attacks, Creeper fuse or Goal priority.
- * No clock-only rotation, global coordinator, chunk scan or extra target query.
+ * A "round" is one observation/decision cycle, never a turn to attack.
+ * The controller chooses the lowest estimated travel + clearance-deficit
+ * cost from actually checked available positions. Previous side is retained
+ * unless changing saves more distance than crossing one agent footprint.
+ * This is a bounded kinematic proxy, NOT full path planning, MPC, or a
+ * mathematical proof of collision avoidance.
  */
 public final class SwarmTacticalRoundPolicy {
     public enum Phase { HOLD, COVER, ROTATE }
 
-    /** Only meaningful observations can request a phase change. */
-    public record Signals(boolean freshContact, boolean supportPresent,
-                          boolean frontlinePresent, boolean congested,
-                          boolean navigationBlocked) {}
+    public record SupportDecision(Phase phase, int side,
+                                  double chosenCost, boolean clearanceVerified) {}
 
     /**
-     * Pending candidates must be consistent across multiple planning samples;
-     * a phase is allowed to settle before another switch is accepted.
-     * All fields are transient and scoped to the current target.
+     * Distances and costs are Minecraft blocks, not arbitrary combat scores.
+     * Hard constraints (verified terrain/shot lane and known teammate
+     * obstruction) precede cost minimization.
+     *
+     * The switching overhead is the agent's physical width: a minimum
+     * measurable displacement to justify abandoning a previously good lane.
+     * If that lane becomes unsafe, the hard constraint overrides inertia.
      */
-    public record Decision(Phase phase, Phase candidate, long candidateSince,
-                           long phaseSince, long switchCount) {}
+    public static SupportDecision chooseSupport(
+            Vec2 self, Vec2 positive, Vec2 negative,
+            List<Vec2> localPeers, double requiredSeparation,
+            double agentWidth, int currentSide, int formationSlot,
+            boolean positiveBlockClear, boolean negativeBlockClear,
+            boolean positiveFriendlyClear, boolean negativeFriendlyClear) {
 
-    public static final int CONFIRM_TICKS = 12;
-    public static final int MIN_PHASE_HOLD_TICKS = 20;
-
-    public static Decision initial() {
-        return new Decision(Phase.HOLD, null, Long.MIN_VALUE,
-                Long.MIN_VALUE, 0);
-    }
-
-    public static Phase recommend(Signals situation) {
-        if (situation == null || !situation.freshContact()) return Phase.HOLD;
-        // A locally observed obstruction overrides routine formation plans,
-        // but the phase transition still requires stable evidence.
-        if (situation.congested() || situation.navigationBlocked()) {
-            return Phase.ROTATE;
-        }
-        if (situation.supportPresent() && situation.frontlinePresent()) {
-            return Phase.COVER;
-        }
-        return Phase.HOLD;
-    }
-
-    /**
-     * Advance only when the requested phase stays consistent, NOT when a
-     * fixed wall-clock round finishes. Old/suddenly negative timestamps are
-     * ignored. Confirmed switches can be counted for debug/performance tests.
-     */
-    public static Decision advance(Decision state, Phase requested, long gameTick) {
-        Decision previous = state == null ? initial() : state;
-        Phase next = requested == null ? Phase.HOLD : requested;
-        if (gameTick < 0) return previous;
-
-        if (next == previous.phase()) {
-            return new Decision(previous.phase(), null, Long.MIN_VALUE,
-                    previous.phaseSince(), previous.switchCount());
-        }
-        if (next != previous.candidate() || previous.candidateSince() > gameTick) {
-            return new Decision(previous.phase(), next, gameTick,
-                    previous.phaseSince(), previous.switchCount());
+        if (!finite(self) || !finite(positive) || !finite(negative)
+                || !Double.isFinite(requiredSeparation) || requiredSeparation <= 0
+                || !Double.isFinite(agentWidth) || agentWidth <= 0) {
+            return new SupportDecision(Phase.HOLD, 0,
+                    Double.POSITIVE_INFINITY, false);
         }
 
-        long candidateDuration = gameTick - previous.candidateSince();
-        long phaseDuration = previous.phaseSince() == Long.MIN_VALUE
-                ? Long.MAX_VALUE : Math.max(0L, gameTick - previous.phaseSince());
-        if (candidateDuration < CONFIRM_TICKS
-                || phaseDuration < MIN_PHASE_HOLD_TICKS) {
-            return previous;
-        }
-
-        return new Decision(next, null, Long.MIN_VALUE, gameTick,
-                previous.switchCount() + 1);
-    }
-
-    /**
-     * Small spatial adjustments for the Minecraft mob archetypes.
-     * This is a game heuristic, not a physical robot's actuator model.
-     */
-    public static double formationRadiusMultiplier(Phase phase,
-                                                   SwarmAgentArchetype archetype) {
-        if (phase == null || archetype == null) return 1.0;
-        return switch (phase) {
-            case HOLD -> 1.0;
-            case COVER -> switch (archetype) {
-                case ASSAULT -> 1.10;
-                case BREACHER -> 0.98;
-                case RANGED_SUPPORT -> 1.05;
-                case FLANKER -> 1.04;
-            };
-            case ROTATE -> switch (archetype) {
-                case ASSAULT -> 1.04;
-                case BREACHER -> 1.0;
-                case RANGED_SUPPORT -> 1.02;
-                case FLANKER -> 1.06;
-            };
-        };
-    }
-
-    /**
-     * Returns +1/-1 for a verified support lane or 0 when both are unsafe.
-     * Rotation never overrides terrain collision or ally clearance checks.
-     */
-    public static int supportSide(Phase phase, int formationSlot,
-                                  boolean positiveBlockClear,
-                                  boolean negativeBlockClear,
-                                  boolean positiveFriendlyClear,
-                                  boolean negativeFriendlyClear) {
         boolean plus = positiveBlockClear && positiveFriendlyClear;
         boolean minus = negativeBlockClear && negativeFriendlyClear;
-        if (!plus && !minus) return 0;
-        if (plus && !minus) return +1;
-        if (!plus) return -1;
-        int stable = Math.floorMod(formationSlot, 2) == 0 ? +1 : -1;
-        return phase == Phase.ROTATE ? -stable : stable;
+        if (!plus && !minus) return new SupportDecision(Phase.HOLD, 0,
+                Double.POSITIVE_INFINITY, false);
+
+        double positiveCost = plus ? localCost(self, positive, localPeers,
+                requiredSeparation) : Double.POSITIVE_INFINITY;
+        double negativeCost = minus ? localCost(self, negative, localPeers,
+                requiredSeparation) : Double.POSITIVE_INFINITY;
+
+        int previous = Integer.compare(currentSide, 0);
+        int selected;
+        if (plus && !minus) selected = +1;
+        else if (minus && !plus) selected = -1;
+        else if (previous > 0 && positiveCost <= negativeCost + agentWidth)
+            selected = +1;
+        else if (previous < 0 && negativeCost <= positiveCost + agentWidth)
+            selected = -1;
+        else if (positiveCost < negativeCost) selected = +1;
+        else if (negativeCost < positiveCost) selected = -1;
+        else selected = Math.floorMod(formationSlot, 2) == 0 ? +1 : -1;
+
+        boolean rotated = previous != 0 && previous != selected;
+        return new SupportDecision(rotated ? Phase.ROTATE : Phase.COVER,
+                selected, selected > 0 ? positiveCost : negativeCost, true);
+    }
+
+    /**
+     * A geometric one-step objective: locomotion to the proposed waypoint,
+     * plus the sum of predicted violations of the configured separation
+     * distance at that waypoint. No synthetic reward, damage or target risk.
+     */
+    public static double localCost(Vec2 self, Vec2 candidate,
+                                   List<Vec2> localPeers, double separation) {
+        if (!finite(self) || !finite(candidate) || !Double.isFinite(separation)
+                || separation <= 0) return Double.POSITIVE_INFINITY;
+        double cost = self.subtract(candidate).length();
+        if (localPeers != null) for (Vec2 peer : localPeers) {
+            if (!finite(peer)) continue;
+            cost += Math.max(0.0,separation-candidate.subtract(peer).length());
+        }
+        return cost;
+    }
+
+    /** Non-ranged agents keep the ordinary swarm planner; no invented maneuver. */
+    public static Phase classification(boolean active, boolean supportAndFrontline) {
+        return active && supportAndFrontline ? Phase.COVER : Phase.HOLD;
+    }
+
+    private static boolean finite(Vec2 v) {
+        return v != null && Double.isFinite(v.x()) && Double.isFinite(v.z());
     }
 
     private SwarmTacticalRoundPolicy() {}
