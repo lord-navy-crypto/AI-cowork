@@ -113,7 +113,8 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 ItemEntity.class, zombie.getBoundingBox().inflate(radius),
                 candidate -> candidate.isAlive() && !candidate.getItem().isEmpty())) {
             var kind = SwarmNestBlockEntity.classify(drop.getItem());
-            if (!SwarmNestHaulPolicy.eligible(true, true, true,
+            if (!nest.needsResource(kind)
+                    || !SwarmNestHaulPolicy.eligible(true, true, true,
                     kind != SwarmNestColonyPolicy.Kind.NONE,
                     playerNear(level, drop.getX(), drop.getY(), drop.getZ(), 6.0),
                     drop.getItem().getCount(), SwarmConfig.NEST_HAUL_MAX_STACK.get(),
@@ -169,8 +170,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 pos.getX(), pos.getY(), pos.getZ());
         var report = nest.scoutBoard().reserve(zombie.getUUID(),
                 workerPos, tick, SwarmNestScoutBoard.MAX_DISTANCE,
-                lead -> SwarmNestColonyPolicy.acceptAmount(
-                        nest.resources(), 1, lead.kind()) > 0,
+                lead -> nest.needsResource(lead.kind()),
                 lead -> emergentCost(nest, lead.kind(),
                         SwarmNestHaulPolicy.pickupScore(lead.kind(),
                                 workerPos.distanceSquared(lead.position()),
@@ -201,9 +201,9 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         }
         boolean cargoValid = phase == Phase.TO_SCOUT
                 ? scoutLead != null && level.hasChunkAt(scoutPosition(scoutLead))
-                        && SwarmNestColonyPolicy.acceptAmount(nest.resources(), 1,
-                                scoutLead.kind()) > 0
+                        && nest.needsResource(scoutLead.kind())
                 : item != null && item.isAlive() && !item.getItem().isEmpty()
+                        && nest.needsResource(SwarmNestBlockEntity.classify(item.getItem()))
                         && SwarmNestHaulPolicy.hasRoomFor(nest.resources(),
                                 item.getItem().getCount(),
                                 SwarmNestBlockEntity.classify(item.getItem()));
@@ -260,6 +260,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             }
             var kind = SwarmNestBlockEntity.classify(physical.getItem());
             if (kind != scoutLead.kind()
+                    || !nest.needsResource(kind)
                     || !SwarmNestHaulPolicy.eligible(true, true, true,
                             kind != SwarmNestColonyPolicy.Kind.NONE,
                             playerNear(level, physical.getX(), physical.getY(),
