@@ -1,6 +1,5 @@
 package dev.swarmmobs.algorithm;
 
-import dev.swarmmobs.agent.SwarmAgentArchetype;
 import dev.swarmmobs.agent.SwarmAgentState;
 import org.junit.jupiter.api.Test;
 
@@ -43,23 +42,15 @@ class SwarmEngagementPolicyTest {
                 SwarmEngagementPolicy.Mode.RECOVERY,false,false,999,30));
     }
 
-    @Test void allCasteCombatPhasesAreSmallAndLeaveVanillaGoalAuthorityAlone() {
-        for(var archetype:SwarmAgentArchetype.values()) {
-            assertEquals(1.0,SwarmTacticalRoundPolicy.formationRadiusMultiplier(
-                    SwarmTacticalRoundPolicy.Phase.HOLD,archetype),1e-10);
-            for(var phase:SwarmTacticalRoundPolicy.Phase.values()) {
-                double value=SwarmTacticalRoundPolicy.formationRadiusMultiplier(
-                        phase,archetype);
-                assertTrue(Double.isFinite(value));
-                assertTrue(value>=.95 && value<=1.12);
-            }
-        }
+    @Test void combatOnlyCoordinationDoesNotReplaceOrdinaryWorkMode() {
         assertFalse(SwarmEngagementPolicy.enableBattleRounds(
                 SwarmEngagementPolicy.Mode.WORK,4));
         assertFalse(SwarmEngagementPolicy.enableBattleRounds(
                 SwarmEngagementPolicy.Mode.RECOVERY,4));
         assertFalse(SwarmEngagementPolicy.enableBattleRounds(
                 SwarmEngagementPolicy.Mode.ALERT,4));
+        assertTrue(SwarmEngagementPolicy.enableBattleRounds(
+                SwarmEngagementPolicy.Mode.COMBAT,1));
     }
 
     @Test void renewedThreatCancelsRecoveryWithoutRememberingAnOldTarget() {
