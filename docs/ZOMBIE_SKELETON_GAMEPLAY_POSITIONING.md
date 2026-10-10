@@ -11,6 +11,16 @@ planner had proposed a tactical location. A Skeleton seeing a Survival-mode
 player closer than 6 blocks now considers a short 3-block step **away**
 from that directly observed player, up to a 7.5-block separation.
 
+**Skeletons with obstructed arrow corridors:** When a known same-target
+Zombie or Creeper stands between a Skeleton and an actually visible
+Minecraft player, evaluate two perpendicular game locations 2.5 blocks
+away. Both candidate squares require valid ground/headroom, an unobstructed
+world ray to that actual player and a clear locally calculated ally corridor.
+Pick a clear side using the stable formation slot; never assume a player
+hidden behind walls is visible and never generate a longer-range path
+without valid evidence. Reuse the same-target peer list already collected
+by the normal AI plan — no new world entity search.
+
 The proposed destination must be valid in already loaded Minecraft chunks,
 have solid footing and body clearance. Only then does the actual MOVE Goal
 temporarily retain control before the vanilla bow handoff. If the square is
@@ -31,8 +41,11 @@ engineering/resource workers are not reassigned by this mechanic.
 1. Spawn Zombies and Skeletons near a Survival-mode player in an open,
    flat game arena. Stand at different distances from a Skeleton and
    observe the moment it changes from bow firing to a short movement.
-2. Put Minecraft obstacles behind a Skeleton. A blocked reposition
+2. Put Minecraft obstacles behind a Skeleton. A blocked distance-reposition
    attempt should not prevent its existing bow from functioning.
+   Place same-target Zombies directly between a Skeleton and the player:
+   the Skeleton should adopt a reachable left/right game square with a
+   clear shooting lane, not simply display a new tactic name.
 3. Build a small wall that breaks line of sight. Skeletons cannot use
    exact hidden-player positions for the new spacing step.
 4. In a mixed group, observe flank-role Zombies approaching and then
