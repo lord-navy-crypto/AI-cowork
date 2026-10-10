@@ -5,6 +5,7 @@ import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.colony.SwarmNestHaulPolicy;
+import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
@@ -13,8 +14,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.animal.Chicken;
+import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.animal.Sheep;
+import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -110,7 +118,53 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
             // ItemEntity reference or an invented inventory stack.
             if (!nest.reportScoutItem(item, now)) continue;
             SwarmNestScoutSignal.mark(item, home, now);
+            if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                nest.markPheromone(item.blockPosition(), kind, now);
+            }
             if (++marked >= MAX_MARKS_PER_SURVEY) break;
+        }
+
+        // A scout can recognize living food and ripe plants, not just
+        // previously dropped cargo. Passive sensors never attack or dig.
+        if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
+                && SwarmColonyGatherPolicy.needs(
+                        SwarmNestColonyPolicy.Kind.NUTRIENT,
+                        nest.soilPoints(), nest.timberPoints(),
+                        nest.nutrientPoints() + nest.legacyPoints(), nest.resources())) {
+            for (Animal animal : level.getEntitiesOfClass(
+                    Animal.class, spider.getBoundingBox().inflate(8.0),
+                    a -> a.isAlive() && !a.isBaby() && !a.hasCustomName()
+                            && (a instanceof Pig || a instanceof Chicken
+                                || a instanceof Cow || a instanceof Sheep
+                                || a instanceof Rabbit))) {
+                if (marked >= MAX_MARKS_PER_SURVEY) break;
+                if (level.hasChunkAt(animal.blockPosition())
+                        && nest.markPheromone(animal.blockPosition(),
+                                SwarmNestColonyPolicy.Kind.NUTRIENT, now)) {
+                    marked++;
+                }
+            }
+        }
+        if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
+                && marked < MAX_MARKS_PER_SURVEY) {
+            BlockPos center = spider.blockPosition();
+            // Bounded 5x5x3 physical plant/wood/soil observation;
+            // no global world scan, no direct resource fabrication.
+            for (int dx = -2; dx <= 2 && marked < MAX_MARKS_PER_SURVEY; dx++) {
+                for (int dz = -2; dz <= 2 && marked < MAX_MARKS_PER_SURVEY; dz++) {
+                    for (int dy = -1; dy <= 1 && marked < MAX_MARKS_PER_SURVEY; dy++) {
+                        BlockPos pos = center.offset(dx, dy, dz);
+                        if (!level.hasChunkAt(pos)) continue;
+                        BlockState state = level.getBlockState(pos);
+                        var kind = SwarmZombieColonyGatherGoal.category(level, pos, state);
+                        if (!SwarmColonyGatherPolicy.needs(kind,
+                                nest.soilPoints(), nest.timberPoints(),
+                                nest.nutrientPoints() + nest.legacyPoints(), nest.resources()))
+                            continue;
+                        if (nest.markPheromone(pos, kind, now)) marked++;
+                    }
+                }
+            }
         }
         home = null;
     }
