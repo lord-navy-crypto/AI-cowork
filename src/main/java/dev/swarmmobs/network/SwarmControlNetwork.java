@@ -74,7 +74,18 @@ public final class SwarmControlNetwork {
             return;
         }
 
-        applyAction(payload.action(), payload.value(), player);
+        // Absolute setters make Save idempotent even after reopening or packet retries.
+        if (payload.action().startsWith("set:")) {
+            if (!applyAbsoluteAction(payload.action().substring(4), payload.value())) {
+                sendSnapshot(player);
+                return;
+            }
+            SwarmExperimentManager.markCustom();
+        } else {
+            applyAction(payload.action(), payload.value(), player);
+        }
+        // NeoForge ConfigValue.set changes memory only; save before acknowledging.
+        SwarmConfig.SPEC.save();
         sendSnapshot(player);
     }
 
@@ -83,6 +94,85 @@ public final class SwarmControlNetwork {
             IPayloadContext context
     ) {
         SwarmControlClient.acceptSnapshot(payload.data());
+    }
+
+    /** Cloth Save sends desired values, not inversion commands or deltas. */
+    private static boolean applyAbsoluteAction(String action, double value) {
+        if (!Double.isFinite(value)) return false;
+        switch (action) {
+            case "toggle_master" -> { SwarmConfig.ENABLED.set(value >= 0.5); return true; }
+            case "ai_toggle" -> { SwarmConfig.EXTERNAL_AI_ENABLED.set(value >= 0.5); if (value < 0.5) SwarmAiActiveState.clear(); return true; }
+            case "ai_active_toggle" -> { SwarmConfig.EXTERNAL_AI_ACTIVE_ENABLED.set(value >= 0.5); if (value < 0.5) SwarmAiActiveState.clear(); return true; }
+            case "toggle_engineering" -> { SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(value >= 0.5); return true; }
+            case "engineering_hardness_delta" -> { SwarmConfig.ZOMBIE_ENGINEERING_MAX_BREAK_HARDNESS.set(Math.max(0.0, Math.min(10.0, value))); return true; }
+            case "engineering_carry_delta" -> { SwarmConfig.ZOMBIE_ENGINEERING_MAX_CARRIED_BLOCKS.set((int) Math.round(Math.max(0, Math.min(16, value)))); return true; }
+            case "engineering_radius_delta" -> { SwarmConfig.ZOMBIE_ENGINEERING_TASK_RADIUS.set(Math.max(2.0, Math.min(24.0, value))); return true; }
+            case "engineering_ttl_delta" -> { SwarmConfig.ZOMBIE_ENGINEERING_TASK_TTL_TICKS.set((int) Math.round(Math.max(10, Math.min(400, value)))); return true; }
+            case "engineering_handoff_delta" -> { SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(Math.max(0.5, Math.min(6.0, value))); return true; }
+            case "engineering_bridge_delta" -> { SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set((int) Math.round(Math.max(1, Math.min(8, value)))); return true; }
+            case "nest_toggle" -> { SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(value >= 0.5); return true; }
+            case "nest_visible_expansion_toggle" -> { SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(value >= 0.5); return true; }
+            case "nest_lifecycle_toggle" -> { SwarmConfig.NEST_LIFECYCLE_ENABLED.set(value >= 0.5); return true; }
+            case "nest_max_population_delta" -> { SwarmConfig.NEST_MAX_POPULATION.set((int) Math.round(Math.max(3, Math.min(32, value)))); return true; }
+            case "nest_haul_toggle" -> { SwarmConfig.NEST_HAULING_ENABLED.set(value >= 0.5); return true; }
+            case "nest_pheromone_toggle" -> { SwarmConfig.NEST_PHEROMONES_ENABLED.set(value >= 0.5); return true; }
+            case "nest_pheromone_explore_toggle" -> { SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(value >= 0.5); return true; }
+            case "nest_animal_hunt_toggle" -> { SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(value >= 0.5); return true; }
+            case "nest_block_gather_toggle" -> { SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(value >= 0.5); return true; }
+            case "nest_stock_adapt_toggle" -> { SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(value >= 0.5); return true; }
+            case "nest_crop_replant_toggle" -> { SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(value >= 0.5); return true; }
+            case "nest_gather_interval_delta" -> { SwarmConfig.NEST_GATHER_INTERVAL.set((int) Math.round(Math.max(60, Math.min(800, value)))); return true; }
+            case "nest_berry_forage_toggle" -> { SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(value >= 0.5); return true; }
+            case "nest_berry_forage_interval_delta" -> { SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set((int) Math.round(Math.max(120, Math.min(800, value)))); return true; }
+            case "nest_haul_radius_delta" -> { SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set((int) Math.round(Math.max(4, Math.min(16, value)))); return true; }
+            case "nest_haul_stack_delta" -> { SwarmConfig.NEST_HAUL_MAX_STACK.set((int) Math.round(Math.max(1, Math.min(64, value)))); return true; }
+            case "nest_haul_interval_delta" -> { SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set((int) Math.round(Math.max(40, Math.min(400, value)))); return true; }
+            case "nest_adaptive_toggle" -> { SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(value >= 0.5); return true; }
+            case "nest_worker_share_delta" -> { SwarmConfig.NEST_WORKER_TARGET_SHARE.set(Math.max(0.15, Math.min(0.65, value))); return true; }
+            case "nest_guard_share_delta" -> { SwarmConfig.NEST_GUARD_TARGET_SHARE.set(Math.max(0.10, Math.min(0.50, value))); return true; }
+            case "nest_response_threshold_delta" -> { SwarmConfig.NEST_RESPONSE_THRESHOLD.set(Math.max(0.10, Math.min(3.0, value))); return true; }
+            case "nest_interval_delta" -> { SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set((int) Math.round(Math.max(100, Math.min(1200, value)))); return true; }
+            case "nest_population_delta" -> { SwarmConfig.NEST_MIN_GROUP_SIZE.set((int) Math.round(Math.max(2, Math.min(16, value)))); return true; }
+            case "toggle_division" -> { SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(value >= 0.5); return true; }
+            case "support_position_toggle" -> { SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(value >= 0.5); return true; }
+            case "formation_hysteresis_delta" -> { SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set((int) Math.round(Math.max(0, Math.min(200, value)))); return true; }
+            case "role_hysteresis_delta" -> { SwarmConfig.ROLE_HYSTERESIS_TICKS.set((int) Math.round(Math.max(0, Math.min(200, value)))); return true; }
+            case "specialization_hold_delta" -> { SwarmConfig.SPECIALIZATION_MIN_HOLD_TICKS.set((int) Math.round(Math.max(0, Math.min(400, value)))); return true; }
+            case "specialization_gain_delta" -> { SwarmConfig.SPECIALIZATION_EXPERIENCE_GAIN.set(Math.max(0.0, Math.min(0.25, value))); return true; }
+            case "specialization_decay_delta" -> { SwarmConfig.SPECIALIZATION_EXPERIENCE_DECAY.set(Math.max(0.90, Math.min(1.0, value))); return true; }
+            case "toggle_sensing" -> { SwarmConfig.SENSING_IMPERFECTION_ENABLED.set(value >= 0.5); return true; }
+            case "sensing_drop_delta" -> { SwarmConfig.SENSING_DROPOUT_RATE.set(Math.max(0.0, Math.min(1.0, value))); return true; }
+            case "sensing_noise_delta" -> { SwarmConfig.SENSING_MAX_HORIZONTAL_NOISE.set(Math.max(0.0, Math.min(8.0, value))); return true; }
+            case "toggle_comm" -> { SwarmConfig.COMMUNICATION_ENABLED.set(value >= 0.5); return true; }
+            case "comm_drop_delta" -> { SwarmConfig.COMMUNICATION_PACKET_DROP_RATE.set(Math.max(0.0, Math.min(1.0, value))); return true; }
+            case "comm_latency_delta" -> { SwarmConfig.COMMUNICATION_LATENCY_TICKS.set((int) Math.round(Math.max(0, Math.min(400, value)))); return true; }
+            case "comm_radius_delta" -> { SwarmConfig.COMMUNICATION_RADIUS.set(Math.max(1.0, Math.min(96.0, value))); return true; }
+            case "search_threshold_delta" -> { SwarmConfig.SEARCH_CONFIDENCE_THRESHOLD.set(Math.max(0.05, Math.min(0.95, value))); return true; }
+            case "search_speed_delta" -> { SwarmConfig.SEARCH_SPEED_FACTOR.set(Math.max(0.25, Math.min(1.5, value))); return true; }
+            case "search_max_radius_delta" -> { SwarmConfig.SEARCH_MAX_RADIUS.set(Math.max(2.0, Math.min(32.0, value))); return true; }
+            case "toggle_prediction" -> { SwarmConfig.TARGET_PREDICTION_ENABLED.set(value >= 0.5); return true; }
+            case "prediction_distance_delta" -> { SwarmConfig.TARGET_PREDICTION_MAX_DISTANCE.set(Math.max(0.0, Math.min(12.0, value))); return true; }
+            case "toggle_obstacle" -> { SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(value >= 0.5); return true; }
+            case "nav_lookahead_delta" -> { SwarmConfig.NAV_OBSTACLE_LOOKAHEAD.set(Math.max(0.5, Math.min(4.0, value))); return true; }
+            case "nav_lateral_delta" -> { SwarmConfig.NAV_OBSTACLE_LATERAL_DISTANCE.set(Math.max(0.5, Math.min(4.0, value))); return true; }
+            case "toggle_walkability" -> { SwarmConfig.NAV_WALKABILITY_ENABLED.set(value >= 0.5); return true; }
+            case "nav_max_drop_delta" -> { SwarmConfig.NAV_MAX_PROBE_DROP_BLOCKS.set((int) Math.round(Math.max(0, Math.min(4, value)))); return true; }
+            case "nav_stuck_window_delta" -> { SwarmConfig.NAV_STUCK_WINDOW_TICKS.set((int) Math.round(Math.max(6, Math.min(200, value)))); return true; }
+            case "nav_stuck_progress_delta" -> { SwarmConfig.NAV_STUCK_MIN_PROGRESS.set(Math.max(0.05, Math.min(4.0, value))); return true; }
+            case "nav_recovery_distance_delta" -> { SwarmConfig.NAV_RECOVERY_LATERAL_DISTANCE.set(Math.max(0.25, Math.min(6.0, value))); return true; }
+            case "nav_recovery_duration_delta" -> { SwarmConfig.NAV_RECOVERY_DURATION_TICKS.set((int) Math.round(Math.max(3, Math.min(100, value)))); return true; }
+            case "nav_progress_weight_delta" -> { SwarmConfig.NAV_LOCAL_PROGRESS_WEIGHT.set(Math.max(0.0, Math.min(4.0, value))); return true; }
+            case "nav_lateral_penalty_delta" -> { SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(Math.max(0.0, Math.min(4.0, value))); return true; }
+            case "nav_congestion_penalty_delta" -> { SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(Math.max(0.0, Math.min(4.0, value))); return true; }
+            case "nav_congestion_radius_delta" -> { SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(Math.max(0.5, Math.min(8.0, value))); return true; }
+            case "toggle_path_evidence" -> { SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(value >= 0.5); return true; }
+            case "nav_path_budget_delta" -> { SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.set((int) Math.round(Math.max(8, Math.min(512, value)))); return true; }
+            case "nav_path_node_penalty_delta" -> { SwarmConfig.NAV_PATH_NODE_PENALTY.set(Math.max(0.0, Math.min(2.0, value))); return true; }
+            case "nav_path_residual_penalty_delta" -> { SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(Math.max(0.0, Math.min(2.0, value))); return true; }
+            case "nav_path_max_residual_delta" -> { SwarmConfig.NAV_PATH_MAX_RESIDUAL_DISTANCE.set(Math.max(0.0, Math.min(4.0, value))); return true; }
+            case "experiment_seed_delta" -> { SwarmExperimentManager.setExperimentSeed((int) Math.round(Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, value)))); return true; }
+            default -> { return false; }
+        }
     }
 
     private static void applyAction(String action, double value, ServerPlayer player) {
