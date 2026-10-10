@@ -18,6 +18,7 @@ import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
+import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
@@ -44,6 +45,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SweetBerryBushBlock;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.monster.Skeleton;
@@ -4644,6 +4647,104 @@ public final class SwarmRuntimeGameTests {
             SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(wasRadius);
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(wasGriefing, helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_renewable_berry_forage",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void ripeBushProducesPhysicalFoodThenZombieHaulsItToCore(
+            GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(0, 1, 2);
+        BlockPos plantPos = new BlockPos(4, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(plantPos.below(), Blocks.DIRT);
+        helper.setBlock(plantPos,
+                Blocks.SWEET_BERRY_BUSH.defaultBlockState()
+                        .setValue(SweetBerryBushBlock.AGE, 3));
+        var blockEntity = helper.getLevel().getBlockEntity(helper.absolutePos(corePos));
+        if (!(blockEntity instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Forage fixture missing live colony core");
+            return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(corePos).asLong());
+
+        boolean master = SwarmConfig.ENABLED.get();
+        boolean lifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean foraging = SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get();
+        boolean grief = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+
+            boolean installed = worker.goalSelector.getAvailableGoals().stream()
+                    .anyMatch(wrapped -> wrapped.getGoal()
+                            instanceof SwarmZombieBerryForageGoal);
+            if (!installed) {
+                helper.fail("Colony worker is missing safe renewable foraging goal");
+                return;
+            }
+            var forage = new SwarmZombieBerryForageGoal(worker);
+            if (!forage.canUse()) {
+                helper.fail("Idle worker did not locate mature berry bush");
+                return;
+            }
+            forage.start();
+            forage.tick();
+            forage.stop();
+
+            var after = helper.getLevel().getBlockState(helper.absolutePos(plantPos));
+            if (!after.is(Blocks.SWEET_BERRY_BUSH)
+                    || after.getValue(SweetBerryBushBlock.AGE) != 1
+                    || nest.resources() != 0 || nest.nutrientPoints() != 0
+                    || nest.foragedBerries() != 2) {
+                helper.fail("Picking did not conserve a renewable bush and real food accounting");
+                return;
+            }
+            var drops = helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class, new AABB(helper.absolutePos(plantPos)).inflate(2.0),
+                    candidate -> candidate.isAlive()
+                            && candidate.getItem().is(Items.SWEET_BERRIES));
+            if (drops.size() != 1 || drops.getFirst().getItem().getCount() != 2) {
+                helper.fail("Foraging must create exactly two physical berry items");
+                return;
+            }
+            ItemEntity physicalBerries = drops.getFirst();
+            // The regular transport subsystem now accepts that same item.
+            var haul = new SwarmZombieColonyHaulGoal(worker);
+            if (!haul.canUse()) {
+                helper.fail("Hauler could not claim the actually produced berry drop");
+                return;
+            }
+            haul.start();
+            haul.tick();
+            Vec3 dock = helper.absoluteVec(new Vec3(1.1, 1.0, 2.5));
+            worker.setPos(dock.x, dock.y, dock.z);
+            haul.tick();
+            haul.stop();
+            if (physicalBerries.isAlive() || nest.nutrientPoints() != 8
+                    || nest.resources() != 8 || nest.hauledItems() != 2
+                    || nest.haulTrips() != 1 || nest.foragedBerries() != 2) {
+                helper.fail("Existing real-item hauler failed to deliver foraged food exactly");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(lifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(foraging);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief, helper.getLevel().getServer());
         }
     }
 }
