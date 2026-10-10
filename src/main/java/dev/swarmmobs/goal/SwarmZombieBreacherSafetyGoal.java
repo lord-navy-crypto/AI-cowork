@@ -88,8 +88,11 @@ public final class SwarmZombieBreacherSafetyGoal extends Goal {
                 || !SwarmConfig.ENABLED.get()
                 || hazard==null || retreat==null
                 || !zombie.isAlive() || !hazard.isAlive()
-                || zombie.getTarget()==null
+                || !(zombie.getTarget() instanceof Player livePlayer)
+                || !validTarget(livePlayer)
                 || zombie.getData(SwarmAttachments.AGENT_STATE.get()).targetId()==null
+                || !livePlayer.getUUID().equals(
+                        zombie.getData(SwarmAttachments.AGENT_STATE.get()).targetId())
                 || !SwarmBreacherSafetyPolicy.mustYield(
                         zombie.getData(SwarmAttachments.AGENT_STATE.get()).targetId(),
                         hazard.getData(SwarmAttachments.AGENT_STATE.get()).targetId(),
