@@ -7,6 +7,7 @@ import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.colony.SwarmNestHaulPolicy;
 import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
+import dev.swarmmobs.colony.SwarmNestOpportunityBoard;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.registry.SwarmNestBlocks;
@@ -126,8 +127,7 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
 
         // A scout can recognize living food and ripe plants, not just
         // previously dropped cargo. Passive sensors never attack or dig.
-        if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
-                && SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()
+        if (SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()
                 && SwarmColonyGatherPolicy.needs(
                         SwarmNestColonyPolicy.Kind.NUTRIENT,
                         nest.soilPoints(), nest.timberPoints(),
@@ -139,15 +139,22 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
                                 || a instanceof Cow || a instanceof Sheep
                                 || a instanceof Rabbit))) {
                 if (marked >= MAX_MARKS_PER_SURVEY) break;
-                if (level.hasChunkAt(animal.blockPosition())
-                        && nest.markPheromone(animal.blockPosition(),
-                                SwarmNestColonyPolicy.Kind.NUTRIENT, now)) {
+                if (!level.hasChunkAt(animal.blockPosition())) continue;
+                BlockPos loc = animal.blockPosition();
+                var homePos = new SwarmNestOpportunityBoard.Position(
+                        home.getX(),home.getY(),home.getZ());
+                var sitePos = new SwarmNestOpportunityBoard.Position(
+                        loc.getX(),loc.getY(),loc.getZ());
+                if (nest.opportunityBoard().publishAnimal(
+                        animal.getUUID(),sitePos,now,homePos)) {
+                    if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                        nest.markPheromone(loc,SwarmNestColonyPolicy.Kind.NUTRIENT,now);
+                    }
                     marked++;
                 }
             }
         }
-        if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
-                && SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()
+        if (SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()
                 && marked < MAX_MARKS_PER_SURVEY) {
             BlockPos center = spider.blockPosition();
             // Bounded 5x5x3 physical plant/wood/soil observation;
@@ -163,7 +170,16 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
                                 nest.soilPoints(), nest.timberPoints(),
                                 nest.nutrientPoints() + nest.legacyPoints(), nest.resources()))
                             continue;
-                        if (nest.markPheromone(pos, kind, now)) marked++;
+                        if (nest.opportunityBoard().publishBlock(
+                                new SwarmNestOpportunityBoard.Position(
+                                        pos.getX(),pos.getY(),pos.getZ()),kind,now,
+                                new SwarmNestOpportunityBoard.Position(
+                                        home.getX(),home.getY(),home.getZ()))) {
+                            if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                                nest.markPheromone(pos,kind,now);
+                            }
+                            marked++;
+                        }
                     }
                 }
             }
