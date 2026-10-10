@@ -12,6 +12,7 @@ import dev.swarmmobs.colony.SwarmNestHaulPolicy;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
 import dev.swarmmobs.colony.SwarmNestScoutBoard;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import net.minecraft.core.BlockPos;
@@ -444,7 +445,8 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             return false;
         }
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
-        return state.targetId() == null && !state.hasDestination();
+        return state.targetId() == null && !state.hasDestination()
+                && SwarmEngagementPolicy.canDoNestWork(state.engagementMode());
     }
 
     private static boolean playerNear(ServerLevel level, double x, double y,
