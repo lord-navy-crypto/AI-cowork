@@ -20,6 +20,7 @@ import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
+import dev.swarmmobs.algorithm.SwarmRangedSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
@@ -465,6 +466,7 @@ public final class SwarmMobEvents {
                 coverage.fillingMissingFlank() && tacticalRole == coverage.role());
 
         if (searchMode) {
+            state.updateRangedSpacing(false);
             state.setTacticalPattern("SEARCH");
             state.beginSearchEpisode(gameTick, observation.targetId());
             state.clearPredictionTelemetry();
@@ -716,6 +718,25 @@ public final class SwarmMobEvents {
                     // scientifically justified extra support-position move.
                 }
                 }
+            }
+
+            // Skeleton: direct, close game contact may choose an actually
+            // walkable 3-block spacing correction before vanilla bow handoff.
+            // When blocked, ordinary shooting still works.
+            if (mob instanceof Skeleton skeleton) {
+                var spacing = SwarmRangedSpacingPolicy.consider(
+                        new Vec2(mob.getX(), mob.getZ()),
+                        new Vec2(observation.x(), observation.z()),
+                        selection.direct() && selection.player() != null
+                                && skeleton.hasLineOfSight(selection.player()),
+                        confidence);
+                boolean possible = spacing.active()
+                        && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                                level, mob.getY(), spacing.candidate());
+                if (possible) plannedDestination = spacing.candidate();
+                state.updateRangedSpacing(possible);
+            } else {
+                state.updateRangedSpacing(false);
             }
 
             state.updateLocalPlan(
