@@ -229,6 +229,12 @@ public final class SwarmControlNetwork {
                             !SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get());
             case "nest_haul_toggle" ->
                     SwarmConfig.NEST_HAULING_ENABLED.set(!SwarmConfig.NEST_HAULING_ENABLED.get());
+            case "nest_berry_forage_toggle" ->
+                    SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(
+                            !SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get());
+            case "nest_berry_forage_interval_delta" ->
+                    SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set((int) clamp(
+                            SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.get() + value, 120.0, 800.0));
             case "nest_haul_radius_delta" -> SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set((int) clamp(
                     SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get() + value, 4.0, 16.0));
             case "nest_haul_stack_delta" -> SwarmConfig.NEST_HAUL_MAX_STACK.set((int) clamp(
@@ -254,6 +260,8 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
                 SwarmConfig.NEST_HAULING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
                 SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
                 SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
                 SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
@@ -642,11 +650,14 @@ public final class SwarmControlNetwork {
                 pair("nestEnabled", SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()),
                 pair("nestLifecycleEnabled", SwarmConfig.NEST_LIFECYCLE_ENABLED.get()),
                 pair("nestHaulingEnabled", SwarmConfig.NEST_HAULING_ENABLED.get()),
+                pair("nestBerryForagingEnabled", SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get()),
+                pair("nestBerryForageInterval", SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.get()),
                 pair("nestHaulSearchRadius", SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get()),
                 pair("nestHaulMaxStack", SwarmConfig.NEST_HAUL_MAX_STACK.get()),
                 pair("nestHaulAttemptInterval", SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.get()),
                 pair("colonyHaulItems", colony.hauledItems()),
                 pair("colonyHaulTrips", colony.haulTrips()),
+                pair("colonyForagedBerries", colony.foragedBerries()),
                 pair("nestVisibleExpansionEnabled",
                         SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()),
                 pair("nestMaxPopulation", SwarmConfig.NEST_MAX_POPULATION.get()),
