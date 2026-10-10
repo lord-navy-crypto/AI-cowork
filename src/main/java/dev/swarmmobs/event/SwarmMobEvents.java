@@ -39,6 +39,8 @@ import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
 import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyGatherGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyHuntGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
@@ -97,7 +99,9 @@ public final class SwarmMobEvents {
             mob.goalSelector.addGoal(2, new SwarmZombieColonyHaulGoal(builder));
             // Renewable food harvest happens only when idle logistics has
             // no existing cargo to move; no attack or engineering override.
-            mob.goalSelector.addGoal(3, new SwarmZombieBerryForageGoal(builder));
+            mob.goalSelector.addGoal(3, new SwarmZombieColonyHuntGoal(builder));
+            mob.goalSelector.addGoal(4, new SwarmZombieColonyGatherGoal(builder));
+            mob.goalSelector.addGoal(5, new SwarmZombieBerryForageGoal(builder));
         }
     }
 
