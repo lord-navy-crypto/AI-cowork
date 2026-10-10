@@ -5823,4 +5823,74 @@ public final class SwarmRuntimeGameTests {
             }
         });
     }
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_guard_birth",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void colonyBornSkeletonKeepsItsVanillaBowGoal(GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(2, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(new BlockPos(4, 0, 2), Blocks.DIRT);
+        if (!(helper.getLevel().getBlockEntity(helper.absolutePos(corePos))
+                instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Guard birth test missing loaded nest"); return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 1, 2));
+        worker.setNoAi(true);
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(corePos).asLong());
+        worker.getPersistentData().putString("SwarmColonyDimension",
+                helper.getLevel().dimension().location().toString());
+
+        boolean oldEnabled = SwarmConfig.ENABLED.get();
+        boolean oldLifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean oldRecruitment = SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.get();
+        boolean oldSpawn = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_DOMOBSPAWNING);
+        Difficulty oldDifficulty = helper.getLevel().getDifficulty();
+        TestPlayerHandle observer = createTickingTestPlayer(helper, GameType.SURVIVAL);
+        try {
+            ServerPlayer player = observer.player();
+            player.setNoGravity(true);
+            Vec3 location = helper.absoluteVec(new Vec3(20.0, 1.0, 2.0));
+            player.setPos(location.x, location.y, location.z);
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING)
+                    .set(true, helper.getLevel().getServer());
+            helper.getLevel().getServer().setDifficulty(Difficulty.HARD, true);
+            // One existing worker makes a guard the largest local caste
+            // deficit. Three real food items pay for precisely one birth.
+            if (nest.deposit(SwarmNestColonyPolicy.Kind.NUTRIENT, 3) != 3) {
+                helper.fail("Cannot seed physically accounted guard birth"); return;
+            }
+            nest.runColonyCycle(helper.getLevel());
+            var born = helper.getLevel().getEntitiesOfClass(
+                    Skeleton.class, new AABB(helper.absolutePos(corePos)).inflate(12),
+                    entity -> entity.isAlive()).stream().findFirst().orElse(null);
+            if (nest.births() != 1L || born == null
+                    || !born.getMainHandItem().is(Items.BOW)
+                    || born.goalSelector.getAvailableGoals().stream()
+                            .noneMatch(g -> g.getGoal() instanceof
+                                    net.minecraft.world.entity.ai.goal.RangedBowAttackGoal)
+                    || nest.nutrientPoints() != 0 || nest.resources() != 0) {
+                helper.fail("New colony guard lacked vanilla bow Goal or consumed invalid resources"
+                        + " births=" + nest.births()
+                        + " skeleton=" + (born != null)
+                        + " nutrition=" + nest.nutrientPoints());
+                return;
+            }
+            helper.succeed();
+        } finally {
+            observer.close();
+            SwarmConfig.ENABLED.set(oldEnabled);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(oldLifecycle);
+            SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(oldRecruitment);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING)
+                    .set(oldSpawn, helper.getLevel().getServer());
+            helper.getLevel().getServer().setDifficulty(oldDifficulty, true);
+        }
+    }
+
 }
