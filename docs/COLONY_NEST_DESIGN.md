@@ -982,3 +982,67 @@ software regression tests, not claims that this strategy necessarily
 improves combat effectiveness or matches physical military robotics.
 Game-specific A/B trials are still needed to quantify path length,
 replan counts, attack completion, and server tick performance.
+
+## Current scientific controller: sampled feasible-position selection (supersedes all earlier timed rounds)
+
+Important: Previous paragraphs on clock-driven phases, 12-tick confirmation
+and 20-tick phase holds describe **superseded historical implementations**.
+The code now implements sampled, local geometric decision-making, NOT
+physical turn-taking. No attacking, fuse or navigation Goal is gated by a
+planning cycle. Work, alert, combat and recovery remain separate.
+
+At each already-scheduled COMBAT planning sample, a ranged agent with
+a real directly observed target and same-target frontal peers may
+evaluate the *two positions* proposed by the existing formation planner.
+The prior world-visibility ray check and same-target occlusion check are
+HARD prerequisites: an unavailable position can never win merely because
+it is closer. If neither passes, no optional positioning overrides the
+ordinary planner. The policy does not force a risky position.
+
+For a geometrically admissible candidate position p, peer samples q_j
+and present position x, the local objective has distance units:
+
+    J(p) = ||p-x|| + sum_j max(0, d_clear - ||p-q_j||)
+
+where d_clear is the preexisting configurable separation distance in
+blocks. Term 1 approximates movement effort in blocks; term 2 measures
+total shortfall from peer spacing in blocks. There is no bonus damage,
+arbitrary score for "flanking" or 1.05x/1.10x caste radius rule.
+If the prior candidate is admissible, the controller retains it unless
+the alternative saves more than one agent-body width in estimated
+movement/clearance cost. An invalid prior candidate is abandoned without
+that threshold. Position validity, path feasibility and safety are NOT
+proved by this one-step Euclidean objective: real navigation remains
+handled by the existing Minecraft path planner, and this is NOT a
+certified real-world controller.
+
+HOLD/COVER/ROTATE are now interpreted as *labels of measured decisions*:
+HOLD = no justified optional support position; COVER = feasible position
+retained/selected; ROTATE = verified change of occupied support side.
+Other castes' navigation remains under the original swarm steering and
+native Goals; their COVER label describes verified squad composition,
+not a synthetic command. Separate labor and COMBAT activity controls
+remain untouched, and existing saved operator toggles are preserved.
+
+The practical research comparison is sampled decision vs sampled
+decision (the old deterministic slot parity baseline and the new
+small finite candidate optimizer). Suitable measurable metrics include:
+    - number of unnecessary lane switches per 1000 planning samples;
+    - total chosen Euclidean travel and clearance-deficit proxy J;
+    - actual navigation arrival and blocked-path fraction;
+    - server tick cost at different agent densities;
+    - loss of vanilla behaviors and violations of the no-work-in-combat
+      invariant.
+These must be evaluated under identical worlds and seeds. Local J
+improvement in unit tests cannot by itself establish better game combat
+outcomes, collision-free routes or biological/robotic validity.
+
+Conceptual background (NOT code copied or a certification):
+- Alonso-Mora et al., "Distributed multi-robot formation control in
+  dynamic environments", Autonomous Robots, 2019,
+  https://doi.org/10.1007/s10514-018-9783-9
+- Zhang, Garg & Fan, "Neural Graph Control Barrier Functions Guided
+  Distributed Collision-avoidance Multi-agent Control", CoRL 2023,
+  https://proceedings.mlr.press/v229/zhang23h.html
+The present mod does NOT implement model-predictive control, barrier
+function optimization, convergence proofs or safety certification.
