@@ -206,6 +206,34 @@ class SwarmTacticalHandoffStateTest {
         assertTrue(state.allowShortZombieFlank(1));
     }
 
+    @Test void ZombieTimedOutFlankAvoidsSameBlockedSquareButAcceptsAlternative() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(11, 1));
+        state.updateLocalPlan(0, 0, SwarmRole.FLANK_LEFT, 4, 8, 0, 0);
+        assertTrue(state.allowShortZombieFlank(100));
+        assertFalse(state.allowShortZombieFlank(118));
+        assertEquals(1, state.zombieFlankFallbacks());
+        assertTrue(state.hasRecentlyFailedZombieWaypoint(148));
+        assertFalse(state.canUseZombieFlankWaypoint(4, 8, 147));
+        // Retry is permitted after cooldown, but not at the same failed spot.
+        assertFalse(state.canUseZombieFlankWaypoint(4, 8, 148));
+        assertTrue(state.canUseZombieFlankWaypoint(6, 8, 148));
+        assertTrue(state.canUseZombieFlankWaypoint(4, 8, 268));
+        assertFalse(state.hasRecentlyFailedZombieWaypoint(268));
+        assertFalse(state.canUseZombieFlankWaypoint(Double.NaN, 8, 268));
+    }
+
+    @Test void ZombieFailureMemoryClearsForDifferentTarget() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(11, 1));
+        state.updateLocalPlan(0, 0, SwarmRole.FLANK_RIGHT, 4, 8, 0, 0);
+        assertTrue(state.allowShortZombieFlank(100));
+        assertFalse(state.allowShortZombieFlank(118));
+        state.bindTacticalTarget(new UUID(11, 2));
+        assertFalse(state.hasRecentlyFailedZombieWaypoint(149));
+        assertTrue(state.canUseZombieFlankWaypoint(4, 8, 149));
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
