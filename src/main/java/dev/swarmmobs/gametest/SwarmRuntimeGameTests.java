@@ -21,6 +21,7 @@ import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
 import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyGatherGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHuntGoal;
+import dev.swarmmobs.goal.SwarmZombieBreacherSafetyGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmZombiePheromoneExploreGoal;
 import dev.swarmmobs.colony.SwarmNestPheromoneField;
@@ -5506,5 +5507,104 @@ public final class SwarmRuntimeGameTests {
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(grief,helper.getLevel().getServer());
         }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_final_mixed_squad",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 120)
+    public static void zombieCreeperAndSkeletonCoordinateWithoutBreakingCombatGoals(
+            GameTestHelper helper) {
+        // Stable terrain: separate local squad members and sufficient retreat
+        // space. Test their live target/goal handoffs, not teleport or bonus damage.
+        for (int x=-1;x<=9;x++) for(int z=-2;z<=6;z++) {
+            helper.setBlock(new BlockPos(x,0,z),Blocks.STONE);
+        }
+        Skeleton skeleton=helper.spawn(EntityType.SKELETON,new BlockPos(1,1,1));
+        var creeper=helper.spawn(EntityType.CREEPER,new BlockPos(1,1,3));
+        Zombie zombie=helper.spawn(EntityType.ZOMBIE,new BlockPos(2,1,3));
+        skeleton.setNoGravity(true);
+        creeper.setNoGravity(true);
+        zombie.setNoGravity(true);
+        skeleton.setItemSlot(EquipmentSlot.MAINHAND,new ItemStack(Items.BOW));
+        skeleton.reassessWeaponGoal();
+        var zombieSpeed=zombie.getAttribute(Attributes.MOVEMENT_SPEED);
+        var creeperSpeed=creeper.getAttribute(Attributes.MOVEMENT_SPEED);
+        if(zombieSpeed!=null) zombieSpeed.setBaseValue(0.0);
+        if(creeperSpeed!=null) creeperSpeed.setBaseValue(0.0);
+        TestPlayerHandle handle=createTickingTestPlayer(helper,GameType.SURVIVAL);
+        ServerPlayer player=handle.player();
+        player.setNoGravity(true);
+        Vec3 at=helper.absoluteVec(new Vec3(4.0,1.0,2.0));
+        player.setPos(at.x,at.y,at.z);
+
+        helper.runAfterDelay(28,()->{
+            try {
+                if(!zombie.isAlive() || !skeleton.isAlive() || !creeper.isAlive()) {
+                    helper.fail("One supported vanilla mob was lost before squad cooperation");
+                    return;
+                }
+                SwarmAgentState z=zombie.getData(SwarmAttachments.AGENT_STATE.get());
+                SwarmAgentState s=skeleton.getData(SwarmAttachments.AGENT_STATE.get());
+                SwarmAgentState c=creeper.getData(SwarmAttachments.AGENT_STATE.get());
+                if(!player.getUUID().equals(z.targetId())
+                        || !player.getUUID().equals(s.targetId())
+                        || !player.getUUID().equals(c.targetId())
+                        || s.role()!=SwarmRole.RANGED_SUPPORT
+                        || c.role()!=SwarmRole.CHASER) {
+                    helper.fail("Zombie/Skeleton/Creeper did not share a real player target and native roles");
+                    return;
+                }
+
+                var safety=zombie.goalSelector.getAvailableGoals().stream()
+                        .map(w->w.getGoal())
+                        .filter(SwarmZombieBreacherSafetyGoal.class::isInstance)
+                        .map(SwarmZombieBreacherSafetyGoal.class::cast)
+                        .findFirst().orElse(null);
+                var bow=skeleton.goalSelector.getAvailableGoals().stream()
+                        .map(w->w.getGoal())
+                        .filter(dev.swarmmobs.goal.SwarmSkeletonBowGoal.class::isInstance)
+                        .map(dev.swarmmobs.goal.SwarmSkeletonBowGoal.class::cast)
+                        .findFirst().orElse(null);
+                var swell=creeper.goalSelector.getAvailableGoals().stream()
+                        .map(w->w.getGoal())
+                        .filter(SwarmCreeperSwellGoal.class::isInstance)
+                        .map(SwarmCreeperSwellGoal.class::cast)
+                        .findFirst().orElse(null);
+                var engineer=zombie.goalSelector.getAvailableGoals().stream()
+                        .anyMatch(w->w.getGoal() instanceof SwarmZombieEngineerGoal);
+                if(safety==null || bow==null || swell==null || !engineer) {
+                    helper.fail("Mixed squad integration removed an original combat/engineering Goal");
+                    return;
+                }
+                if(safety.canUse()) {
+                    helper.fail("No active Creeper fuse: Zombie must retain ordinary melee and engineering");
+                    return;
+                }
+                creeper.ignite();
+                if(!safety.canUse()) {
+                    helper.fail("Same-target active Creeper fuse did not trigger local Zombie avoidance");
+                    return;
+                }
+                safety.start();
+                if(!safety.canContinueToUse()) {
+                    helper.fail("Active breacher handoff did not hold a bounded retreat");
+                    return;
+                }
+                creeper.discard();
+                if(safety.canContinueToUse()) {
+                    helper.fail("Zombie failed to release safety MOVE after ally removed");
+                    return;
+                }
+                safety.stop();
+                if(!skeleton.getItemBySlot(EquipmentSlot.MAINHAND).is(Items.BOW)) {
+                    helper.fail("Skeleton lost its vanilla bow during cross-species teamwork");
+                    return;
+                }
+                helper.succeed();
+            } finally {
+                creeper.discard();
+                handle.close();
+            }
+        });
     }
 }
