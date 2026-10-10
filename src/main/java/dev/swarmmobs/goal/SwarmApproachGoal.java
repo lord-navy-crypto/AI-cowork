@@ -508,24 +508,25 @@ public final class SwarmApproachGoal extends Goal {
             return;
         }
 
+        SwarmNavigationCommandPolicy.Decision decision =
+                SwarmNavigationCommandPolicy.Decision.INITIAL;
         if (mob.level() instanceof ServerLevel level) {
-            SwarmNavigationCommandPolicy.Decision decision =
-                    SwarmNavigationCommandPolicy.evaluate(
-                            commandIssued,
-                            mob.getNavigation().isDone(),
-                            now,
-                            lastCommandTick,
-                            navigationX,
-                            targetY,
-                            navigationZ,
-                            speed,
-                            lastCommandX,
-                            lastCommandY,
-                            lastCommandZ,
-                            lastCommandSpeed
-                    );
-            SwarmNavigationCommandTelemetry.record(level, decision);
+            decision = SwarmNavigationCommandPolicy.evaluate(
+                    commandIssued,
+                    mob.getNavigation().isDone(),
+                    now,
+                    lastCommandTick,
+                    navigationX,
+                    targetY,
+                    navigationZ,
+                    speed,
+                    lastCommandX,
+                    lastCommandY,
+                    lastCommandZ,
+                    lastCommandSpeed
+            );
             if (decision == SwarmNavigationCommandPolicy.Decision.SKIP) {
+                SwarmNavigationCommandTelemetry.record(level, decision);
                 return;
             }
         }
@@ -560,6 +561,12 @@ public final class SwarmApproachGoal extends Goal {
         lastCommandY = targetY;
         lastCommandZ = navigationZ;
         lastCommandSpeed = speed;
+        // The legacy per-level issued counter must count only moves the
+        // Minecraft navigator actually accepted; failed requests have
+        // their own explicit real server telemetry.
+        if (mob.level() instanceof ServerLevel level) {
+            SwarmNavigationCommandTelemetry.record(level, decision);
+        }
     }
 
     private SwarmObstacleAvoidancePolicy.Avoidance localObstacleAvoidance(
