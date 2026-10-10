@@ -95,7 +95,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
             for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                 for (int dy = -1; dy <= 2; dy++) {
                     BlockPos test = center.offset(dx, dy, dz);
-                    if (!level.hasChunkAt(test)
+                    if (!level.hasChunkAt(test) || nest.ownsShellPiece(test)
                             || nest.workBoard().claimedByAnother(
                                     test.asLong(), zombie.getUUID(), tick)) continue;
                     BlockState state = level.getBlockState(test);
@@ -170,7 +170,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
             if (fromScout == null) return false;
             var p = fromScout.position();
             BlockPos observed = new BlockPos(p.x(),p.y(),p.z());
-            if (!level.hasChunkAt(observed)
+            if (!level.hasChunkAt(observed) || nest.ownsShellPiece(observed)
                     || !validBlock(level,observed,level.getBlockState(observed))
                     || category(level,observed,level.getBlockState(observed))
                             != fromScout.kind()) {
@@ -202,6 +202,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                 || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
                 || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())
                 || !level.getBlockState(site).equals(original)
+                || nest.ownsShellPiece(site)
                 || !nest.workBoard().owned(site.asLong(), zombie.getUUID(),
                         level.getGameTime())
                 || (scoutOpportunity != null
