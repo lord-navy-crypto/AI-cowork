@@ -19,6 +19,8 @@ public final class SwarmNestScienceTelemetry {
             int nutrientPoints, int legacyPoints, int resourceTotal,
             long births, long hauledItems, long haulTrips, long foragedBerries,
             int activeWorkSites, int scoutItemLeads,
+            int activeOpportunities, int opportunityWorkers,
+            long opportunityReports, long opportunityInvalidations,
             long reinforcedTrips, long inhibitedJobs,
             double foodRecruitment, double timberRecruitment, double soilRecruitment,
             double foodInhibition, double timberInhibition, double soilInhibition,
@@ -35,7 +37,8 @@ public final class SwarmNestScienceTelemetry {
     private static final Snapshot EMPTY = new Snapshot(
             -1L, 0, 0, 0, 0, 0, 0, 0, 0.0,
             0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0, 0, 0, 0, 0, 0, 0L, 0L,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             0, 0, 0, 0, EMPTY_MODEL);
 
     public static void record(ServerLevel level, BlockPos pos,
@@ -51,6 +54,10 @@ public final class SwarmNestScienceTelemetry {
                 nest.hauledItems(), nest.haulTrips(), nest.foragedBerries(),
                 nest.workBoard().size(level.getGameTime()),
                 nest.scoutBoard().size(level.getGameTime()),
+                nest.opportunityBoard().size(level.getGameTime()),
+                nest.opportunityBoard().activeWorkers(level.getGameTime()),
+                nest.opportunityBoard().reports(),
+                nest.opportunityBoard().invalidReports(),
                 nest.laborFeedback().successes(), nest.laborFeedback().failures(),
                 nest.laborFeedback().reinforcement(
                         SwarmNestColonyPolicy.Kind.NUTRIENT, level.getGameTime()),
