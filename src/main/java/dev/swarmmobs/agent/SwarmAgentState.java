@@ -58,6 +58,8 @@ public final class SwarmAgentState {
     private SwarmRole pendingRole;
     private long pendingRoleSinceTick = Long.MIN_VALUE;
     private long roleReassignmentCount;
+    private boolean coveringVacantFlank;
+    private long vacantFlankCoverageEpisodes;
     private SwarmBehaviorMode behaviorMode = SwarmBehaviorMode.ENGAGE;
     private double searchRadius;
     private boolean hasPrediction;
@@ -149,6 +151,7 @@ public final class SwarmAgentState {
         resetSupportPositionState();
         tacticalPattern = "STANDARD";
         searchRallyActive = false;
+        coveringVacantFlank = false;
         bowLaneClear = true;
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -367,6 +370,20 @@ public final class SwarmAgentState {
     public void updateSearchRally(boolean regrouping) {
         if (regrouping && !searchRallyActive) searchRallyEpisodes++;
         searchRallyActive = regrouping;
+    }
+
+    /** Current real role coverage, not a role computed for a UI preview. */
+    public boolean coveringVacantFlank() {
+        return coveringVacantFlank;
+    }
+
+    public long vacantFlankCoverageEpisodes() {
+        return vacantFlankCoverageEpisodes;
+    }
+
+    public void updateVacantFlankCoverage(boolean active) {
+        if (active && !coveringVacantFlank) vacantFlankCoverageEpisodes++;
+        coveringVacantFlank = active;
     }
 
     public int tacticalPeerCount() {
