@@ -48,11 +48,22 @@ public final class SwarmColonyEmergencePolicy {
                                   int soil, int timber, int food,
                                   double scent, double stop,
                                   int nearbyWorkers, double experience) {
+        return workCost(baseCost,worker,kind,soil,timber,food,
+                scent,stop,nearbyWorkers,experience,shortage(kind,soil,timber,food));
+    }
+
+    /** Shared dynamic pressure is supplied by this worker's loaded nest. */
+    public static double workCost(double baseCost, UUID worker,
+                                  SwarmNestColonyPolicy.Kind kind,
+                                  int soil, int timber, int food,
+                                  double scent, double stop,
+                                  int nearbyWorkers, double experience,
+                                  double colonyDeficit) {
         if (worker == null || kind == null
                 || kind == SwarmNestColonyPolicy.Kind.NONE
                 || !Double.isFinite(baseCost) || baseCost < 0)
             return Double.POSITIVE_INFINITY;
-        double need = shortage(kind,soil,timber,food);
+        double need = bounded(colonyDeficit,0,1);
         double attraction = bounded(scent,0,MAX_SCENT);
         double repellent = bounded(stop,0,MAX_SCENT);
         SwarmTaskType originalSwarmTask = kind == SwarmNestColonyPolicy.Kind.NUTRIENT
