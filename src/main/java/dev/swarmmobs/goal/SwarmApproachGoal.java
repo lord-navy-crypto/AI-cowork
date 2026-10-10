@@ -413,7 +413,9 @@ public final class SwarmApproachGoal extends Goal {
         // Skeleton sidestep or Zombie microflank must not inherit a player's
         // different Y elevation (e.g. a raised platform across a wall).
         boolean localReposition = state.rangedSpacingActive()
-                || (mob instanceof Zombie && state.shortZombieFlankActive());
+                || (mob instanceof Zombie
+                        && (state.shortZombieFlankActive()
+                                || state.zombieBowLaneYieldPlanned()));
         targetY = SwarmOptionalGameWaypointCommitmentPolicy.chooseNavigationHeight(
                 localReposition, mob.getY(), targetY);
 
