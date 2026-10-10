@@ -282,7 +282,7 @@ public final class SwarmClothControlScreen {
         toggle(category, entries, values,
                 "Adaptive nest resource targets (capacity-aware)",
                 "nestAdaptiveStockEnabled", "nest_stock_adapt_toggle", true,
-                "When lifecycle is enabled, soil/log demand follows upcoming chamber construction, food demand follows remaining population slots. Once the real hard cap is full, workers stop needless harvesting.");
+                "When lifecycle is enabled, soil/log demand follows chamber construction and food demand follows remaining population slots. Physical item intake accepts only outstanding category demand; surplus dropped items remain in the world. When the population cap is full, unnecessary harvesting stops.");
 
         toggle(category, entries, values,
                 "Renewable crop replanting (consumes ONE physical seed)",
