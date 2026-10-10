@@ -33,8 +33,16 @@ This is **not** an artificial round-based mechanic: on each scheduled local
 planning event, patterns follow the newest allowed local observations. No
 global controller, teleportation, new attacks, faster fuse or free resources.
 
-Existing Skeleton ranged corridors / arrow fire remain with the vanilla bow
-handoff. Creeper explosion timing and Zombie safe-yield Goals remain unchanged.
+Existing Skeleton ranged corridors and the vanilla bow handoff remain.
+There is one important cross-species interaction fix: when a **same-target**
+Zombie/Creeper occupies the Skeleton's *current* two-dimensional firing
+corridor, the Skeleton keeps its swarm MOVE goal instead of yielding movement
+to the bow. Once the teammate clears that corridor, the ordinary vanilla bow
+goal may run. This uses the already sampled local teammate positions; there
+is no extra every-tick entity search in the bow Goal and it does not change
+projectile damage or aiming.
+
+Creeper explosion timing and Zombie safe-yield Goals remain unchanged.
 Observed movement is bounded; Skeletons and Creepers do NOT gain the new
 waypoint lead offsets.
 
