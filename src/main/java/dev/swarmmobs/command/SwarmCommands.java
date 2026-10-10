@@ -14,6 +14,7 @@ import dev.swarmmobs.ai.SwarmAiShadowService;
 import dev.swarmmobs.ai.SwarmAiShadowState;
 import dev.swarmmobs.ai.ollama.OllamaStrategyProvider;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.registry.SwarmNestBlocks;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.debug.SwarmDebugState;
@@ -22,6 +23,7 @@ import dev.swarmmobs.experiment.SwarmExperimentManager;
 import dev.swarmmobs.experiment.SwarmExperimentMetrics;
 import dev.swarmmobs.experiment.SwarmExperimentPreset;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -92,6 +94,8 @@ public final class SwarmCommands {
                         .executes(context -> setPlaytestMode(context.getSource(), false)))
                 .then(Commands.literal("status")
                         .executes(context -> playtestModeStatus(context.getSource()))));
+        debug.then(Commands.literal("workstatus")
+                .executes(context -> nearestWorkerStatus(context.getSource())));
 
         var communication = Commands.literal("comm")
                 .then(Commands.literal("on")
@@ -1161,6 +1165,54 @@ public final class SwarmCommands {
                 + ", mobGriefing=" + grief + ", doMobSpawning=" + spawning
                 + ". Work requires a loaded home core, no combat target, nearby suitable resources."),
                 false);
+        return 1;
+    }
+
+    // Report WHY the nearest Zombie can or cannot perform opt-in colony work.
+    private static int nearestWorkerStatus(CommandSourceStack source) {
+        ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Run /swarmmobs debug workstatus as a player."));
+            return 0;
+        }
+        ServerLevel level = source.getLevel();
+        Zombie zombie = level.getEntitiesOfClass(
+                Zombie.class, player.getBoundingBox().inflate(24.0),
+                candidate -> candidate.isAlive() && !candidate.isNoAi()
+        ).stream().min(Comparator.comparingDouble(player::distanceToSqr)).orElse(null);
+        if (zombie == null) {
+            source.sendFailure(Component.literal("No living AI-enabled Zombie within 24 blocks."));
+            return 0;
+        }
+        var state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
+        var data = zombie.getPersistentData();
+        boolean assigned = data.contains("SwarmColonyNest");
+        boolean homeLoaded = false;
+        boolean homeValid = false;
+        boolean nearHome = false;
+        String homeText = "none";
+        if (assigned) {
+            BlockPos home = BlockPos.of(data.getLong("SwarmColonyNest"));
+            homeText = home.toShortString();
+            homeLoaded = level.hasChunkAt(home);
+            homeValid = homeLoaded && level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get());
+            nearHome = zombie.distanceToSqr(home.getX() + 0.5, home.getY() + 0.5,
+                    home.getZ() + 0.5) <= 24.0 * 24.0;
+        }
+        boolean combat = zombie.getTarget() != null || state.targetId() != null;
+        String result = "Worker #" + zombie.getId()
+                + ": home=" + homeText + " (loaded=" + homeLoaded
+                + ", core=" + homeValid + ", <=24blocks=" + nearHome + ")"
+                + ", targetBusy=" + combat
+                + ", engagement=" + state.engagementMode()
+                + ", lifecycle=" + SwarmConfig.NEST_LIFECYCLE_ENABLED.get()
+                + ", hauling=" + SwarmConfig.NEST_HAULING_ENABLED.get()
+                + ", gathering=" + SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()
+                + ", mobGriefing=" + level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)
+                + ". For work: valid nearby core, no target, WORK mode, available resources.";
+        source.sendSuccess(() -> Component.literal(result), false);
         return 1;
     }
 
