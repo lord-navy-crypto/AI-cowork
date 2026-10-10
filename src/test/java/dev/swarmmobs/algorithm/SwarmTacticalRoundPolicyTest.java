@@ -90,6 +90,37 @@ class SwarmTacticalRoundPolicyTest {
     }
 
     @Test
+    void finiteCandidateOptimizerNeverChoosesCostlierThanOldParityBaselineWhenUncommitted() {
+        var plus=new Vec2(3,0);
+        var minus=new Vec2(-3,0);
+        for(int ix=-10;ix<=10;ix++) for(int iz=-5;iz<=5;iz++) {
+            var self=new Vec2(ix*0.4,iz*0.4);
+            var peers=List.of(new Vec2(3,0),new Vec2(2.8,0.4));
+            var optimized=choose(self,plus,minus,peers,0,true,true);
+            double oldSlotParity=SwarmTacticalRoundPolicy.localCost(
+                    self,plus,peers,2.4);
+            assertTrue(optimized.chosenCost()<=oldSlotParity+1e-9,
+                    "Local optimizer lost to always-positive legacy parity at "+self);
+        }
+    }
+
+    @Test
+    void reportingTheCurrentActivityMustNotEraseLaneHysteresis() {
+        var state=new SwarmAgentState();
+        var initial=choose(new Vec2(2,0),new Vec2(3,0),
+                new Vec2(-3,0),List.of(),0,true,true);
+        state.acceptTacticalSupportDecision(initial);
+        assertEquals(1,state.tacticalSupportSide());
+        state.classifyTacticalRound(SwarmTacticalRoundPolicy.Phase.HOLD);
+        assertEquals(1,state.tacticalSupportSide());
+        var next=choose(new Vec2(0,0),new Vec2(2,0),
+                new Vec2(-1.9,0),List.of(),state.tacticalSupportSide(),true,true);
+        state.acceptTacticalSupportDecision(next);
+        assertEquals(1,state.tacticalSupportSide());
+        assertEquals(0,state.tacticalRoundSwitchCount());
+    }
+
+    @Test
     void noTimersNorSpeciesDamageMultipliersAreRequired() {
         assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,
                 SwarmTacticalRoundPolicy.classification(true,true));
