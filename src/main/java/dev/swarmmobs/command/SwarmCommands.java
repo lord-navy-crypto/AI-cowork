@@ -671,6 +671,8 @@ public final class SwarmCommands {
                                 + " skeletonMoveFallbacks=" + state.rangedSpacingFallbacks()
                                 + " skeletonNoProgress=" + state.rangedNoProgressFallbacks()
                                 + " zombieNoProgress=" + state.zombieNoProgressFallbacks()
+                                + " knownFailedSkeletonSites=" + state.recentRangedFailureLocations(source.getLevel().getGameTime())
+                                + " knownFailedZombieSites=" + state.recentZombieFailureLocations(source.getLevel().getGameTime())
                                 + " zombieFlankFallbacks=" + state.zombieFlankFallbacks()
                                 + " fillingMissingFlank=" + state.coveringVacantFlank()
                                 + " flankFillEpisodes=" + state.vacantFlankCoverageEpisodes()
@@ -810,6 +812,8 @@ public final class SwarmCommands {
         long zombieFlankFallbacks = 0L;
         long skeletonNoProgress = 0L;
         long zombieNoProgress = 0L;
+        int skeletonFailedSites = 0;
+        int zombieFailedSites = 0;
         int flankFillers = 0;
         long flankFillEpisodes = 0;
         int searchRallying = 0;
@@ -867,6 +871,8 @@ public final class SwarmCommands {
             zombieFlankFallbacks += state.zombieFlankFallbacks();
             skeletonNoProgress += state.rangedNoProgressFallbacks();
             zombieNoProgress += state.zombieNoProgressFallbacks();
+            skeletonFailedSites += state.recentRangedFailureLocations(source.getLevel().getGameTime());
+            zombieFailedSites += state.recentZombieFailureLocations(source.getLevel().getGameTime());
             if (state.coveringVacantFlank()) flankFillers++;
             flankFillEpisodes += state.vacantFlankCoverageEpisodes();
             if (state.searchRallyActive()) searchRallying++;
@@ -1005,7 +1011,7 @@ public final class SwarmCommands {
 
         // Aggregate of actual per-agent game tactic states, not claimed wins.
         String patternsText = patterns.toString();
-        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", skeletonMoveFallbacks=" + spacingTimeouts + ", zombieFlankFallbacks=" + zombieFlankFallbacks + ", skeletonNoProgress=" + skeletonNoProgress + ", zombieNoProgress=" + zombieNoProgress + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
+        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", skeletonMoveFallbacks=" + spacingTimeouts + ", zombieFlankFallbacks=" + zombieFlankFallbacks + ", skeletonNoProgress=" + skeletonNoProgress + ", zombieNoProgress=" + zombieNoProgress + ", skeletonFailedSites=" + skeletonFailedSites + ", zombieFailedSites=" + zombieFailedSites + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
         source.sendSuccess(() -> Component.literal(summary + ", patterns=" + patternsText + mobility), false);
         return total;
     }

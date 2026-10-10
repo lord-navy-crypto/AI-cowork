@@ -315,12 +315,21 @@ public final class SwarmApproachGoal extends Goal {
 
         double x = state.destinationX();
         double z = state.destinationZ();
+        // A planner may change its proposed game point while the path query
+        // is deferred or the old PathNavigation command is still running.
+        // Comparing movement against an unissued target is not stall proof.
+        if (!SwarmOptionalWaypointProgressPolicy.matchesCommand(
+                commandIssued, x, z, lastCommandX, lastCommandZ)) {
+            resetOptionalProgressSample();
+            return false;
+        }
         double remaining = Math.hypot(x - mob.getX(), z - mob.getZ());
         long tick = level.getGameTime();
         double shifted = Math.hypot(x - optionalSampleWaypointX,
                 z - optionalSampleWaypointZ);
         if (optionalSampleTick == Long.MIN_VALUE
-                || optionalSampleSkeleton != skeleton) {
+                || optionalSampleSkeleton != skeleton
+                || lastCommandTick > optionalSampleTick) {
             beginOptionalProgressSample(tick, x, z, remaining, skeleton);
             return false;
         }

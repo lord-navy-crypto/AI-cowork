@@ -38,6 +38,21 @@ class SwarmOptionalWaypointProgressPolicyTest {
                 106, 100, 8, 8, 1.49, false));
     }
 
+    @Test void onlyIssuedMatchingMinecraftPathCanSupplyProgressEvidence() {
+        assertTrue(SwarmOptionalWaypointProgressPolicy.matchesCommand(
+                true, 10, 5, 10, 5));
+        assertTrue(SwarmOptionalWaypointProgressPolicy.matchesCommand(
+                true, 10.3, 5, 10, 5));
+        assertFalse(SwarmOptionalWaypointProgressPolicy.matchesCommand(
+                false, 10, 5, 10, 5));
+        assertFalse(SwarmOptionalWaypointProgressPolicy.matchesCommand(
+                true, 12, 5, 10, 5));
+        assertFalse(SwarmOptionalWaypointProgressPolicy.matchesCommand(
+                true, Double.NaN, 5, 10, 5));
+        assertFalse(SwarmOptionalWaypointProgressPolicy.matchesCommand(
+                true, 10, 5, Double.POSITIVE_INFINITY, 5));
+    }
+
     @Test void invalidOrRegressingTicksCannotInventProgress() {
         assertEquals(RESET, SwarmOptionalWaypointProgressPolicy.assess(
                 -1, 100, 8, 8, 0, false));

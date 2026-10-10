@@ -15,6 +15,26 @@ public final class SwarmOptionalWaypointProgressPolicy {
     public static final double WAYPOINT_CHANGE_BLOCKS = 1.5;
 
     public enum Decision { RESET, WAIT, PROGRESS, ARRIVED, STALLED }
+    // Larger than the command policy's 0.25-block replan threshold to
+    // allow tiny floating-point differences, but never an old destination.
+    public static final double MATCHED_PATH_TOLERANCE = 0.35;
+
+    /**
+     * A measured stall is evidence about the command that Minecraft
+     * navigation actually received, not merely a newly planned waypoint.
+     * The planner can change its target while path-budget scheduling
+     * intentionally leaves an older command in control.
+     */
+    public static boolean matchesCommand(boolean commandIssued,
+            double plannedX, double plannedZ,
+            double commandedX, double commandedZ) {
+        return commandIssued && Double.isFinite(plannedX)
+                && Double.isFinite(plannedZ) && Double.isFinite(commandedX)
+                && Double.isFinite(commandedZ)
+                && Math.hypot(plannedX - commandedX, plannedZ - commandedZ)
+                        <= MATCHED_PATH_TOLERANCE;
+    }
+
 
     public static Decision assess(long tick, long sampleTick,
             double sampleDistance, double remainingDistance,

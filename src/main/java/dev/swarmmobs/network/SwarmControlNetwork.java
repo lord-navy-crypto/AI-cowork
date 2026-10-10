@@ -753,6 +753,8 @@ public final class SwarmControlNetwork {
         long zombieFlankFallbacks = 0;
         long skeletonNoProgress = 0;
         long zombieNoProgress = 0;
+        int skeletonFailedSites = 0;
+        int zombieFailedSites = 0;
         long flankFillEpisodes = 0;
         int searchRallying = 0;
         long searchRallyEpisodes = 0;
@@ -799,6 +801,8 @@ public final class SwarmControlNetwork {
                     zombieFlankFallbacks += tacticalState.zombieFlankFallbacks();
                     skeletonNoProgress += tacticalState.rangedNoProgressFallbacks();
                     zombieNoProgress += tacticalState.zombieNoProgressFallbacks();
+                    skeletonFailedSites += tacticalState.recentRangedFailureLocations(level.getGameTime());
+                    zombieFailedSites += tacticalState.recentZombieFailureLocations(level.getGameTime());
                     flankFillEpisodes += tacticalState.vacantFlankCoverageEpisodes();
                     if (tacticalState.searchRallyActive()) searchRallying++;
                     searchRallyEpisodes += tacticalState.searchRallyEpisodes();
@@ -879,6 +883,8 @@ public final class SwarmControlNetwork {
                 pair("zombieFlankFallbacks", Math.min(Integer.MAX_VALUE, zombieFlankFallbacks)),
                 pair("skeletonNoProgress", Math.min(Integer.MAX_VALUE, skeletonNoProgress)),
                 pair("zombieNoProgress", Math.min(Integer.MAX_VALUE, zombieNoProgress)),
+                pair("skeletonFailedSites", skeletonFailedSites),
+                pair("zombieFailedSites", zombieFailedSites),
                 pair("activeFlankFillers", activeFlankFillers),
                 pair("flankFillEpisodes", Math.min(Integer.MAX_VALUE, flankFillEpisodes)),
                 pair("tacticSweep", tacticSweep),
