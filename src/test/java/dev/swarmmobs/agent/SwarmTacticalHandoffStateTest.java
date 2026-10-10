@@ -117,6 +117,21 @@ class SwarmTacticalHandoffStateTest {
         assertEquals(1, state.vacantFlankCoverageEpisodes());
     }
 
+    @Test void SkeletonMovementEpisodeCountersReflectActualRepositionStarts() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(2, 3));
+        state.updateRangedSpacing(true);
+        state.updateRangedSpacing(true);
+        assertTrue(state.rangedSpacingActive());
+        assertEquals(1, state.rangedSpacingEpisodes());
+        state.updateRangedSpacing(false);
+        state.updateRangedSpacing(true);
+        assertEquals(2, state.rangedSpacingEpisodes());
+        state.bindTacticalTarget(new UUID(2, 4));
+        assertFalse(state.rangedSpacingActive());
+        assertEquals(2, state.rangedSpacingEpisodes());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));

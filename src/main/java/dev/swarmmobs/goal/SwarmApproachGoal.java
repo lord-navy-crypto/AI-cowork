@@ -19,6 +19,7 @@ import dev.swarmmobs.algorithm.SwarmPathEvidencePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmRecoveryCandidatePolicy;
 import dev.swarmmobs.algorithm.SwarmRangedHandoffPolicy;
+import dev.swarmmobs.algorithm.SwarmZombieFlankHandoffPolicy;
 import dev.swarmmobs.algorithm.SwarmCreeperHandoffPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
@@ -117,6 +118,10 @@ public final class SwarmApproachGoal extends Goal {
 
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
         if (profile.archetype() == SwarmAgentArchetype.RANGED_SUPPORT) {
+            if (state.rangedSpacingActive()) {
+                return mob.distanceToSqr(state.destinationX(), mob.getY(),
+                        state.destinationZ()) > 0.75 * 0.75;
+            }
             if (mob.getTarget() instanceof Player target
                     && validTarget(target)
                     && state.bowLaneClear()
@@ -152,6 +157,18 @@ public final class SwarmApproachGoal extends Goal {
                 return true;
             }
             if (state.directObservation()) {
+                // Flank-assigned Zombies get a small local completion window
+                // before vanilla melee takes over. At <=2.5 blocks, melee
+                // ALWAYS wins so game tactical movement cannot disable attacks.
+                if (mob instanceof net.minecraft.world.entity.monster.Zombie
+                        && SwarmZombieFlankHandoffPolicy.finishWaypointBeforeMelee(
+                            state.role(), true, true,
+                            mob.distanceToSqr(target),
+                            mob.distanceToSqr(state.destinationX(), mob.getY(),
+                                    state.destinationZ()),
+                            release)) {
+                    return true;
+                }
                 return mob.distanceToSqr(target) > release * release;
             }
         }

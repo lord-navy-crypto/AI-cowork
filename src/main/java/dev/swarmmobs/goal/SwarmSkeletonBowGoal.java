@@ -47,9 +47,12 @@ public final class SwarmSkeletonBowGoal extends RangedBowAttackGoal<Skeleton> {
             return false;
         }
 
-        // A same-target melee ally occupying the current shot corridor
-        // sends the Skeleton back to its ordinary repositioning planner.
-        return state.bowLaneClear()
+        // A checked short-distance spacing waypoint temporarily keeps
+        // MOVE before the ordinary bow; if no route is open, it can still shoot.
+        boolean spacingUnfinished = state.rangedSpacingActive()
+                && skeleton.distanceToSqr(state.destinationX(), skeleton.getY(),
+                        state.destinationZ()) > 0.75 * 0.75;
+        return !spacingUnfinished && state.bowLaneClear()
                 && SwarmRangedHandoffPolicy.shouldYieldToVanilla(
                 state.directObservation(),
                 state.targetId().equals(target.getUUID()),
