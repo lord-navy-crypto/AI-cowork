@@ -18,6 +18,10 @@ public final class SwarmNestScienceTelemetry {
             int colonyCapacity, int soilPoints, int timberPoints,
             int nutrientPoints, int legacyPoints, int resourceTotal,
             long births, long hauledItems, long haulTrips, long foragedBerries,
+            int activeWorkSites, int scoutItemLeads,
+            long reinforcedTrips, long inhibitedJobs,
+            double foodRecruitment, double timberRecruitment, double soilRecruitment,
+            double foodInhibition, double timberInhibition, double soilInhibition,
             SwarmColonySciencePolicy.Sample science
     ) {
         public boolean available() { return sampleTick >= 0; }
@@ -28,7 +32,8 @@ public final class SwarmNestScienceTelemetry {
             SwarmColonySciencePolicy.evaluate(0, 0, 0, 0, 1, 0, 0.4, 0.25, 0.55);
     private static final Snapshot EMPTY = new Snapshot(
             -1L, 0, 0, 0, 0, 0, 0, 0, 0.0,
-            0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, EMPTY_MODEL);
+            0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, EMPTY_MODEL);
 
     public static void record(ServerLevel level, BlockPos pos,
                               SwarmNestBlockEntity nest,
@@ -40,7 +45,22 @@ public final class SwarmNestScienceTelemetry {
                 nest.chamberLevel(), nest.visibleChamberLevel(), nest.effectiveCapacity(),
                 nest.soilPoints(), nest.timberPoints(), nest.nutrientPoints(),
                 nest.legacyPoints(), nest.resources(), nest.births(),
-                nest.hauledItems(), nest.haulTrips(), nest.foragedBerries(), model
+                nest.hauledItems(), nest.haulTrips(), nest.foragedBerries(),
+                nest.workBoard().size(level.getGameTime()),
+                nest.scoutBoard().size(level.getGameTime()),
+                nest.laborFeedback().successes(), nest.laborFeedback().failures(),
+                nest.laborFeedback().reinforcement(
+                        SwarmNestColonyPolicy.Kind.NUTRIENT, level.getGameTime()),
+                nest.laborFeedback().reinforcement(
+                        SwarmNestColonyPolicy.Kind.TIMBER, level.getGameTime()),
+                nest.laborFeedback().reinforcement(
+                        SwarmNestColonyPolicy.Kind.SOIL, level.getGameTime()),
+                nest.laborFeedback().inhibition(
+                        SwarmNestColonyPolicy.Kind.NUTRIENT, level.getGameTime()),
+                nest.laborFeedback().inhibition(
+                        SwarmNestColonyPolicy.Kind.TIMBER, level.getGameTime()),
+                nest.laborFeedback().inhibition(
+                        SwarmNestColonyPolicy.Kind.SOIL, level.getGameTime()), model
         ));
     }
 
