@@ -616,6 +616,7 @@ public final class SwarmControlNetwork {
         int tacticalAgentsWithAllies = 0;
         int tacticalPeerLinks = 0;
         int agentsWithTacticalBreacher = 0;
+        int workAgents = 0, alertAgents = 0, combatAgents = 0, recoveringAgents = 0;
         long nestsFoundedByLoadedAgents = 0L;
         EnumMap<SwarmTaskType, Integer> taskCounts = new EnumMap<>(SwarmTaskType.class);
         EnumMap<SwarmSpecialization, Integer> specializationCounts =
@@ -644,6 +645,12 @@ public final class SwarmControlNetwork {
             if (masterEnabled) {
                 SwarmAgentState tacticalState =
                         mob.getData(SwarmAttachments.AGENT_STATE.get());
+                switch (tacticalState.engagementMode()) {
+                    case WORK -> workAgents++;
+                    case ALERT -> alertAgents++;
+                    case COMBAT -> combatAgents++;
+                    case RECOVERY -> recoveringAgents++;
+                }
                 if (tacticalState.tacticalPeerCount() > 0) {
                     tacticalAgentsWithAllies++;
                     tacticalPeerLinks += tacticalState.tacticalPeerCount();
@@ -685,6 +692,10 @@ public final class SwarmControlNetwork {
                 pair("aiLastError", ai.lastError()),
                 pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
+                pair("modeWorkAgents", workAgents),
+                pair("modeAlertAgents", alertAgents),
+                pair("modeCombatAgents", combatAgents),
+                pair("modeRecoveryAgents", recoveringAgents),
                 pair("liveZombies", zombies),
                 pair("liveSkeletons", skeletons),
                 pair("liveSpiders", spiders),
