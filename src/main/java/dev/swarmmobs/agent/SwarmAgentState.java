@@ -54,6 +54,7 @@ public final class SwarmAgentState {
     // Minecraft Skeleton has a locally checked open square to regain distance.
     private boolean rangedSpacingActive;
     private long rangedSpacingEpisodes;
+    private long rangedWaypointHoldSamples;
     private long rangedSpacingStartedAt = Long.MIN_VALUE;
     private long rangedSpacingRetryAfter = Long.MIN_VALUE;
     private long rangedSpacingFallbacks;
@@ -353,6 +354,15 @@ public final class SwarmAgentState {
 
     public long rangedSpacingEpisodes() {
         return rangedSpacingEpisodes;
+    }
+
+    public long rangedWaypointHoldSamples() {
+        return rangedWaypointHoldSamples;
+    }
+
+    /** Increment only if a verified old game waypoint is actually reused. */
+    public void recordRangedWaypointHold() {
+        rangedWaypointHoldSamples++;
     }
 
     /** Count genuine starts. Without a game tick this is telemetry-only. */

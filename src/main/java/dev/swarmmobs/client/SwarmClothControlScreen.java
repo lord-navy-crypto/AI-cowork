@@ -119,7 +119,8 @@ public final class SwarmClothControlScreen {
         status(category, entries,
                 "Skeleton game spacing: " + integer(values, "skeletonSpacing")
                         + " actively repositioning / " + integer(values, "skeletonSpacingEpisodes")
-                        + " spacing episodes");
+                        + " spacing episodes / " + integer(values, "skeletonWaypointHolds")
+                        + " verified waypoint holds");
         status(category, entries,
                 "AI movement fallback (real): Skeleton " + integer(values, "skeletonMoveFallbacks")
                         + " / Zombie flank " + integer(values, "zombieFlankFallbacks"));

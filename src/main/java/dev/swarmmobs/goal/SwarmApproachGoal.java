@@ -13,6 +13,7 @@ import dev.swarmmobs.algorithm.SwarmPathProbePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationEpisodePolicy;
 import dev.swarmmobs.algorithm.SwarmOptionalWaypointProgressPolicy;
+import dev.swarmmobs.algorithm.SwarmOptionalGameWaypointCommitmentPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
@@ -392,6 +393,14 @@ public final class SwarmApproachGoal extends Goal {
                 targetY = observation.y();
             }
         }
+
+        // These are *local* game squares, not the player's block. A
+        // Skeleton sidestep or Zombie microflank must not inherit a player's
+        // different Y elevation (e.g. a raised platform across a wall).
+        boolean localReposition = state.rangedSpacingActive()
+                || (mob instanceof Zombie && state.shortZombieFlankActive());
+        targetY = SwarmOptionalGameWaypointCommitmentPolicy.chooseNavigationHeight(
+                localReposition, mob.getY(), targetY);
 
         double confidence = 1.0;
         if (mob.level() instanceof ServerLevel level) {

@@ -22,6 +22,7 @@ import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import dev.swarmmobs.algorithm.SwarmRangedSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSkeletonSightlinePolicy;
+import dev.swarmmobs.algorithm.SwarmOptionalGameWaypointCommitmentPolicy;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
@@ -786,6 +787,33 @@ public final class SwarmMobEvents {
                     if (newLane != null) {
                         possible = true;
                         plannedDestination = newLane;
+                    }
+                }
+                // Replanning while moving can perpetually shift a local
+                // 3-block offset. Keep the previously issued game waypoint
+                // when the fresh proposal is nearby AND the old square and
+                // its actual line remain verified. No new chunk/entity scans.
+                // Keep a lane only while an actual same-target ally
+                // obstructs the current shot. In an unobstructed bow
+                // envelope, do not prolong spacing and starve native firing.
+                if (possible && state.rangedSpacingActive()
+                        && !state.bowLaneClear()
+                        && state.hasDestination()) {
+                    Vec2 previouslyPlanned = new Vec2(
+                            state.destinationX(), state.destinationZ());
+                    if (SwarmOptionalGameWaypointCommitmentPolicy.keep(
+                            true, directVisible, confidence, shooterPoint,
+                            previouslyPlanned, plannedDestination)
+                            && state.canUseRangedWaypoint(
+                                    previouslyPlanned.x(), previouslyPlanned.z(), gameTick)
+                            && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                                    level, mob.getY(), previouslyPlanned)
+                            && SwarmFriendlyFireLanePolicy.isClear(
+                                    previouslyPlanned, sightedPoint, frontPlayers)
+                            && hasClearSupportShot(level, mob,
+                                    selection.player(), previouslyPlanned)) {
+                        plannedDestination = previouslyPlanned;
+                        state.recordRangedWaypointHold();
                     }
                 }
                 // An expired waypoint lease may not instantly re-arm on

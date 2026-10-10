@@ -313,6 +313,17 @@ class SwarmTacticalHandoffStateTest {
         assertTrue(state.canUseZombieFlankWaypoint(0,5,197));
     }
 
+    @Test void skeletonWaypointHoldTelemetryOnlyCountsVerifiedReuses() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(54, 1));
+        assertEquals(0,state.rangedWaypointHoldSamples());
+        state.recordRangedWaypointHold();
+        state.recordRangedWaypointHold();
+        assertEquals(2,state.rangedWaypointHoldSamples());
+        state.bindTacticalTarget(new UUID(54, 2));
+        assertEquals(2,state.rangedWaypointHoldSamples());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
