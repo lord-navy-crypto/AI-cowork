@@ -198,8 +198,14 @@ public final class SwarmMobEvents {
         // A genuinely fighting same-target neighbor can locally recruit
         // a defender even before its own line-of-sight opens.
         boolean squadCombat = selection.direct() || tacticalNeighbors.stream()
-                .anyMatch(peer -> peer.getData(SwarmAttachments.AGENT_STATE.get())
-                        .engagementMode() == SwarmEngagementPolicy.Mode.COMBAT);
+                .anyMatch(peer -> {
+                    SwarmAgentState ally = peer.getData(SwarmAttachments.AGENT_STATE.get());
+                    long observedAt = ally.lastTargetObservationTick();
+                    return ally.directObservation()
+                            && observedAt >= 0
+                            && gameTick >= observedAt
+                            && gameTick-observedAt <= SwarmEngagementPolicy.DIRECT_GRACE_TICKS;
+                });
         state.updateEngagement(true,squadCombat,gameTick);
         final boolean battleRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
                 && SwarmEngagementPolicy.enableBattleRounds(
