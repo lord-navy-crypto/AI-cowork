@@ -259,6 +259,16 @@ public final class SwarmClothControlScreen {
                 "nestHaulingEnabled", "nest_haul_toggle", false,
                 "OFF by default: idle colony members move existing dirt, logs and food item entities to their own loaded nest; no auto-crafting.");
 
+        toggle(category, entries, values,
+                "Renewable sweet-berry foraging (TEST WORLDS ONLY)",
+                "nestBerryForagingEnabled", "nest_berry_forage_toggle", false,
+                "OFF by default. Idle Zombies may pick mature sweet berries near a loaded core, spawning physical drops for later hauling. Does not cut logs or dig dirt. Can affect player farms: only use in a designated test world. Requires lifecycle, hauling and mobGriefing.");
+
+        intField(category, entries, values,
+                "Berry-foraging survey interval (ticks)",
+                "nestBerryForageInterval", "nest_berry_forage_interval_delta", 200,
+                "Each worker checks a small nearby set of ripe berry bushes infrequently (120-800 ticks).");
+
         intField(category, entries, values,
                 "Worker item search radius",
                 "nestHaulSearchRadius", "nest_haul_radius_delta", 8,
@@ -334,6 +344,10 @@ public final class SwarmClothControlScreen {
                     "Worker logistics: delivered items " + integer(values, "colonyHaulItems")
                             + " | completed trips " + integer(values, "colonyHaulTrips")
                             + " (last sampled loaded core)");
+
+            status(category, entries,
+                    "Real berry items picked (not necessarily delivered): "
+                            + integer(values, "colonyForagedBerries"));
 
             status(category, entries,
                     "Stored points: soil " + integer(values, "colonyScienceSoil")
