@@ -123,8 +123,8 @@ public final class SwarmConfig {
                 .define("enabled", true);
 
         TACTICAL_ROUNDS_ENABLED = BUILDER
-                .comment("EXPERIMENTAL: synchronized non-blocking 100-tick tactical support phases among same-target mixed Zombie/Skeleton/Creeper groups. Only biases safe planned Skeleton lanes; never makes Minecraft combat turn-based. OFF by default.")
-                .define("tacticalRoundsEnabled", false);
+                .comment("EXPERIMENTAL: non-blocking 100-tick tactical phases activate only in actual COMBAT for same-target squads; separate peaceful nest labor and alert/recovery. Modifies bounded formation and safe Skeleton positioning, NEVER vanilla attacks. ON by default; can be disabled in the command center.")
+                .define("tacticalRoundsEnabled", true);
 
         PLAN_INTERVAL_TICKS = BUILDER
                 .comment("How often each swarm mob replans. 20 ticks = 1 second.")
