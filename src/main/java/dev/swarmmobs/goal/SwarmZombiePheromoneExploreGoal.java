@@ -3,6 +3,9 @@ package dev.swarmmobs.goal;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
+import dev.swarmmobs.colony.SwarmColonyEmergencePolicy;
+import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
+import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.colony.SwarmNestPheromoneField;
@@ -66,6 +69,13 @@ public final class SwarmZombiePheromoneExploreGoal extends Goal {
         if (!BUDGETS.computeIfAbsent(level, key->new SwarmNestSurveyBudget())
                 .trySurvey(now, 10)) return false;
 
+        // Reuse the original swarm's geometric congestion policy, taking
+        // one short-lived neighbor snapshot rather than scanning per cell.
+        var peers=level.getEntitiesOfClass(Zombie.class,
+                zombie.getBoundingBox().inflate(8.0),
+                other -> other != zombie && other.isAlive()).stream()
+                .limit(12).map(other -> new Vec2(other.getX(),other.getZ()))
+                .toList();
         BlockPos here=zombie.blockPosition();
         double current=localValue(nest,here,now);
         BlockPos best=null;
@@ -79,7 +89,11 @@ public final class SwarmZombiePheromoneExploreGoal extends Goal {
                             level,candidate.above()).isEmpty()
                     || !level.getBlockState(candidate.below()).isFaceSturdy(
                             level,candidate.below(),net.minecraft.core.Direction.UP)) continue;
-            double strength=localValue(nest,candidate,now);
+            // Dense groups spread into nearby alternate branches instead
+            // of all following the exact same strongest cell.
+            int congestion=SwarmCongestionPolicy.countWithin(peers,
+                    new Vec2(candidate.getX()+.5,candidate.getZ()+.5),2.5);
+            double strength=localValue(nest,candidate,now)-0.22*congestion;
             if (strength>strongest) { strongest=strength; best=candidate; }
         }
         if (best==null) return false;
@@ -127,7 +141,8 @@ public final class SwarmZombiePheromoneExploreGoal extends Goal {
                     nest.soilPoints(),nest.timberPoints(),
                     nest.nutrientPoints()+nest.legacyPoints(),nest.resources())) continue;
             var signal=SwarmNestPheromoneField.signal(kind);
-            double scent=nest.pheromones().scent(point,signal,tick);
+            double scent=SwarmColonyEmergencePolicy.sensedAttraction(
+                    zombie.getUUID(),nest.pheromones().scent(point,signal,tick));
             if(kind==SwarmNestColonyPolicy.Kind.NUTRIENT) scent*=1.15;
             best=Math.max(best,scent);
         }
