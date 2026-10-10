@@ -557,6 +557,10 @@ public final class SwarmMobEvents {
 
             Vec2 plannedDestination = SwarmAdaptiveTacticsPolicy.refineDestination(
                     tacticalFrame, plan.destination(), tacticalRole, profile.archetype());
+            plannedDestination = SwarmAdaptiveTacticsPolicy.farSideWaypoint(
+                    tacticalFrame, plannedDestination,
+                    new Vec2(prediction.x(), prediction.z()),
+                    effectiveFormationRadius, tacticalRole, profile.archetype());
 
             if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT) {
                 // Only allies on the same active target count. Do not let
