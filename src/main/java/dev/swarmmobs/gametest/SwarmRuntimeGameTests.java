@@ -5557,6 +5557,15 @@ public final class SwarmRuntimeGameTests {
                     return;
                 }
 
+                // All three real Minecraft monsters must enter actual
+                // COMBAT, not remain in the idle ant/bee labor context.
+                if(z.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
+                        || s.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
+                        || c.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT) {
+                    helper.fail("Mixed species squad failed to leave WORK and enter COMBAT");
+                    return;
+                }
+
                 var safety=zombie.goalSelector.getAvailableGoals().stream()
                         .map(w->w.getGoal())
                         .filter(SwarmZombieBreacherSafetyGoal.class::isInstance)
@@ -5695,5 +5704,58 @@ public final class SwarmRuntimeGameTests {
                     .set(grief,helper.getLevel().getServer());
             handle.close();
         }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_work_alert_combat_recovery",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 125)
+    public static void realZombieCombatEndsBeforeAnyNestWorkCanRestart(
+            GameTestHelper helper) {
+        Zombie worker=helper.spawn(EntityType.ZOMBIE,new BlockPos(1,1,2));
+        worker.setNoGravity(true);
+        var speed=worker.getAttribute(Attributes.MOVEMENT_SPEED);
+        if(speed!=null) speed.setBaseValue(0.0);
+        var handle=createTickingTestPlayer(helper,GameType.SURVIVAL);
+        ServerPlayer player=handle.player();
+        player.setNoGravity(true);
+        Vec3 at=helper.absoluteVec(new Vec3(4,1,2));
+        player.setPos(at.x,at.y,at.z);
+        boolean oldMaster=SwarmConfig.ENABLED.get();
+        boolean oldRounds=SwarmConfig.TACTICAL_ROUNDS_ENABLED.get();
+        SwarmConfig.ENABLED.set(true);
+        SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(true);
+        var state=worker.getData(SwarmAttachments.AGENT_STATE.get());
+        helper.runAfterDelay(23,()->{
+            if(state.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
+                    || !player.getUUID().equals(state.targetId())) {
+                handle.close();
+                SwarmConfig.ENABLED.set(oldMaster);
+                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
+                helper.fail("Live Player encounter failed to transition WORK -> COMBAT");
+                return;
+            }
+            handle.close();
+        });
+        helper.runAfterDelay(38,()->{
+            if(state.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.RECOVERY) {
+                SwarmConfig.ENABLED.set(oldMaster);
+                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
+                helper.fail("Disengagement failed to trigger non-working recovery");
+            }
+        });
+        helper.runAfterDelay(94,()->{
+            try {
+                if(state.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.WORK
+                        || state.targetId()!=null || state.hasDestination()) {
+                    helper.fail("After calm-down, old battle memory did not release nest workers");
+                    return;
+                }
+                helper.succeed();
+            } finally {
+                SwarmConfig.ENABLED.set(oldMaster);
+                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
+                handle.close();
+            }
+        });
     }
 }
