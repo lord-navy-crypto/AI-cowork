@@ -535,7 +535,7 @@ public final class SwarmClothControlScreen {
                         + ", lead breacher " + integer(values, "specLeadBreacher"));
 
         status(category, entries,
-                "Combat positioning phases [HOLD / COVER / ROTATE]: "
+                "Local positioning decisions [HOLD / COVER / ROTATE]: "
                         + integer(values, "roundHoldAgents") + " / "
                         + integer(values, "roundCoverAgents") + " / "
                         + integer(values, "roundRotateAgents")
