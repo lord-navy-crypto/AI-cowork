@@ -76,10 +76,7 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
                 || zombie.distanceToSqr(candidateHome.getX() + .5,
                         candidateHome.getY() + .5, candidateHome.getZ() + .5)
                         > 24.0 * 24.0
-                || !SwarmColonyGatherPolicy.needs(
-                        SwarmNestColonyPolicy.Kind.NUTRIENT,
-                        nest.soilPoints(), nest.timberPoints(),
-                        nest.nutrientPoints() + nest.legacyPoints(), nest.resources()))
+                || !nest.needsResource(SwarmNestColonyPolicy.Kind.NUTRIENT))
             return false;
         if (!BUDGETS.computeIfAbsent(level, ignored -> new SwarmNestSurveyBudget())
                 .trySurvey(tick, 8)) return false;
@@ -117,9 +114,7 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
                         where.getX(),where.getY(),where.getZ()),
                 SwarmNestOpportunityBoard.Type.ANIMAL,tick,
                 SwarmNestOpportunityBoard.MAX_RADIUS,
-                lead -> SwarmColonyGatherPolicy.needs(
-                        lead.kind(),nest.soilPoints(),nest.timberPoints(),
-                        nest.nutrientPoints()+nest.legacyPoints(),nest.resources()),
+                lead -> nest.needsResource(lead.kind()),
                 lead -> where.distSqr(new BlockPos(
                         lead.position().x(),lead.position().y(),lead.position().z())));
         if (report == null) return false;
@@ -141,10 +136,7 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
                 || !idle(level) || home == null || !level.hasChunkAt(home)
                 || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())
                 || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
-                || !SwarmColonyGatherPolicy.needs(
-                        SwarmNestColonyPolicy.Kind.NUTRIENT,
-                        nest.soilPoints(), nest.timberPoints(),
-                        nest.nutrientPoints() + nest.legacyPoints(), nest.resources())
+                || !nest.needsResource(SwarmNestColonyPolicy.Kind.NUTRIENT)
                 || (prey == null && remotePrey == null)) return false;
         if (prey == null) {
             BlockPos waypoint = remoteWaypoint();
