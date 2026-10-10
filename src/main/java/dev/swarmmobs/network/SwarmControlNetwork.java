@@ -751,6 +751,7 @@ public final class SwarmControlNetwork {
         int laneDiverted = 0;
         long laneDiversionSamples = 0;
         long laneBlockedFallbacks = 0;
+        long staleRouteResets = 0;
         int optimizedSupportAgents = 0;
         long supportLaneSwitches = 0, supportFeasibleSamples = 0,
                 supportUnavailableSamples = 0;
@@ -788,6 +789,7 @@ public final class SwarmControlNetwork {
                     if (tacticalState.crowdLaneSide() != 0) laneDiverted++;
                     laneDiversionSamples += tacticalState.crowdLaneUses();
                     laneBlockedFallbacks += tacticalState.crowdLaneRejected();
+                    staleRouteResets += tacticalState.navigationEpisodeResets();
                     switch (tacticalState.tacticalPattern()) {
                         case "SWEEP" -> tacticSweep++;
                         case "SURROUND" -> tacticSurround++;
@@ -851,6 +853,7 @@ public final class SwarmControlNetwork {
                 pair("aiLastError", ai.lastError()),
                 pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
+                pair("staleRouteResets", Math.min(Integer.MAX_VALUE, staleRouteResets)),
                 pair("laneBlockedFallbacks", Math.min(Integer.MAX_VALUE, laneBlockedFallbacks)),
                 pair("laneDiverted", laneDiverted),
                 pair("laneDiversionSamples", Math.min(Integer.MAX_VALUE, laneDiversionSamples)),

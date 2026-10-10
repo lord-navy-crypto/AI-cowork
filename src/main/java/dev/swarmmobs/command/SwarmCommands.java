@@ -713,6 +713,7 @@ public final class SwarmCommands {
                                 + " recoveries=" + state.recoveryCount()
                                 + " recoveryPlanAttempts=" + state.recoveryPlanningAttempts()
                                 + " recoveryPlanFailures=" + state.recoveryPlanningFailures()
+                                + " staleRouteResets=" + state.navigationEpisodeResets()
                                 + " plannerContext=" + state.plannerContext()
                                 + " plannerCandidates=" + state.plannerCandidateCount()
                                 + " plannerBlocked=" + state.plannerBlockedCount()
@@ -823,6 +824,7 @@ public final class SwarmCommands {
         long recoveries = 0L;
         long recoveryPlanAttempts = 0L;
         long recoveryPlanFailures = 0L;
+        long staleRouteResets = 0L;
         long plannerPathQueries = 0L;
         int agentsWithPlannerDiagnostics = 0;
         long sensingAccepted = 0L;
@@ -889,6 +891,7 @@ public final class SwarmCommands {
             recoveries += state.recoveryCount();
             recoveryPlanAttempts += state.recoveryPlanningAttempts();
             recoveryPlanFailures += state.recoveryPlanningFailures();
+            staleRouteResets += state.navigationEpisodeResets();
             plannerPathQueries += state.plannerPathQueryCount();
             if (state.plannerContext() != SwarmPlannerContext.NONE) {
                 agentsWithPlannerDiagnostics++;
@@ -978,7 +981,7 @@ public final class SwarmCommands {
 
         // Aggregate of actual per-agent game tactic states, not claimed wins.
         String patternsText = patterns.toString();
-        String mobility = ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
+        String mobility = ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
         source.sendSuccess(() -> Component.literal(summary + ", patterns=" + patternsText + mobility), false);
         return total;
     }

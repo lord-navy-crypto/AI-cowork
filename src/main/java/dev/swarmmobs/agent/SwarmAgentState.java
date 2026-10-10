@@ -79,6 +79,8 @@ public final class SwarmAgentState {
     private long recoveryCount;
     private long recoveryPlanningAttempts;
     private long recoveryPlanningFailures;
+    // Number of active movement episodes invalidated by changed game context.
+    private long navigationEpisodeResets;
     private SwarmPlannerContext plannerContext = SwarmPlannerContext.NONE;
     private int plannerCandidateCount;
     private int plannerBlockedCount;
@@ -568,6 +570,14 @@ public final class SwarmAgentState {
 
     public long recoveryPlanningFailures() {
         return recoveryPlanningFailures;
+    }
+
+    public long navigationEpisodeResets() {
+        return navigationEpisodeResets;
+    }
+
+    public void recordNavigationEpisodeReset() {
+        navigationEpisodeResets++;
     }
 
     public SwarmPlannerContext plannerContext() {

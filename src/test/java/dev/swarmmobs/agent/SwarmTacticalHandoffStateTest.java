@@ -82,6 +82,19 @@ class SwarmTacticalHandoffStateTest {
         assertFalse(state.searchRallyActive());
     }
 
+    @Test void movementEpisodeResetTelemetryCountsOnlyExplicitInvalidations() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(8,1));
+        assertEquals(0,state.navigationEpisodeResets());
+        state.recordNavigationEpisodeReset();
+        assertEquals(1,state.navigationEpisodeResets());
+        state.bindTacticalTarget(new UUID(8,2));
+        // Target changes alone must not invent an executed navigation reset.
+        assertEquals(1,state.navigationEpisodeResets());
+        state.recordNavigationEpisodeReset();
+        assertEquals(2,state.navigationEpisodeResets());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
