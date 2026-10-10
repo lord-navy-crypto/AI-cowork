@@ -4277,7 +4277,10 @@ public final class SwarmRuntimeGameTests {
             if (nest.chamberLevel() != 1 || nest.visibleChamberLevel() != 1
                     || nest.effectiveCapacity() != 8 || nest.resources() != 0
                     || !helper.getLevel().getBlockState(helper.absolutePos(soilPos)).is(Blocks.DIRT)
-                    || !helper.getLevel().getBlockState(helper.absolutePos(timberPos)).is(Blocks.OAK_LOG)) {
+                    || !helper.getLevel().getBlockState(helper.absolutePos(timberPos)).is(Blocks.OAK_LOG)
+                    || !nest.ownsShellPiece(helper.absolutePos(soilPos))
+                    || !nest.ownsShellPiece(helper.absolutePos(timberPos))
+                    || nest.ownsShellPiece(helper.absolutePos(new BlockPos(3,1,3)))) {
                 helper.fail("Safe nest shell failed to place raw dirt / oak-log modules"
                         + " chambers=" + nest.chamberLevel()
                         + " visual=" + nest.visibleChamberLevel()
@@ -5439,6 +5442,69 @@ public final class SwarmRuntimeGameTests {
                     .set(grief,helper.getLevel().getServer());
             helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBLOOT)
                     .set(loot,helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_renewable_crops",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void harvestedCarrotsOnlyReplantBySpendingPhysicalCropDrop(
+            GameTestHelper helper) {
+        var core = new BlockPos(0,1,2);
+        var plot = new BlockPos(4,1,2);
+        helper.setBlock(core,SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(plot.below(),Blocks.FARMLAND);
+        helper.setBlock(plot,Blocks.CARROTS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.CarrotBlock.AGE,7));
+        var be=helper.getLevel().getBlockEntity(helper.absolutePos(core));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Missing nest for renewable agriculture");return;
+        }
+        Zombie worker=helper.spawn(EntityType.ZOMBIE,new BlockPos(3,1,2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",helper.absolutePos(core).asLong());
+        boolean master=SwarmConfig.ENABLED.get();
+        boolean life=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean haul=SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean mine=SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean replant=SwarmConfig.NEST_CROP_REPLANT_ENABLED.get();
+        boolean grief=helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true,helper.getLevel().getServer());
+            var goal=new SwarmZombieColonyGatherGoal(worker);
+            if(!goal.canUse()){
+                helper.fail("Worker did not accept mature carrot crop");return;
+            }
+            goal.start();
+            goal.tick();
+            goal.stop();
+            var plant=helper.getLevel().getBlockState(helper.absolutePos(plot));
+            var carrotDrops=helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class,new AABB(helper.absolutePos(plot)).inflate(2),
+                    e -> e.isAlive() && e.getItem().is(Items.CARROT));
+            if(!plant.is(Blocks.CARROTS)
+                    || plant.getValue(net.minecraft.world.level.block.CarrotBlock.AGE)!=0
+                    || nest.resources()!=0 || nest.nutrientPoints()!=0
+                    || nest.haulTrips()!=0 || carrotDrops.stream()
+                            .anyMatch(e -> e.getItem().isEmpty())) {
+                helper.fail("Replant requires genuine harvested carrot and cannot credit storage");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(life);
+            SwarmConfig.NEST_HAULING_ENABLED.set(haul);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(mine);
+            SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(replant);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief,helper.getLevel().getServer());
         }
     }
 }
