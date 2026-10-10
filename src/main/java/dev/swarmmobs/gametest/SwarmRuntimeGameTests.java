@@ -5893,4 +5893,52 @@ public final class SwarmRuntimeGameTests {
         }
     }
 
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_stock_fairness",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void physicalNestIntakeCannotOverfillOneCategoryAndStarveOthers(
+            GameTestHelper helper) {
+        BlockPos corePos = new BlockPos(2, 1, 2);
+        helper.setBlock(corePos, SwarmNestBlocks.NEST_CORE.get());
+        if (!(helper.getLevel().getBlockEntity(helper.absolutePos(corePos))
+                instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Stock fairness test missing Nest Core"); return;
+        }
+        boolean previous = SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get();
+        try {
+            SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(true);
+            Vec3 pos = helper.absoluteVec(new Vec3(3.5, 1.5, 2.5));
+            ItemEntity logs = new ItemEntity(helper.getLevel(),pos.x,pos.y,pos.z,
+                    new ItemStack(Items.OAK_LOG,64));
+            ItemEntity soil = new ItemEntity(helper.getLevel(),pos.x,pos.y,pos.z,
+                    new ItemStack(Items.DIRT,64));
+            ItemEntity food = new ItemEntity(helper.getLevel(),pos.x,pos.y,pos.z,
+                    new ItemStack(Items.BEEF,64));
+            helper.getLevel().addFreshEntity(logs);
+            helper.getLevel().addFreshEntity(soil);
+            helper.getLevel().addFreshEntity(food);
+            int acceptedLogs = nest.acceptDroppedItem(logs,64);
+            int surplusLogs = nest.acceptDroppedItem(logs,64);
+            int acceptedSoil = nest.acceptDroppedItem(soil,64);
+            int acceptedFood = nest.acceptDroppedItem(food,64);
+            if (acceptedLogs != 2 || surplusLogs != 0 || acceptedSoil != 8
+                    || acceptedFood != 6
+                    || !logs.isAlive() || logs.getItem().getCount() != 62
+                    || !soil.isAlive() || soil.getItem().getCount() != 56
+                    || !food.isAlive() || food.getItem().getCount() != 58
+                    || nest.timberPoints() != 6 || nest.soilPoints() != 8
+                    || nest.nutrientPoints() != 24 || nest.resources() != 38) {
+                helper.fail("Adaptive physical intake consumed surplus items or starved a stock category"
+                        + " timber=" + nest.timberPoints()
+                        + " soil=" + nest.soilPoints()
+                        + " food=" + nest.nutrientPoints()
+                        + " stored=" + nest.resources());
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(previous);
+        }
+    }
+
 }
