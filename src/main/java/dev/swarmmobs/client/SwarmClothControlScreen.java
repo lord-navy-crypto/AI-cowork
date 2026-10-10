@@ -117,6 +117,10 @@ public final class SwarmClothControlScreen {
                         + "  STANDARD " + integer(values, "tacticStandard")
                         + "  SEARCH " + integer(values, "tacticSearch"));
         status(category, entries,
+                "Vacant flank coverage: " + integer(values, "activeFlankFillers")
+                        + " active Zombies / " + integer(values, "flankFillEpisodes")
+                        + " replacement episodes (server observed)");
+        status(category, entries,
                 "Navigation stale-route resets: " + integer(values, "staleRouteResets"));
         status(category, entries,
                 "SEARCH rejoining: " + integer(values, "searchRallying")
