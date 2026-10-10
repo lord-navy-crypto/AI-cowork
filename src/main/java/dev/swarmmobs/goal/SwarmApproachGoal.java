@@ -141,10 +141,9 @@ public final class SwarmApproachGoal extends Goal {
                     && mob.level() instanceof ServerLevel gameLevel) {
                 state.expireRangedSpacing(gameLevel.getGameTime());
             }
-            if (state.rangedSpacingActive()) {
-                return mob.distanceToSqr(state.destinationX(), mob.getY(),
-                        state.destinationZ()) > 0.75 * 0.75;
-            }
+            // A verified clear shot inside the normal bow envelope wins
+            // over optional spacing. Never let decorative repositioning
+            // starve the real Minecraft Skeleton bow attack.
             if (mob.getTarget() instanceof Player target
                     && validTarget(target)
                     && state.bowLaneClear()
@@ -155,7 +154,14 @@ public final class SwarmApproachGoal extends Goal {
                             mob.distanceToSqr(target),
                             SwarmSkeletonBowGoal.HANDOFF_DISTANCE
                     )) {
+                if (state.rangedSpacingActive()) {
+                    state.updateRangedSpacing(false, mob.level().getGameTime());
+                }
                 return false;
+            }
+            if (state.rangedSpacingActive()) {
+                return mob.distanceToSqr(state.destinationX(), mob.getY(),
+                        state.destinationZ()) > 0.75 * 0.75;
             }
 
             double tolerance = Math.max(0.5, profile.arrivalTolerance());
@@ -549,7 +555,12 @@ public final class SwarmApproachGoal extends Goal {
                 state.failShortZombieFlankForRejectedPath(now);
             }
             mob.getNavigation().stop();
-            state.clearNavigationTelemetry();
+            // NavigationMode describes the planner's chosen lane (PLAN,
+            // OBSTACLE_DETOUR, RECOVERY), not guaranteed PathNavigation
+            // acceptance. Keep that real planned mode visible so the
+            // detour-toggle GameTest can verify that OFF clears the plan.
+            // The failed execution is separately recorded by the rejection
+            // counters and commandIssued=false.
             resetProgressSample();
             resetOptionalProgressSample();
             return;
