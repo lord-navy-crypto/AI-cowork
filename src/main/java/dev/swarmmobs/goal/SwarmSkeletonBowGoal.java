@@ -47,7 +47,10 @@ public final class SwarmSkeletonBowGoal extends RangedBowAttackGoal<Skeleton> {
             return false;
         }
 
-        return SwarmRangedHandoffPolicy.shouldYieldToVanilla(
+        // A same-target melee ally occupying the current shot corridor
+        // sends the Skeleton back to its ordinary repositioning planner.
+        return state.bowLaneClear()
+                && SwarmRangedHandoffPolicy.shouldYieldToVanilla(
                 state.directObservation(),
                 state.targetId().equals(target.getUUID()),
                 skeleton.hasLineOfSight(target),
