@@ -365,6 +365,28 @@ public final class SwarmClothControlScreen {
                             + integer(values, "colonyForagedBerries"));
 
             status(category, entries,
+                    "Local work assignments " + integer(values, "colonyActiveWorkSites")
+                            + " | Spider dropped-item leads "
+                            + integer(values, "colonyScoutItemLeads"));
+            status(category, entries,
+                    "Returning-forager feedback: successful cargo trips "
+                            + integer(values, "colonyReinforcedTrips")
+                            + " | failed/unreachable work signals "
+                            + integer(values, "colonyInhibitedJobs"));
+            status(category, entries,
+                    "Recruitment cues [food / timber / soil]: "
+                            + decimal(values, "colonyFoodRecruitment") + " / "
+                            + decimal(values, "colonyTimberRecruitment") + " / "
+                            + decimal(values, "colonySoilRecruitment"));
+            status(category, entries,
+                    "Stop/inhibition cues [food / timber / soil]: "
+                            + decimal(values, "colonyFoodInhibition") + " / "
+                            + decimal(values, "colonyTimberInhibition") + " / "
+                            + decimal(values, "colonySoilInhibition"));
+            status(category, entries,
+                    "Research-inspired feedback values are experimental GAME parameters, not measured ant or bee signal rates.");
+
+            status(category, entries,
                     "Stored points: soil " + integer(values, "colonyScienceSoil")
                             + ", timber " + integer(values, "colonyScienceTimber")
                             + ", nutrients " + integer(values, "colonyScienceNutrient")
