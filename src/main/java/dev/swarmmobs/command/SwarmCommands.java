@@ -14,6 +14,9 @@ import dev.swarmmobs.ai.SwarmAiShadowService;
 import dev.swarmmobs.ai.SwarmAiShadowState;
 import dev.swarmmobs.ai.ollama.OllamaStrategyProvider;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.colony.SwarmNestBlockEntity;
+import dev.swarmmobs.colony.SwarmNestColonyPolicy;
+import dev.swarmmobs.colony.SwarmNestArchitecturePolicy;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.algorithm.TargetObservation;
@@ -32,6 +35,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 import java.util.Comparator;
@@ -96,6 +101,8 @@ public final class SwarmCommands {
                         .executes(context -> playtestModeStatus(context.getSource()))));
         debug.then(Commands.literal("workstatus")
                 .executes(context -> nearestWorkerStatus(context.getSource())));
+        debug.then(Commands.literal("neststatus")
+                .executes(context -> inspectLookedAtNest(context.getSource())));
 
         var communication = Commands.literal("comm")
                 .then(Commands.literal("on")
@@ -1245,6 +1252,50 @@ public final class SwarmCommands {
                 + ", mobGriefing=" + level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)
                 + ". For work: valid nearby core, no target, WORK mode, available resources.";
         source.sendSuccess(() -> Component.literal(result), false);
+        return 1;
+    }
+
+    /** Read-only building inspection; aim at the Nest Core within 48 blocks. */
+    private static int inspectLookedAtNest(CommandSourceStack source) {
+        ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Run this command as a player."));
+            return 0;
+        }
+        HitResult hit = player.pick(48.0, 0.0F, false);
+        if (!(hit instanceof BlockHitResult block)
+                || !player.serverLevel().hasChunkAt(block.getBlockPos())
+                || !(player.serverLevel().getBlockEntity(block.getBlockPos())
+                        instanceof SwarmNestBlockEntity nest)) {
+            source.sendFailure(Component.literal(
+                    "Aim your crosshair at a loaded Nest Core within 48 blocks."));
+            return 0;
+        }
+        String msg = "Nest @ " + block.getBlockPos().toShortString()
+                + ": stock=" + nest.resources() + "/"
+                + SwarmNestColonyPolicy.MAX_STORED_RESOURCES
+                + " [soil=" + nest.soilPoints()
+                + ", timber=" + nest.timberPoints()
+                + ", food=" + nest.nutrientPoints()
+                + ", legacy=" + nest.legacyPoints() + "]"
+                + ", pop=" + nest.lastPopulation() + "/" + nest.effectiveCapacity()
+                + ", chambers=" + nest.chamberLevel() + "/"
+                + SwarmNestArchitecturePolicy.MAX_CHAMBER_LEVEL
+                + ", visibleModules=" + nest.visibleChamberLevel()
+                + ", paidRepairs=" + nest.repairedShellPieces()
+                + ", births=" + nest.births()
+                + ", haulTrips=" + nest.haulTrips()
+                + ", hauledItems=" + nest.hauledItems()
+                + ", visibleBuildEnabled=" + SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()
+                + ", lifecycleEnabled=" + SwarmConfig.NEST_LIFECYCLE_ENABLED.get()
+                + ", mobGriefing=" + player.serverLevel().getGameRules()
+                        .getBoolean(GameRules.RULE_MOBGRIEFING)
+                + ". Expansion requires near-capacity population and real soil/timber; "
+                + "damaged registered shell blocks repair only if their sites are empty "
+                + "and enough corresponding materials remain.";
+        source.sendSuccess(() -> Component.literal(msg), false);
         return 1;
     }
 
