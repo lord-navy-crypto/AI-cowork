@@ -5,6 +5,7 @@ import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
 import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
+import dev.swarmmobs.colony.SwarmNestOpportunityBoard;
 import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.registry.SwarmNestBlocks;
@@ -19,6 +20,7 @@ import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.animal.Sheep;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.phys.AABB;
 
 import java.util.EnumSet;
 import java.util.Map;
@@ -39,6 +41,7 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
 
     private final Zombie zombie;
     private Animal prey;
+    private SwarmNestOpportunityBoard.Opportunity remotePrey;
     private BlockPos home;
     private long nextSearch = Long.MIN_VALUE;
     private long started;
@@ -98,33 +101,69 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
                 bestScore = score;
             }
         }
-        if (best == null || !claim(best, tick)) return false;
-        prey = best;
+        if (best != null) {
+            if (!claim(best, tick)) return false;
+            prey = best;
+            remotePrey = null;
+            home = candidateHome;
+            return true;
+        }
+        // Spider observation gives a bounded local waypoint, not a
+        // globally visible animal or permission for a distant attack.
+        var where = zombie.blockPosition();
+        var report = nest.opportunityBoard().reserve(
+                zombie.getUUID(),
+                new SwarmNestOpportunityBoard.Position(
+                        where.getX(),where.getY(),where.getZ()),
+                SwarmNestOpportunityBoard.Type.ANIMAL,tick,
+                SwarmNestOpportunityBoard.MAX_RADIUS,
+                lead -> SwarmColonyGatherPolicy.needs(
+                        lead.kind(),nest.soilPoints(),nest.timberPoints(),
+                        nest.nutrientPoints()+nest.legacyPoints(),nest.resources()),
+                lead -> where.distSqr(new BlockPos(
+                        lead.position().x(),lead.position().y(),lead.position().z())));
+        if (report == null) return false;
+        BlockPos hint = new BlockPos(
+                report.position().x(),report.position().y(),report.position().z());
+        if (!level.hasChunkAt(hint)) {
+            nest.opportunityBoard().release(report,zombie.getUUID());
+            return false;
+        }
+        prey = null;
+        remotePrey = report;
         home = candidateHome;
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (finished || prey == null || !prey.isAlive()
-                || !(zombie.level() instanceof ServerLevel level)
+        if (finished || !(zombie.level() instanceof ServerLevel level)
                 || !idle(level) || home == null || !level.hasChunkAt(home)
-                || !level.hasChunkAt(prey.blockPosition())
                 || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())
                 || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
                 || !SwarmColonyGatherPolicy.needs(
                         SwarmNestColonyPolicy.Kind.NUTRIENT,
                         nest.soilPoints(), nest.timberPoints(),
                         nest.nutrientPoints() + nest.legacyPoints(), nest.resources())
-                || !validAnimal(prey)) return false;
+                || (prey == null && remotePrey == null)) return false;
+        if (prey == null) {
+            BlockPos waypoint = remoteWaypoint();
+            if (waypoint == null || !level.hasChunkAt(waypoint)
+                    || !nest.opportunityBoard().renew(
+                            remotePrey,zombie.getUUID(),level.getGameTime())) {
+                return false;
+            }
+        } else if (!prey.isAlive() || !validAnimal(prey)
+                || !level.hasChunkAt(prey.blockPosition())) return false;
         if (SwarmColonyGatherPolicy.expired(
                 level.getGameTime(), started, lastProgress)) {
             routeFailed = true;
             return false;
         }
-        return zombie.distanceToSqr(prey) <= SEARCH_RADIUS * SEARCH_RADIUS * 4.0
+        return prey == null || (zombie.distanceToSqr(prey)
+                <= SEARCH_RADIUS * SEARCH_RADIUS * 4.0
                 && !claimedByOther(prey, level.getGameTime(),
-                        zombie.getUUID().toString());
+                        zombie.getUUID().toString()));
     }
 
     @Override
@@ -145,6 +184,45 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
             return;
         }
         long now = level.getGameTime();
+        if (prey == null) {
+            BlockPos waypoint = remoteWaypoint();
+            if (waypoint == null) { finished = true; return; }
+            double distanceToHint = zombie.distanceToSqr(
+                    waypoint.getX() + .5,waypoint.getY(),waypoint.getZ() + .5);
+            if (distanceToHint > 9.0) {
+                if (distanceToHint + .5 < bestDistance) {
+                    bestDistance = distanceToHint;
+                    lastProgress = now;
+                }
+                if (lastMove == Long.MIN_VALUE
+                        || now - lastMove >= SwarmColonyGatherPolicy.RETRY_NAV_TICKS) {
+                    lastMove = now;
+                    zombie.getNavigation().moveTo(
+                            waypoint.getX() + .5,waypoint.getY(),waypoint.getZ() + .5,1.05);
+                }
+                return;
+            }
+            // Re-sense a LIVING, adult animal at the actual scout waypoint;
+            // do not use remote UUID lookup, teleport or virtual meat.
+            var physical = level.getEntitiesOfClass(Animal.class,
+                    new AABB(waypoint).inflate(4.0),
+                    entity -> entity.getUUID().equals(remotePrey.animalId())
+                            && validAnimal(entity)).stream().findFirst().orElse(null);
+            if (physical == null || !claim(physical,now)) {
+                if (home != null && level.getBlockEntity(home)
+                        instanceof SwarmNestBlockEntity nest) {
+                    nest.opportunityBoard().invalidate(remotePrey);
+                    if (SwarmConfig.NEST_PHEROMONES_ENABLED.get())
+                        nest.inhibitPheromone(waypoint,
+                                SwarmNestColonyPolicy.Kind.NUTRIENT,now);
+                }
+                finished = true;
+                return;
+            }
+            prey = physical;
+            lastProgress = now;
+            bestDistance = Double.POSITIVE_INFINITY;
+        }
         if (!claim(prey, now)) {
             finished = true;
             return;
@@ -169,13 +247,24 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
             // Actual melee damage and standard vanilla animal loot, never
             // generated food added directly to the core or virtual storage.
             zombie.doHurtTarget(prey);
-            if (!prey.isAlive()) finished = true;
+            if (!prey.isAlive()) {
+                finished = true;
+                if (remotePrey != null && home != null
+                        && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
+                    nest.opportunityBoard().invalidate(remotePrey);
+                }
+            }
         }
     }
 
     @Override
     public void stop() {
         if (prey != null) release(prey);
+        if (remotePrey != null && home != null
+                && zombie.level() instanceof ServerLevel level && level.hasChunkAt(home)
+                && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
+            nest.opportunityBoard().release(remotePrey,zombie.getUUID());
+        }
         if (routeFailed && home != null
                 && zombie.level() instanceof ServerLevel level
                 && level.hasChunkAt(home)
@@ -187,8 +276,15 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
         }
         zombie.getNavigation().stop();
         prey = null;
+        remotePrey = null;
         home = null;
         finished = true;
+    }
+
+    private BlockPos remoteWaypoint() {
+        if (remotePrey == null) return null;
+        var p = remotePrey.position();
+        return new BlockPos(p.x(),p.y(),p.z());
     }
 
     private static boolean validAnimal(Animal a) {
