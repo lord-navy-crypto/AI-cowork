@@ -358,6 +358,23 @@ class SwarmTacticalHandoffStateTest {
         assertTrue(state.canUseZombieFlankWaypoint(4,8,131));
     }
 
+    @Test void zombieBowLanePlanIsNotAutomaticallyAnAcceptedGamePath() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(91,1));
+        state.updateZombieBowLaneYieldPlan(true);
+        assertTrue(state.zombieBowLaneYieldPlanned());
+        assertEquals(0,state.zombieBowLaneYieldAcceptedCommands());
+        // Only the real Goal's positive PathNavigation.moveTo result
+        // may call this explicit accepted-command telemetry method.
+        state.recordZombieBowLaneYieldAccepted();
+        assertEquals(1,state.zombieBowLaneYieldAcceptedCommands());
+        state.bindTacticalTarget(new UUID(91,2));
+        assertFalse(state.zombieBowLaneYieldPlanned());
+        assertEquals(1,state.zombieBowLaneYieldAcceptedCommands());
+        state.updateZombieBowLaneYieldPlan(false);
+        assertFalse(state.zombieBowLaneYieldPlanned());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
