@@ -7,6 +7,7 @@ public final class SwarmConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.IntValue PLAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.BooleanValue TACTICAL_ROUNDS_ENABLED;
     public static final ModConfigSpec.DoubleValue NEIGHBOR_RADIUS;
     public static final ModConfigSpec.IntValue MAX_NEIGHBORS;
     public static final ModConfigSpec.DoubleValue TARGET_RADIUS;
@@ -120,6 +121,10 @@ public final class SwarmConfig {
         ENABLED = BUILDER
                 .comment("Master switch for the algorithmic swarm layer.")
                 .define("enabled", true);
+
+        TACTICAL_ROUNDS_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: synchronized non-blocking 100-tick tactical support phases among same-target mixed Zombie/Skeleton/Creeper groups. Only biases safe planned Skeleton lanes; never makes Minecraft combat turn-based. OFF by default.")
+                .define("tacticalRoundsEnabled", false);
 
         PLAN_INTERVAL_TICKS = BUILDER
                 .comment("How often each swarm mob replans. 20 ticks = 1 second.")
