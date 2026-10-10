@@ -1,15 +1,15 @@
-# Swarm Mobs — Active Colony Playtest (isolated test branch)
+# Swarm Mobs — Active Colony Playtest
 
-Branch: `test/colony-all-features-playtest-20261010`, based on PR #64 commit `b4a1ccad`.
-
-**Use a disposable creative test world.** All destructive features remain OFF by
-default in both new and old worlds to avoid interference with GameTests and existing
-builds. Use the explicit testmode command below to enable everything for testing.
+**Use a disposable creative test world.** In a NEW development world, physical
+colony experiments start enabled. An EXISTING world retains its prior saved
+SERVER configuration; use the explicit testmode command below to switch
+on all experiments. Runtime GameTests use isolated OFF defaults.
 These features can break logs, soil, crops, farm animals and player-built blocks.
 
-## 1. Enable all colony experiments
+## 1. Confirm or enable all colony experiments
 
-Run as an operator in your disposable test world:
+Use `/swarmmobs panel` → Overview → **Enable ALL colony experiments** → Save,
+or run as an operator in your disposable test world:
 
 ```mcfunction
 /swarmmobs debug testmode on
