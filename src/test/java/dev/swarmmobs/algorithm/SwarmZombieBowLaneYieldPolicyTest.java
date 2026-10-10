@@ -76,7 +76,7 @@ class SwarmZombieBowLaneYieldPolicyTest {
     @Test void allObservedSkeletonLinesMustBeClearForSuggestedSquare() {
         var plan = SwarmZombieBowLaneYieldPolicy.propose(
                 ZOMBIE, ZOMBIE, SHOOTER, PLAYER, true, 1.0);
-        Vec2 secondShooter = new Vec2(5, 5);
+        Vec2 secondShooter = new Vec2(0, 5);
         // The left proposal is clear for the primary Skeleton, but may
         // not be clear for a Skeleton looking down another game corridor.
         assertFalse(SwarmFriendlyFireLanePolicy.isClear(
