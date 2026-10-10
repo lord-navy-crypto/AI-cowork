@@ -21,7 +21,12 @@ The new `SwarmAdaptiveTacticsPolicy` chooses a game-specific spatial pattern:
 - **SURROUND**: same-target group is at least three, target is nearly still,
   and observation is recent. The planned formation axis follows the measured
   vector from the same-target group's centroid toward the target. Assigned
-  roles occupy different local geometrical positions.
+  roles occupy different local geometrical positions. One assault Zombie
+  assigned REAR_PRESSURE can try a bounded route to the *other side* of
+  the stationary observed target (at most 3 blocks beyond the target).
+  It is a genuine navigational waypoint, not an instant teleport or a
+  special attack. Spiders occupy the sides and the Creeper/Skeleton
+  vanilla attack handoffs remain unchanged.
 - **STANDARD**: solo/pair, stale target information, disabled division of
   labor, low confidence or unrealistic velocity. Retain the prior formation
   behavior and regular vanilla movement/attack handoffs.
