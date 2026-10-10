@@ -30,7 +30,9 @@ public final class SwarmAgentState {
     private long lastLostTargetTick = Long.MIN_VALUE;
     // Hysteresis and temporary work leases must not cross target boundaries.
     private UUID tacticalAssignmentTarget;
-    private SwarmTacticalRoundPolicy.Decision tacticalRound = SwarmTacticalRoundPolicy.initial();
+    private SwarmTacticalRoundPolicy.Phase tacticalPhase = SwarmTacticalRoundPolicy.Phase.HOLD;
+    private int tacticalSupportSide;
+    private long tacticalSwitchCount;
     private int tacticalPeerCount;
     private int tacticalBreacherCount;
     private int neighborCount;
@@ -177,23 +179,41 @@ public final class SwarmAgentState {
     }
 
     public SwarmTacticalRoundPolicy.Phase tacticalRoundPhase() {
-        return tacticalRound.phase();
+        return tacticalPhase;
+    }
+
+    public int tacticalSupportSide() {
+        return tacticalSupportSide;
     }
 
     public long tacticalRoundSwitchCount() {
-        return tacticalRound.switchCount();
+        return tacticalSwitchCount;
     }
 
-    /** Keep decisions per mob and target, never on one global timed cycle. */
-    public SwarmTacticalRoundPolicy.Phase updateTacticalRound(
-            SwarmTacticalRoundPolicy.Signals signals, long gameTick) {
-        tacticalRound = SwarmTacticalRoundPolicy.advance(tacticalRound,
-                SwarmTacticalRoundPolicy.recommend(signals),gameTick);
-        return tacticalRound.phase();
+    /** Store only the last feasible side for the same live target. */
+    public void acceptTacticalSupportDecision(
+            SwarmTacticalRoundPolicy.SupportDecision decision) {
+        if (decision == null || decision.side() == 0) {
+            tacticalPhase = SwarmTacticalRoundPolicy.Phase.HOLD;
+            tacticalSupportSide = 0;
+            return;
+        }
+        if (tacticalSupportSide != 0 && tacticalSupportSide != decision.side()) {
+            tacticalSwitchCount++;
+        }
+        tacticalSupportSide = decision.side();
+        tacticalPhase = decision.phase();
+    }
+
+    public void classifyTacticalRound(SwarmTacticalRoundPolicy.Phase phase) {
+        tacticalPhase = phase == null ? SwarmTacticalRoundPolicy.Phase.HOLD : phase;
+        tacticalSupportSide = 0;
     }
 
     public void resetTacticalRound() {
-        tacticalRound = SwarmTacticalRoundPolicy.initial();
+        tacticalPhase = SwarmTacticalRoundPolicy.Phase.HOLD;
+        tacticalSupportSide = 0;
+        tacticalSwitchCount = 0;
     }
 
     /**
