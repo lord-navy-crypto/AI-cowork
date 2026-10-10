@@ -733,3 +733,76 @@ limited, and subject to labor demand.
 The goal of the plan is a **credible emergent labor simulator**, not
 only an expanded combat encounter. A green CI demonstrates behavior
 tested so far, not completion of all ecological milestones.
+
+## Integrated nest economy and renewable farm loop (October 2026 increment)
+
+This increment connects the previously separate Nest Core capacity model,
+ant-like task bids, Spider report board, Zombie hunting/mining/hauling,
+four-channel pheromone field, and visible shell. The aim is ONE
+resource->task->physical-action->stock->birth/chamber feedback loop, not
+separate modes that can accidentally conflict.
+
+### One measured stock need for every worker class
+
+`SwarmNestLaborEconomyPolicy.targets(population,capacity,chambers,hardCap)`
+derives stock quotas, using the loaded Nest Core's *last sampled local*
+population (sampled every 200 game ticks). At low capacity pressure,
+an extendable nest asks for soil=8 and timber=6 resource points (one real
+room bill); within two slots of its current capacity, it aims for 16
+soil and 12 timber points (two bills). Food target is 24 nutrition points
+(two real birth bills) when below capacity; 12 when at capacity but able
+to construct another room; ZERO when full at the configured hard cap.
+The quotas are heuristic GAME parameters; actual construction still
+requires population pressure and spends exactly 8 soil + 6 timber,
+while each spawned mob still spends 12 actual nutrition points.
+No resource is ever invented by a demand score.
+
+The `NestBlockEntity.needsResource(kind)` method is the single read
+for idle Zombie miners, hunters, exploratory workers and Spider animal/
+crop scouts; `resourceDeficit(kind)` also feeds the already-existing
+individual response-threshold utility used by miner and hauler bids.
+A new `nestAdaptiveStockEnabled` option can restore legacy fixed quotas,
+without disabling independently controlled hauling/harvesting/AI modes.
+The operator UI shows soil/timber/food quotas and registered built shell.
+
+### Colony material self-preservation
+
+A source-selection conflict was corrected: the real two-piece nest
+shell is constructed from dirt and raw logs, exactly the resources that
+hungry miners seek. Each Nest Core now identifies only the **specific
+positions of its already completed visible modules** (max 14 pieces),
+and its own scout and mining Goals reject these positions even if
+harvesting player-built structures is otherwise enabled.
+Unrelated wood, soil, and farms are still eligible when the operator
+enables destructive gathering. No radius-based block exemptions were
+added. This prevents a self-reinforcing build->mine->build loop.
+
+### Renewable crops with physical seed accounting
+
+A new opt-in `nestCropReplantEnabled`, OFF by default, runs only inside
+an already-authorized successful Zombie block harvest:
+- The worker records IDs of existing nearby dropped items *before*
+  breaking the genuinely ripe crop.
+- Vanilla block destruction creates the actual new seed/harvest drops.
+- On suitable existing farmland, one newly dropped wheat seed, carrot,
+  potato or beetroot seed is consumed to replant a juvenile crop; mature
+  nether wart on soul sand is likewise supported.
+- If no newly produced valid propagule exists, the site remains harvested.
+- No existing player item, inventory reserve, virtual points, block
+  duplication, artificial crop growth or fabricated drop is introduced.
+- Berry regrowth keeps its separate existing berry-harvest path. Pumpkin,
+  melon, mushroom, sugar cane and cocoa are not yet automatically replanted.
+
+### Remaining nontrivial gaps before declaring FULL completion
+
+The module has not been benchmarked as a full biological ecosystem.
+It still lacks physical multi-chamber underground excavations/tunnels
+with route planning; tree sapling planting/growth, livestock breeding and
+sustainable replenishment for every food category; 10/50/100/200-worker
+controlled TPS/MSPT trials; statistically meaningful multi-hour
+experiments of source depletion, route recovery and task division;
+and dedicated bees/ants as separate Minecraft living agent classes.
+The current Spider, Zombie, Skeleton and Creeper labor roles are
+*inspired by* ant/bee computational mechanisms; they are not literal
+biological ant/bee castes. Passing tests only verifies their explicit
+scenarios; it does not prove emergent global optimality.
