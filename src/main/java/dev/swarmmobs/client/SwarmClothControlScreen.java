@@ -535,6 +535,15 @@ public final class SwarmClothControlScreen {
                         + ", lead breacher " + integer(values, "specLeadBreacher"));
 
         status(category, entries,
+                "Live activity modes [WORK / ALERT / COMBAT / RECOVERY]: "
+                        + integer(values, "modeWorkAgents") + " / "
+                        + integer(values, "modeAlertAgents") + " / "
+                        + integer(values, "modeCombatAgents") + " / "
+                        + integer(values, "modeRecoveryAgents"));
+        status(category, entries,
+                "Tactical phases only affect COMBAT squads. Work pheromones and nest tasks stop on alert; vanilla combat always continues.");
+
+        status(category, entries,
                 "Target-scoped squads: agents with allies "
                         + integer(values, "liveTacticalAlliedAgents")
                         + "  directed peer links " + integer(values, "liveTacticalPeerLinks"));
