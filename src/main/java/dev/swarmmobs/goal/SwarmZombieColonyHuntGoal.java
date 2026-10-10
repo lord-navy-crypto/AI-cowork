@@ -47,6 +47,7 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
     private long lastAttack = Long.MIN_VALUE;
     private double bestDistance;
     private boolean finished;
+    private boolean routeFailed;
 
     public SwarmZombieColonyHuntGoal(Zombie zombie) {
         this.zombie = zombie;
@@ -116,9 +117,12 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
                         nest.soilPoints(), nest.timberPoints(),
                         nest.nutrientPoints() + nest.legacyPoints(), nest.resources())
                 || !validAnimal(prey)) return false;
-        return !SwarmColonyGatherPolicy.expired(
-                level.getGameTime(), started, lastProgress)
-                && zombie.distanceToSqr(prey) <= SEARCH_RADIUS * SEARCH_RADIUS * 4.0
+        if (SwarmColonyGatherPolicy.expired(
+                level.getGameTime(), started, lastProgress)) {
+            routeFailed = true;
+            return false;
+        }
+        return zombie.distanceToSqr(prey) <= SEARCH_RADIUS * SEARCH_RADIUS * 4.0
                 && !claimedByOther(prey, level.getGameTime(),
                         zombie.getUUID().toString());
     }
@@ -131,6 +135,7 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
         lastAttack = Long.MIN_VALUE;
         bestDistance = Double.POSITIVE_INFINITY;
         finished = false;
+        routeFailed = false;
     }
 
     @Override
@@ -171,6 +176,15 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
     @Override
     public void stop() {
         if (prey != null) release(prey);
+        if (routeFailed && home != null
+                && zombie.level() instanceof ServerLevel level
+                && level.hasChunkAt(home)
+                && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
+            // Bee-inspired short-lived stop cue: do not keep recruiting
+            // hunters into the same kind of unreachable local work.
+            nest.laborFeedback().failed(
+                    SwarmNestColonyPolicy.Kind.NUTRIENT, level.getGameTime());
+        }
         zombie.getNavigation().stop();
         prey = null;
         home = null;
