@@ -26,8 +26,9 @@ class SwarmFailedWaypointMemoryTest {
         assertEquals(2,memory.activeCount(130));
         assertFalse(memory.allows(5,0,130,1));
         assertFalse(memory.allows(.5,0,130,1));
-        assertTrue(memory.allows(0,0,280,1));
-        assertFalse(memory.allows(.5,0,280,1)); // refreshed until 300
+        assertFalse(memory.allows(0,0,280,1)); // refreshed nearby failure
+        assertFalse(memory.allows(.5,0,280,1));
+        assertTrue(memory.allows(.5,0,300,1)); // refreshed until 300
     }
 
     @Test void independentlyExpiresAndReusesOldCapacity() {
