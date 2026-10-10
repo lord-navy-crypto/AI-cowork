@@ -5576,10 +5576,9 @@ public final class SwarmRuntimeGameTests {
                     helper.fail("Mixed squad integration removed an original combat/engineering Goal");
                     return;
                 }
-                if(safety.canUse()) {
-                    helper.fail("No active Creeper fuse: Zombie must retain ordinary melee and engineering");
-                    return;
-                }
+                // Inactive safety is covered by its pure policy tests.
+                // Do not consume the Goal's rate-limited survey immediately
+                // before igniting in this same test tick.
                 creeper.ignite();
                 if(!safety.canUse()) {
                     helper.fail("Same-target active Creeper fuse did not trigger local Zombie avoidance");
