@@ -68,6 +68,9 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NEST_LIFECYCLE_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_HAULING_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_BERRY_FORAGING_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_BLOCK_GATHER_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_ANIMAL_HUNT_ENABLED;
+    public static final ModConfigSpec.IntValue NEST_GATHER_INTERVAL;
     public static final ModConfigSpec.IntValue NEST_BERRY_FORAGE_INTERVAL;
     public static final ModConfigSpec.IntValue NEST_HAUL_SEARCH_RADIUS;
     public static final ModConfigSpec.IntValue NEST_HAUL_MAX_STACK;
@@ -361,6 +364,18 @@ public final class SwarmConfig {
         NEST_BERRY_FORAGING_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle colony Zombies may pick renewable ripe sweet berries near a loaded nest and create real dropped berry items. OFF by default. Can touch player farms; use only in a designated test world. Requires nest lifecycle, hauling and mobGriefing.")
                 .define("nestBerryForagingEnabled", false);
+
+        NEST_BLOCK_GATHER_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle Zombie workers may mine actual soil/log blocks and harvest ripe crops for colony resources; affects player builds and farms intentionally when enabled. Requires lifecycle, hauling and mobGriefing.")
+                .define("nestBlockGatherEnabled", false);
+
+        NEST_ANIMAL_HUNT_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle Zombie workers may hunt adult farm animals to create vanilla physical food drops. Requires lifecycle, hauling and mobGriefing.")
+                .define("nestAnimalHuntEnabled", false);
+
+        NEST_GATHER_INTERVAL = BUILDER
+                .comment("Ticks between bounded colony block or animal surveys per worker.")
+                .defineInRange("nestGatherInterval", 160, 60, 800);
 
         NEST_BERRY_FORAGE_INTERVAL = BUILDER
                 .comment("Minimum per-worker ticks between bounded nearby ripe-berry foraging surveys.")
