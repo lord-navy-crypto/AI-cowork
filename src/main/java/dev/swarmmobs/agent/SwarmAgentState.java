@@ -5,6 +5,7 @@ import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import dev.swarmmobs.algorithm.SwarmGameHandoffTimeoutPolicy;
+import dev.swarmmobs.algorithm.SwarmFailedWaypointMemory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -59,17 +60,15 @@ public final class SwarmAgentState {
     private long rangedNoProgressFallbacks;
     // A failed, already-tested Minecraft destination is not automatically
     // a good destination again on the very next game tick.
-    private double rangedFailedWaypointX;
-    private double rangedFailedWaypointZ;
-    private long rangedFailedWaypointUntil = Long.MIN_VALUE;
+    private final SwarmFailedWaypointMemory rangedFailedWaypoints =
+            new SwarmFailedWaypointMemory();
     private long zombieFlankStartedAt = Long.MIN_VALUE;
     private long zombieFlankRetryAfter = Long.MIN_VALUE;
     private long zombieFlankFallbacks;
     private long zombieNoProgressFallbacks;
     private boolean zombieShortFlankActive;
-    private double zombieFailedWaypointX;
-    private double zombieFailedWaypointZ;
-    private long zombieFailedWaypointUntil = Long.MIN_VALUE;
+    private final SwarmFailedWaypointMemory zombieFailedWaypoints =
+            new SwarmFailedWaypointMemory();
     // Local crowd-avoidance lane; reset on target switches.
     private int crowdLaneSide;
     private long crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -177,11 +176,11 @@ public final class SwarmAgentState {
         rangedSpacingActive = false;
         rangedSpacingStartedAt = Long.MIN_VALUE;
         rangedSpacingRetryAfter = Long.MIN_VALUE;
-        rangedFailedWaypointUntil = Long.MIN_VALUE;
+        rangedFailedWaypoints.clear();
         zombieFlankStartedAt = Long.MIN_VALUE;
         zombieFlankRetryAfter = Long.MIN_VALUE;
         zombieShortFlankActive = false;
-        zombieFailedWaypointUntil = Long.MIN_VALUE;
+        zombieFailedWaypoints.clear();
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
 
@@ -393,15 +392,15 @@ public final class SwarmAgentState {
                 || !mayAttemptRangedSpacing(tick)) {
             return false;
         }
-        return rangedFailedWaypointUntil == Long.MIN_VALUE
-                || tick < 0 || tick >= rangedFailedWaypointUntil
-                || Math.hypot(x - rangedFailedWaypointX,
-                        z - rangedFailedWaypointZ) >= 2.0;
+        return rangedFailedWaypoints.allows(x, z, tick, 2.0);
     }
 
     public boolean hasRecentlyFailedRangedWaypoint(long tick) {
-        return rangedFailedWaypointUntil != Long.MIN_VALUE && tick >= 0
-                && tick < rangedFailedWaypointUntil;
+        return rangedFailedWaypoints.hasActive(tick);
+    }
+
+    public int recentRangedFailureLocations(long tick) {
+        return rangedFailedWaypoints.activeCount(tick);
     }
 
     /**
@@ -433,10 +432,8 @@ public final class SwarmAgentState {
                 tick, SwarmGameHandoffTimeoutPolicy.SKELETON_RETRY_COOLDOWN_TICKS);
         if (hasDestination && Double.isFinite(destinationX)
                 && Double.isFinite(destinationZ)) {
-            rangedFailedWaypointX = destinationX;
-            rangedFailedWaypointZ = destinationZ;
-            rangedFailedWaypointUntil = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
-                    tick, 180);
+            rangedFailedWaypoints.record(destinationX, destinationZ, tick,
+                    180, 2.0);
         }
         rangedSpacingFallbacks++;
     }
@@ -450,15 +447,15 @@ public final class SwarmAgentState {
                 || tick < zombieFlankRetryAfter) {
             return false;
         }
-        return zombieFailedWaypointUntil == Long.MIN_VALUE
-                || tick >= zombieFailedWaypointUntil
-                || Math.hypot(x - zombieFailedWaypointX,
-                        z - zombieFailedWaypointZ) >= 1.5;
+        return zombieFailedWaypoints.allows(x, z, tick, 1.5);
     }
 
     public boolean hasRecentlyFailedZombieWaypoint(long tick) {
-        return zombieFailedWaypointUntil != Long.MIN_VALUE
-                && tick >= 0 && tick < zombieFailedWaypointUntil;
+        return zombieFailedWaypoints.hasActive(tick);
+    }
+
+    public int recentZombieFailureLocations(long tick) {
+        return zombieFailedWaypoints.activeCount(tick);
     }
 
     /** Called only when a visible game Zombie flank waypoint is worthwhile. */
@@ -500,10 +497,8 @@ public final class SwarmAgentState {
                     tick, SwarmGameHandoffTimeoutPolicy.ZOMBIE_RETRY_COOLDOWN_TICKS);
             if (hasDestination && Double.isFinite(destinationX)
                     && Double.isFinite(destinationZ)) {
-                zombieFailedWaypointX = destinationX;
-                zombieFailedWaypointZ = destinationZ;
-                zombieFailedWaypointUntil = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
-                        tick, 150);
+                zombieFailedWaypoints.record(destinationX, destinationZ, tick,
+                        150, 1.5);
             }
             zombieFlankFallbacks++;
     }
