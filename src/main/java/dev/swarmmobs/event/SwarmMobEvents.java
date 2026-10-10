@@ -16,6 +16,7 @@ import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
 import dev.swarmmobs.algorithm.SwarmTacticalRoundPolicy;
+import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
@@ -149,6 +150,7 @@ public final class SwarmMobEvents {
                 && state.pendingTargetMessageCount() == 0
                 && mob.getTarget() == null) {
             state.scheduleNextPlan(gameTick, Math.max(interval, 20));
+            state.updateEngagement(false,false,gameTick);
             state.clearLocalPlan(0);
             return;
         }
@@ -169,6 +171,7 @@ public final class SwarmMobEvents {
         TargetSelection selection = findTarget(level, mob, state, gameTick);
 
         if (selection == null) {
+            state.updateEngagement(false,false,gameTick);
             state.updateTacticalSquadTelemetry(0, 0);
             state.recordSearchFailure();
             state.forgetTarget();
@@ -191,6 +194,19 @@ public final class SwarmMobEvents {
                 movementNeighbors,
                 peer -> peer.getData(SwarmAttachments.AGENT_STATE.get()).targetId()
         );
+        // A relayed sighting is ALERT, not permission to override combat.
+        // A genuinely fighting same-target neighbor can locally recruit
+        // a defender even before its own line-of-sight opens.
+        boolean squadCombat = selection.direct() || tacticalNeighbors.stream()
+                .anyMatch(peer -> peer.getData(SwarmAttachments.AGENT_STATE.get())
+                        .engagementMode() == SwarmEngagementPolicy.Mode.COMBAT);
+        state.updateEngagement(true,squadCombat,gameTick);
+        final boolean battleRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
+                && SwarmEngagementPolicy.enableBattleRounds(
+                        state.engagementMode(),tacticalNeighbors.size());
+        final SwarmTacticalRoundPolicy.Phase combatRound = battleRounds
+                ? SwarmTacticalRoundPolicy.phase(observation.targetId(),gameTick)
+                : SwarmTacticalRoundPolicy.Phase.HOLD;
         if (selection.direct()) {
             state.recordDirectReacquisition(gameTick, observation.targetId());
         }
@@ -479,6 +495,13 @@ public final class SwarmMobEvents {
                 effectiveFormationRadius *= SwarmSpecializationRolePolicy
                         .formationRadiusMultiplier(state.specialization());
             }
+            if (battleRounds) {
+                // All three combat castes respond to the SAME combat phase.
+                // Only formation-space geometry changes; no vanilla attack
+                // Goal, Creeper fuse, or engineering execution is paused.
+                effectiveFormationRadius *= SwarmTacticalRoundPolicy
+                        .formationRadiusMultiplier(combatRound,profile.archetype());
+            }
 
             SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
                     tacticalRole,
@@ -547,12 +570,11 @@ public final class SwarmMobEvents {
                         positiveLane,targetPointForSafety,alliedPositions);
                 boolean negativeFriendlyClear = SwarmFriendlyFireLanePolicy.isClear(
                         negativeLane,targetPointForSafety,alliedPositions);
-                if (SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
-                        && selection.direct() && selection.player()!=null) {
+                if (battleRounds && selection.direct() && selection.player()!=null) {
                     // The round system is positioning ONLY. No combat Goal
                     // or vanilla bow cooldown is ever stopped or gated.
                     int side = SwarmTacticalRoundPolicy.supportSide(
-                            SwarmTacticalRoundPolicy.phase(observation.targetId(),gameTick),
+                            combatRound,
                             assignedSlot,positiveClear,negativeClear,
                             positiveFriendlyClear,negativeFriendlyClear);
                     if (side > 0) plannedDestination = positiveLane;
