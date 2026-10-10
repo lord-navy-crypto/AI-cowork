@@ -806,3 +806,72 @@ The current Spider, Zombie, Skeleton and Creeper labor roles are
 *inspired by* ant/bee computational mechanisms; they are not literal
 biological ant/bee castes. Passing tests only verifies their explicit
 scenarios; it does not prove emergent global optimality.
+
+## Final mixed-species combat and ecological noninterference verification
+
+The final engineering pass prioritizes **compatibility** over new powers.
+The existing supported types remain separate Minecraft mobs with their
+native mechanics: Zombie melee and engineering, Skeleton vanilla bow
+draw/fire, Creeper vanilla swell/fuse, Spider scouting and navigation.
+All colony harvesting, real-item transport, construction and resource
+recruitment remain lower-priority/idle-only behaviors; they are never
+allowed to steal movement from a Zombie targeting a real player.
+
+### Cross-species tactical cooperation already in the original architecture
+
+- Same-target local peer observations are shared across the already-bounded
+  communication channel. Zombies can relay observed targets to Skeletons
+  without giving the Skeleton fake line-of-sight.
+- Stable role/capability slots, experience, the worker/guard/scout/reserve
+  composition, target-scope filtering and formation cohesion/separation
+  produce complementary duties.
+- Skeletons receive long-range standoff plans and a vanilla bow handoff
+  inside their real visible attack range; Creepers retain their real fuse
+  Goal and tactical movement right up to its 3-block engagement envelope.
+- Zombie close-up melee, obstacle engineering and materials handoff retain
+  their own high-priority guards and workload claims.
+
+### Two conservative improvements in this pass
+
+1. `SwarmFriendlyFireLanePolicy`: A Skeleton's planned ranged-support
+   approach checks its shot corridor against *real nearby Zombie and Creeper
+   allies pursuing the same target*. Where a Creeper is present, its
+   breacher approach direction remains the basis of the side lanes; without
+   a Creeper, the Zombie frontline supplies a similar approach axis.
+   Lane selection considers both the original block collision ray check
+   and a simple bounded 2-D teammate clearance. Nothing rewrites vanilla
+   arrow targeting, damage, AI selectors or projectile behavior.
+2. `SwarmZombieBreacherSafetyGoal`: A Zombie sharing a live Player target
+   with a nearby Creeper may yield its MOVE control **only after the
+   Creeper actually starts swelling or is ignited**. It takes a small
+   loaded-chunk, supported-ground retreat step; the goal expires when the
+   hazard/target disappears, after a strict time cap, or when the Zombie
+   reaches its spot. It is otherwise completely inactive, preserving
+   melee, obstacle repair, harvesting, transport and the old planner.
+   Scanning occurs only for already engaged Zombies, at a five-plus-tick
+   cadence, over at most five blocks. Explosion damage, fuse timing and
+   Creeper powers are not modified.
+
+### Strict regression checks
+
+- The original actual Minecraft bow-fire and Creeper swell/fuse handoff
+  GameTests stay in the suite.
+- A new real Runtime GameTest checks Zombie, Skeleton and Creeper sharing
+  a real target simultaneously while preserving their native/engineering
+  Goal registrations; it tests fuse-triggered safety and prompt release.
+- Another GameTest enables all nest economy/pheromone/harvesting switches,
+  then verifies that none of the idle Zombie labor Goals can start while
+  it is attacking a live Player; physical terrain remains unchanged.
+- New deterministic unit tests cover cross-species firing corridors,
+  teammate-safe side selection, same-target fuse gating, and deterministic
+  retreat vector bounds.
+
+**Verification boundary:** successful GameTests do not prove all natural
+world combat outcomes or TPS with hundreds of monsters. A live-player
+survival test with a mixed group (Zombie, Creeper, Skeleton and Spider)
+should still check natural terrain, bow projectiles, ignition safety,
+construction, world griefing switches, toggles and frame times.
+
+The change stays on the existing unmerged PR branch. It must not be
+silently merged into main, published as a release or enabled in the
+user's live survival world without separate authorization.
