@@ -1,113 +1,114 @@
 package dev.swarmmobs.algorithm;
 
+import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
+import dev.swarmmobs.agent.SwarmAgentState;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SwarmTacticalRoundPolicyTest {
-    private static SwarmTacticalRoundPolicy.Signals cues(boolean fresh,
-                                                         boolean support,
-                                                         boolean frontline,
-                                                         boolean crowded,
-                                                         boolean blocked) {
-        return new SwarmTacticalRoundPolicy.Signals(fresh,support,frontline,crowded,blocked);
+    private static SwarmTacticalRoundPolicy.SupportDecision choose(
+            Vec2 position, Vec2 positive, Vec2 negative, List<Vec2> peers,
+            int currentSide, boolean plusAllowed, boolean minusAllowed) {
+        return SwarmTacticalRoundPolicy.chooseSupport(
+                position,positive,negative,peers,2.4,0.6,currentSide,0,
+                plusAllowed,minusAllowed,true,true);
     }
 
     @Test
-    void noClockOnlyRotationForStableWorldEvenAcrossThousandsOfTicks() {
-        var state=SwarmTacticalRoundPolicy.initial();
-        var unchanged=cues(true,true,true,false,false);
-        // What mattered before: 100-tick global phase boundaries.
-        // What matters now: no new stimulus, no unnecessary movement.
-        for(int t=0;t<=10_000;t+=6) {
-            state=SwarmTacticalRoundPolicy.advance(state,
-                    SwarmTacticalRoundPolicy.recommend(unchanged),t);
+    void positionOptimizationRespondsToMeasuredTravelDistance() {
+        var decision=choose(new Vec2(2,0),new Vec2(3,0),
+                new Vec2(-3,0),List.of(),-1,true,true);
+        assertEquals(1,decision.side());
+        assertEquals(SwarmTacticalRoundPolicy.Phase.ROTATE,decision.phase());
+        assertEquals(1.0,decision.chosenCost(),1e-9);
+        assertTrue(decision.clearanceVerified());
+    }
+
+    @Test
+    void stableLaneDoesNotOscillateForSmallImprovements() {
+        var state=new SwarmAgentState();
+        var self=new Vec2(0,0);
+        for(int tick=0;tick<10000;tick+=6) {
+            // Alternate tiny estimates: opposite side is marginally
+            // shorter but not by a full physical body width.
+            double next= tick%12==0 ? -1.8 : -1.9;
+            var plan=choose(self,new Vec2(2,0),new Vec2(next,0),
+                    List.of(),state.tacticalSupportSide(),true,true);
+            state.acceptTacticalSupportDecision(plan);
         }
-        assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,state.phase());
-        assertEquals(1,state.switchCount());
-        assertNull(state.candidate());
-    }
-
-    @Test
-    void crowdedSquadSwitchesOnlyAfterSignalConfirmationAndHoldTime() {
-        var state=SwarmTacticalRoundPolicy.initial();
-        var regular=cues(true,true,true,false,false);
-        var crowded=cues(true,true,true,true,false);
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(regular),0);
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(regular),12);
-        assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,state.phase());
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(crowded),18);
-        assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,state.phase());
-        // A transient noisy sample is not a new phase.
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(regular),24);
-        assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,state.phase());
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(crowded),30);
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(crowded),42);
-        assertEquals(SwarmTacticalRoundPolicy.Phase.ROTATE,state.phase());
-        assertEquals(2,state.switchCount());
-        // Even though the congestion clears, the rotation is given time.
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(regular),48);
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(regular),60);
-        assertEquals(SwarmTacticalRoundPolicy.Phase.ROTATE,state.phase());
-        state=SwarmTacticalRoundPolicy.advance(state,
-                SwarmTacticalRoundPolicy.recommend(regular),66);
-        assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,state.phase());
-    }
-
-    @Test
-    void navigationFailureTriggersRotationWithoutWaitingForClockCycle() {
-        assertEquals(SwarmTacticalRoundPolicy.Phase.ROTATE,
-                SwarmTacticalRoundPolicy.recommend(cues(true,false,true,false,true)));
-        assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,
-                SwarmTacticalRoundPolicy.recommend(cues(false,true,true,true,true)));
-        assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,
-                SwarmTacticalRoundPolicy.recommend(cues(true,true,false,false,false)));
+        assertEquals(1,state.tacticalSupportSide());
+        assertEquals(0,state.tacticalRoundSwitchCount());
         assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,
-                SwarmTacticalRoundPolicy.recommend(cues(true,true,true,false,false)));
+                state.tacticalRoundPhase());
     }
 
     @Test
-    void rotationAlternatesOnlyWhenBothSupportLanesAreValid() {
-        assertEquals(+1,SwarmTacticalRoundPolicy.supportSide(
-                SwarmTacticalRoundPolicy.Phase.COVER,0,true,true,true,true));
-        assertEquals(-1,SwarmTacticalRoundPolicy.supportSide(
-                SwarmTacticalRoundPolicy.Phase.ROTATE,0,true,true,true,true));
-        assertEquals(-1,SwarmTacticalRoundPolicy.supportSide(
-                SwarmTacticalRoundPolicy.Phase.COVER,1,true,true,true,true));
-        assertEquals(+1,SwarmTacticalRoundPolicy.supportSide(
-                SwarmTacticalRoundPolicy.Phase.ROTATE,1,true,true,true,true));
+    void unsafeCurrentSideOverridesAnySwitchingCost() {
+        var decision=choose(new Vec2(100,0),new Vec2(2,0),
+                new Vec2(-2,0),List.of(),+1,false,true);
+        assertEquals(-1,decision.side());
+        assertEquals(SwarmTacticalRoundPolicy.Phase.ROTATE,decision.phase());
+        assertEquals(102,decision.chosenCost(),1e-9);
     }
 
     @Test
-    void supportCorridorSafetyOverridesAllPhasePreferences() {
-        for(var phase:SwarmTacticalRoundPolicy.Phase.values()) {
-            assertEquals(0,SwarmTacticalRoundPolicy.supportSide(
-                    phase,0,false,false,true,true));
-            assertEquals(0,SwarmTacticalRoundPolicy.supportSide(
-                    phase,1,true,true,false,false));
-            assertEquals(+1,SwarmTacticalRoundPolicy.supportSide(
-                    phase,1,true,true,true,false));
-            assertEquals(-1,SwarmTacticalRoundPolicy.supportSide(
-                    phase,0,true,true,false,true));
-        }
+    void measuredNeighborCongestionCanOutweighTravelDistance() {
+        // Both candidates are two blocks away. One violates the 2.4
+        // block social-separation distance, the other does not.
+        var choice=choose(new Vec2(0,0),new Vec2(2,0),
+                new Vec2(-2,0),List.of(new Vec2(2,0)),0,true,true);
+        assertEquals(-1,choice.side());
+        assertEquals(2.0,choice.chosenCost(),1e-9);
+        assertEquals(4.4,SwarmTacticalRoundPolicy.localCost(
+                new Vec2(0,0),new Vec2(2,0),
+                List.of(new Vec2(2,0)),2.4),1e-9);
     }
 
     @Test
-    void targetChangeOrDisablingResetsPendingPhaseWithoutContamination() {
-        var pending=SwarmTacticalRoundPolicy.advance(
-                SwarmTacticalRoundPolicy.initial(),SwarmTacticalRoundPolicy.Phase.COVER,50);
-        assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,pending.phase());
-        assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,pending.candidate());
+    void invalidOrUnverifiedCorridorsCannotBeChosen() {
+        var x=new Vec2(0,0);
+        var pos=new Vec2(2,0);
+        var neg=new Vec2(-2,0);
+        var blocked=choose(x,pos,neg,List.of(),1,false,false);
+        assertEquals(0,blocked.side());
+        assertFalse(blocked.clearanceVerified());
+        assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,blocked.phase());
+        var invalid=choose(x,new Vec2(Double.NaN,0),neg,List.of(),-1,true,true);
+        assertEquals(0,invalid.side());
+        assertEquals(Double.POSITIVE_INFINITY,invalid.chosenCost());
+        var nearFriendly=SwarmTacticalRoundPolicy.chooseSupport(
+                x,pos,neg,List.of(),2.4,0.6,0,0,
+                true,true,false,true);
+        assertEquals(-1,nearFriendly.side());
+    }
+
+    @Test
+    void noTimersNorSpeciesDamageMultipliersAreRequired() {
+        assertEquals(SwarmTacticalRoundPolicy.Phase.COVER,
+                SwarmTacticalRoundPolicy.classification(true,true));
         assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,
-                SwarmTacticalRoundPolicy.initial().phase());
-        assertEquals(0,SwarmTacticalRoundPolicy.initial().switchCount());
+                SwarmTacticalRoundPolicy.classification(true,false));
+        assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,
+                SwarmTacticalRoundPolicy.classification(false,true));
+    }
+
+    @Test
+    void realSupportSideChangesCountAndTargetChangesReset() {
+        var state=new SwarmAgentState();
+        state.acceptTacticalSupportDecision(choose(new Vec2(2,0),
+                new Vec2(3,0),new Vec2(-3,0),List.of(),0,true,true));
+        assertEquals(+1,state.tacticalSupportSide());
+        state.acceptTacticalSupportDecision(choose(new Vec2(-2,0),
+                new Vec2(3,0),new Vec2(-3,0),List.of(),+1,true,true));
+        assertEquals(-1,state.tacticalSupportSide());
+        assertEquals(1,state.tacticalRoundSwitchCount());
+        state.bindTacticalTarget(UUID.fromString("ace215c7-d64b-4c12-b226-fc08e7d9f11c"));
+        assertEquals(0,state.tacticalSupportSide());
+        assertEquals(0,state.tacticalRoundSwitchCount());
+        assertEquals(SwarmTacticalRoundPolicy.Phase.HOLD,state.tacticalRoundPhase());
     }
 }
