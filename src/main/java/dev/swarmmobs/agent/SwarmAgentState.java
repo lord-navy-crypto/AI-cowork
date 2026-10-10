@@ -318,8 +318,12 @@ public final class SwarmAgentState {
         return crowdLaneUses;
     }
 
-    /** A lane must remain stable for a minimum interval to avoid oscillation. */
+    /** Keep a lane for 20 ticks, except when its game waypoint is obstructed. */
     public int acceptCrowdLane(int proposed, long tick) {
+        return acceptCrowdLane(proposed, tick, false);
+    }
+
+    public int acceptCrowdLane(int proposed, long tick, boolean oldLaneBlocked) {
         if (proposed == 0) {
             crowdLaneSide = 0;
             crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -327,6 +331,7 @@ public final class SwarmAgentState {
         }
         int next = Integer.compare(proposed, 0);
         if (crowdLaneSide == 0
+                || oldLaneBlocked
                 || (next != crowdLaneSide && tick >= crowdLaneLastSwitchTick
                     && tick - crowdLaneLastSwitchTick >= 20)) {
             crowdLaneSide = next;
