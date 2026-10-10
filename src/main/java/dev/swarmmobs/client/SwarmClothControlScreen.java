@@ -127,6 +127,10 @@ public final class SwarmClothControlScreen {
                 "Measured stalled waypoints: Skeleton " + integer(values, "skeletonNoProgress")
                         + " / Zombie " + integer(values, "zombieNoProgress"));
         status(category, entries,
+                "Recent blocked route memories: Skeleton " + integer(values, "skeletonFailedSites")
+                        + " / Zombie " + integer(values, "zombieFailedSites")
+                        + " (up to 3 per NPC)");
+        status(category, entries,
                 "Vacant flank coverage: " + integer(values, "activeFlankFillers")
                         + " active Zombies / " + integer(values, "flankFillEpisodes")
                         + " replacement episodes (server observed)");
