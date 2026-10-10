@@ -137,9 +137,7 @@ public final class SwarmZombiePheromoneExploreGoal extends Goal {
                 SwarmNestColonyPolicy.Kind.NUTRIENT,
                 SwarmNestColonyPolicy.Kind.TIMBER,
                 SwarmNestColonyPolicy.Kind.SOIL}) {
-            if (!SwarmColonyGatherPolicy.needs(kind,
-                    nest.soilPoints(),nest.timberPoints(),
-                    nest.nutrientPoints()+nest.legacyPoints(),nest.resources())) continue;
+            if (!nest.needsResource(kind)) continue;
             var signal=SwarmNestPheromoneField.signal(kind);
             double scent=SwarmColonyEmergencePolicy.sensedAttraction(
                     zombie.getUUID(),nest.pheromones().scent(point,signal,tick));
