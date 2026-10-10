@@ -474,6 +474,15 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         if (child == null) return;
         child.moveTo(birthSite.getX() + .5, birthSite.getY(),
                 birthSite.getZ() + .5, 0.0f, 0.0f);
+        // EntityType.create() constructs AI Goals but does not perform
+        // natural-spawn initialization. In particular, a Skeleton born
+        // without finalizeSpawn can lack its vanilla bow and bow Goal.
+        // Initialize this caste using the vanilla spawn hook; do not
+        // replace its attacks or introduce a custom ranged controller.
+        if (child instanceof Skeleton skeleton) {
+            skeleton.finalizeSpawn(level, level.getCurrentDifficultyAt(birthSite),
+                    net.minecraft.world.entity.MobSpawnType.MOB_SUMMONED, null);
+        }
         if (!level.noCollision(child)) {
             child.discard();
             return;
