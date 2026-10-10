@@ -260,6 +260,21 @@ public final class SwarmClothControlScreen {
                 "OFF by default: idle colony members move existing dirt, logs and food item entities to their own loaded nest; no auto-crafting.");
 
         toggle(category, entries, values,
+                "Zombie hunts farm animals for food",
+                "nestAnimalHuntEnabled", "nest_animal_hunt_toggle", false,
+                "Adult pigs and chickens are preferred, with cows/sheep/rabbits as alternatives. Uses real melee and vanilla meat drops; transport still requires a Zombie hauler. Can affect livestock farms.");
+
+        toggle(category, entries, values,
+                "Zombie harvests soil, raw logs and mature crops",
+                "nestBlockGatherEnabled", "nest_block_gather_toggle", false,
+                "Workers may break actual world dirt/log blocks including player-built structures, and pick fully grown wheat/carrots/potatoes/beetroots/nether wart/cocoa/melons/pumpkins/mushrooms/sugar cane. All items remain in the world until hauled.");
+
+        intField(category, entries, values,
+                "Animal and block survey interval (ticks)",
+                "nestGatherInterval", "nest_gather_interval_delta", 160,
+                "Per-worker local survey interval (60-800 ticks). Expensive scans are also limited per dimension.");
+
+        toggle(category, entries, values,
                 "Renewable sweet-berry foraging (TEST WORLDS ONLY)",
                 "nestBerryForagingEnabled", "nest_berry_forage_toggle", false,
                 "OFF by default. Idle Zombies may pick mature sweet berries near a loaded core, spawning physical drops for later hauling. Does not cut logs or dig dirt. Can affect player farms: only use in a designated test world. Requires lifecycle, hauling and mobGriefing.");
