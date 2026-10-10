@@ -35,15 +35,15 @@ public final class SwarmTacticalRoundPolicy {
             boolean positiveBlockClear, boolean negativeBlockClear,
             boolean positiveFriendlyClear, boolean negativeFriendlyClear) {
 
-        if (!finite(self) || !finite(positive) || !finite(negative)
+        if (!finite(self)
                 || !Double.isFinite(requiredSeparation) || requiredSeparation <= 0
                 || !Double.isFinite(agentWidth) || agentWidth <= 0) {
             return new SupportDecision(Phase.HOLD, 0,
                     Double.POSITIVE_INFINITY, false);
         }
 
-        boolean plus = positiveBlockClear && positiveFriendlyClear;
-        boolean minus = negativeBlockClear && negativeFriendlyClear;
+        boolean plus = finite(positive) && positiveBlockClear && positiveFriendlyClear;
+        boolean minus = finite(negative) && negativeBlockClear && negativeFriendlyClear;
         if (!plus && !minus) return new SupportDecision(Phase.HOLD, 0,
                 Double.POSITIVE_INFINITY, false);
 
