@@ -99,7 +99,9 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                             dx2 * dx2 + dy2 * dy2 + dz2 * dz2,
                             nest.soilPoints(), nest.timberPoints(),
                             nest.nutrientPoints() + nest.legacyPoints())
-                            * nest.laborFeedback().costFactor(kind, tick);
+                            * nest.laborFeedback().costFactor(kind, tick)
+                            * (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
+                                    ? nest.pheromoneCost(test, kind, tick) : 1.0);
                     if (score < best) {
                         best = score;
                         chosen = test;
@@ -181,7 +183,12 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
         }
         // Vanilla world loot is the sole source of materials; breaking one
         // block is intentional, including player-laid wood/soil when enabled.
-        level.destroyBlock(site, true, zombie);
+        boolean broken = level.destroyBlock(site, true, zombie);
+        // A cut resource is a genuine observation, not a successful haul.
+        // Strong trail reinforcement occurs only on later physical delivery.
+        if (broken && SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+            nest.markPheromone(site, selectedKind, now);
+        }
         done = true;
         zombie.getNavigation().stop();
     }
@@ -193,8 +200,12 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                 && zombie.level() instanceof ServerLevel level && level.hasChunkAt(home)
                 && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
             nest.workBoard().release(site.asLong(), zombie.getUUID());
-            if (failedRoute) nest.laborFeedback().failed(
-                    selectedKind, level.getGameTime());
+            if (failedRoute) {
+                nest.laborFeedback().failed(selectedKind, level.getGameTime());
+                if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                    nest.inhibitPheromone(site, selectedKind, level.getGameTime());
+                }
+            }
         }
         site = null;
         original = null;
