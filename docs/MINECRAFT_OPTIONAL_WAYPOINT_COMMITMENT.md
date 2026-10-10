@@ -20,8 +20,11 @@ platform.
   waypoint with a newly proposed one. Keep the existing point only while
   it is 0.85–4.5 blocks from the Skeleton, the newly considered point is
   within 2.25 blocks of it, the direct player observation remains reliable,
-  and the actual old square still has support/clearance, an ally-clear
-  corridor and an unobstructed shot. This uses the same locally sampled
+  **and a same-target ally currently blocks the Skeleton's shot**, and
+  the actual old square still has support/clearance, an ally-clear
+  corridor and an unobstructed shot. If the current shooting lane is clear,
+  no extra waypoint-hold extension is applied; vanilla bow firing takes
+  precedence. This uses the same locally sampled
   peer positions; no extra entity scan or new PathNavigation query.
 - A new angle, obstruction, arrived endpoint, missing visual evidence or
   changed proposal outside the window permits normal replanning. Previous
