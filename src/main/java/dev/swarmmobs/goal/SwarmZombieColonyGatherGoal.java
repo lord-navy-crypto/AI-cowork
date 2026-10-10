@@ -3,6 +3,7 @@ package dev.swarmmobs.goal;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
+import dev.swarmmobs.colony.SwarmNestCropReplantPolicy;
 import dev.swarmmobs.colony.SwarmColonyEmergencePolicy;
 import dev.swarmmobs.colony.SwarmNestPheromoneField;
 import dev.swarmmobs.colony.SwarmNestOpportunityBoard;
@@ -18,6 +19,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.phys.AABB;
+import java.util.UUID;
+import java.util.Set;
+import java.util.stream.Collectors;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CocoaBlock;
@@ -261,7 +267,16 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
         }
         // Vanilla world loot is the sole source of materials; breaking one
         // block is intentional, including player-laid wood/soil when enabled.
+        var replantPlan = SwarmConfig.NEST_CROP_REPLANT_ENABLED.get()
+                ? SwarmNestCropReplantPolicy.plan(original,level.getBlockState(site.below()))
+                : null;
+        Set<UUID> existingDrops = replantPlan == null ? Set.of()
+                : level.getEntitiesOfClass(ItemEntity.class,new AABB(site).inflate(1.5))
+                        .stream().map(ItemEntity::getUUID).collect(Collectors.toSet());
         boolean broken = level.destroyBlock(site, true, zombie);
+        if (broken && replantPlan != null) {
+            SwarmNestCropReplantPolicy.replant(level,site,replantPlan,existingDrops);
+        }
         // A cut resource is a genuine observation, not a successful haul.
         // Strong trail reinforcement occurs only on later physical delivery.
         if (broken && SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
