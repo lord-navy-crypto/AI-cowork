@@ -15,7 +15,7 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
-import dev.swarmmobs.algorithm.SwarmTacticalRoundPolicy;
+import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
@@ -290,32 +290,14 @@ public final class SwarmMobEvents {
                 SwarmConfig.TARGET_MEMORY_TICKS.get()
         );
 
-        final boolean battleRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
-                && SwarmEngagementPolicy.enableBattleRounds(
+        // No artificial battle cadence. The optional local optimizer is
+        // considered only for a directly-observing, same-target ranged
+        // support agent with a real frontline. All other agents retain the
+        // existing spatial swarm controller and native Minecraft Goals.
+        final boolean optimizeSupport = SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()
+                && SwarmEngagementPolicy.canCoordinateActiveSquad(
                         state.engagementMode(), tacticalNeighbors.size());
-        // Actual sensed composition, not a globally shared clock.
-        boolean supportPresent = profile.archetype()
-                == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
-                || tacticalNeighbors.stream().anyMatch(peer ->
-                        SwarmAgentProfiles.profile(peer).archetype()
-                                == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT);
-        boolean frontlinePresent =
-                profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
-                || profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER
-                || tacticalNeighbors.stream().anyMatch(peer -> {
-                    var kind = SwarmAgentProfiles.profile(peer).archetype();
-                    return kind == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
-                            || kind == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER;
-                });
-        boolean complementaryRoles = supportPresent && frontlinePresent;
-        if (battleRounds) {
-            // Non-ranged members use the already-tested planner and separation
-            // force. Reclassifying a mode NEVER invents a movement command.
-            state.classifyTacticalRound(SwarmTacticalRoundPolicy.classification(
-                    squadCombat, complementaryRoles));
-        } else {
-            state.resetTacticalRound();
-        }
+        if (!optimizeSupport) state.clearSupportPositionSide();
 
         double aiFormationMultiplier = activeStrategy == null
                 ? 1.0
@@ -590,29 +572,32 @@ public final class SwarmMobEvents {
                         positiveLane,targetPointForSafety,alliedPositions);
                 boolean negativeFriendlyClear = SwarmFriendlyFireLanePolicy.isClear(
                         negativeLane,targetPointForSafety,alliedPositions);
-                if (battleRounds && selection.direct() && selection.player()!=null) {
-                    // Verify real candidate shooting corridors first. Choose
-                    // the minimum distance + peer-clearance debt in BLOCKS.
-                    // A switch must repay its one-body-width relocation cost
-                    // unless the previous corridor is no longer safe.
-                    var decision = SwarmTacticalRoundPolicy.chooseSupport(
+                if (optimizeSupport && selection.direct() && selection.player()!=null) {
+                    // Real block visibility and same-target teammate line
+                    // clearance are mandatory before considering either
+                    // position. Compare feasible ones in consistent units.
+                    var decision = SwarmSupportPositionPolicy.chooseSupport(
                             new Vec2(mob.getX(),mob.getZ()),
                             positiveLane,negativeLane,alliedPositions,
                             SwarmConfig.SEPARATION_RADIUS.get(),mob.getBbWidth(),
-                            state.tacticalSupportSide(),assignedSlot,
+                            state.supportPositionSide(),assignedSlot,
                             positiveClear,negativeClear,
                             positiveFriendlyClear,negativeFriendlyClear);
-                    state.acceptTacticalSupportDecision(decision);
+                    state.acceptSupportPositionDecision(decision);
                     if (decision.side() > 0) plannedDestination = positiveLane;
                     else if (decision.side() < 0) plannedDestination = negativeLane;
-                    // No verified corridor: leave the normal planner alone.
-                } else {
-                    // Disabled: preserve the exact tested pre-round behavior.
+                    // Neither feasible: preserve ordinary swarm planning.
+                } else if (!SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()) {
+                    // Explicit OFF means the pre-optimizer legacy behavior.
                     double preferredSign = SwarmFriendlyFireLanePolicy.chooseSide(
                             assignedSlot,positiveClear,negativeClear,
                             positiveFriendlyClear,negativeFriendlyClear);
                     plannedDestination = preferredSign > 0.0
                             ? positiveLane : negativeLane;
+                } else {
+                    state.clearSupportPositionSide();
+                    // Without a directly verified target there is no
+                    // scientifically justified extra support-position move.
                 }
                 }
             }
