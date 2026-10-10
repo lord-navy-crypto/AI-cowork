@@ -49,6 +49,40 @@ public final class SwarmNestLaborEconomyPolicy {
         };
     }
 
+    /**
+     * Admission control for ACTUAL item entities, not a virtual resource
+     * award. Bound each category by its current demand so a single 64-stack
+     * of logs cannot occupy the entire finite store and starve food/soil.
+     * Returns a number of real items to consume, not resource points.
+     */
+    public static int demandedItemLimit(SwarmNestColonyPolicy.Kind kind,
+                                        int availableItems, int totalStored,
+                                        int soil, int timber, int nutrition,
+                                        Targets targets) {
+        if (availableItems <= 0 || targets == null || kind == null
+                || kind == SwarmNestColonyPolicy.Kind.NONE) return 0;
+        int value = SwarmNestColonyPolicy.value(kind);
+        int target = switch (kind) {
+            case SOIL -> targets.soil();
+            case TIMBER -> targets.timber();
+            case NUTRIENT -> targets.food();
+            case NONE -> 0;
+        };
+        int current = switch (kind) {
+            case SOIL -> soil;
+            case TIMBER -> timber;
+            case NUTRIENT -> nutrition;
+            case NONE -> 0;
+        };
+        int deficit = Math.max(0, target - Math.max(0,current));
+        if (deficit == 0 || value == 0) return 0;
+        // Last item may overshoot the target by < one item's value, but
+        // never the global storage capacity. No fractional physical items.
+        int wanted = (deficit + value - 1) / value;
+        return Math.min(Math.min(availableItems,wanted),
+                SwarmNestColonyPolicy.acceptAmount(totalStored,availableItems,kind));
+    }
+
     public static double deficit(SwarmNestColonyPolicy.Kind kind,
                                  int soil, int timber, int food, Targets targets) {
         if (targets == null || kind == null) return 0.0;
