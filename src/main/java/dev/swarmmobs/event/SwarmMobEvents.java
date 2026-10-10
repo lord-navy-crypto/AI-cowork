@@ -809,6 +809,7 @@ public final class SwarmMobEvents {
                             && hasClearSupportShot(level, mob,
                                     selection.player(), previouslyPlanned)) {
                         plannedDestination = previouslyPlanned;
+                        state.recordRangedWaypointHold();
                     }
                 }
                 // An expired waypoint lease may not instantly re-arm on
