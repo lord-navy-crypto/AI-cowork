@@ -260,6 +260,16 @@ public final class SwarmClothControlScreen {
                 "OFF by default: idle colony members move existing dirt, logs and food item entities to their own loaded nest; no auto-crafting.");
 
         toggle(category, entries, values,
+                "Local ant-style pheromone signals",
+                "nestPheromonesEnabled", "nest_pheromone_toggle", true,
+                "Spatial FOOD / TIMBER / SOIL / STOP cues, deposited by actual scouts and physical returns, evaporate and influence worker decisions. Requires opt-in colony lifecycle and hauling.");
+
+        toggle(category, entries, values,
+                "Idle workers follow pheromone gradients",
+                "nestPheromoneExplorationEnabled", "nest_pheromone_explore_toggle", true,
+                "Lower-priority than hunting, hauling and work. Worker senses nearby gradients and takes short exploratory hops only in loaded chunks.");
+
+        toggle(category, entries, values,
                 "Zombie hunts farm animals for food",
                 "nestAnimalHuntEnabled", "nest_animal_hunt_toggle", false,
                 "Adult pigs and chickens are preferred, with cows/sheep/rabbits as alternatives. Uses real melee and vanilla meat drops; transport still requires a Zombie hauler. Can affect livestock farms.");
@@ -385,6 +395,14 @@ public final class SwarmClothControlScreen {
                             + decimal(values, "colonySoilInhibition"));
             status(category, entries,
                     "Research-inspired feedback values are experimental GAME parameters, not measured ant or bee signal rates.");
+            status(category, entries,
+                    "Sparse pheromone field: " + integer(values, "colonyPheromoneCells")
+                            + " / 128 occupied 4-block cells");
+            status(category, entries,
+                    "Real scout observations " + integer(values, "colonyPheromoneObserved")
+                            + " | Successful route reinforcements "
+                            + integer(values, "colonyPheromoneReinforced")
+                            + " | Local stop traces " + integer(values, "colonyPheromoneStopped"));
 
             status(category, entries,
                     "Stored points: soil " + integer(values, "colonyScienceSoil")
