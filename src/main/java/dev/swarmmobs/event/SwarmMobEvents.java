@@ -47,6 +47,7 @@ import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
+import dev.swarmmobs.goal.SwarmZombieBreacherSafetyGoal;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
@@ -86,6 +87,9 @@ public final class SwarmMobEvents {
         } else if (mob instanceof Creeper creeper) {
             mob.goalSelector.addGoal(0, new SwarmCreeperSwellGoal(creeper));
         } else if (mob instanceof Zombie zombie) {
+            // Active allied fuse is a rare, urgent MOVE handoff; otherwise
+            // this never activates and existing engineering/melee remain intact.
+            mob.goalSelector.addGoal(0, new SwarmZombieBreacherSafetyGoal(zombie));
             mob.goalSelector.addGoal(0, new SwarmZombieEngineerGoal(zombie));
         } else if (mob instanceof Spider spider) {
             // A sensor-only action with no MOVE/LOOK flags. Vanilla and
