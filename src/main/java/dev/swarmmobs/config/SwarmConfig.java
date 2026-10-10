@@ -7,7 +7,7 @@ public final class SwarmConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.IntValue PLAN_INTERVAL_TICKS;
-    public static final ModConfigSpec.BooleanValue TACTICAL_ROUNDS_ENABLED;
+    public static final ModConfigSpec.BooleanValue SUPPORT_POSITION_OPTIMIZATION_ENABLED;
     public static final ModConfigSpec.DoubleValue NEIGHBOR_RADIUS;
     public static final ModConfigSpec.IntValue MAX_NEIGHBORS;
     public static final ModConfigSpec.DoubleValue TARGET_RADIUS;
@@ -122,9 +122,9 @@ public final class SwarmConfig {
                 .comment("Master switch for the algorithmic swarm layer.")
                 .define("enabled", true);
 
-        TACTICAL_ROUNDS_ENABLED = BUILDER
-                .comment("EXPERIMENTAL: sampled geometry-based coordination for same-target COMBAT squads. Verified candidate positions are compared by travel distance plus separation violations (in blocks); prior viable lane is kept unless changing saves at least one mob width. No fixed round clock, timed phase holds, or combat damage multipliers. Vanilla movement/combat and WORK/ALERT/RECOVERY remain independent. ON by default; operator may disable.")
-                .define("tacticalRoundsEnabled", true);
+        SUPPORT_POSITION_OPTIMIZATION_ENABLED = BUILDER
+                .comment("Enable local geometric support-position optimization for directly observed same-target squads. Check each candidate against existing world and teammate visibility first, then minimize travel plus separation deficit. Keep feasible prior choice unless another beats it by the mob's physical width. No turn system, attack override, or extra chunk scanning. ON by default; operator can restore legacy side selection.")
+                .define("supportPositionOptimizationEnabled", true);
 
         PLAN_INTERVAL_TICKS = BUILDER
                 .comment("How often each swarm mob replans. 20 ticks = 1 second.")
