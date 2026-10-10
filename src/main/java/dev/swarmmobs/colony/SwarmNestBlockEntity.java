@@ -105,6 +105,33 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         return SwarmNestArchitecturePolicy.effectiveCapacity(
                 chamberLevel, SwarmConfig.NEST_MAX_POPULATION.get());
     }
+    /** Same scarcity judgment shared by scouts, miners, hunters and pheromones. */
+    public SwarmNestLaborEconomyPolicy.Targets stockTargets() {
+        return SwarmNestLaborEconomyPolicy.targets(
+                lastPopulation,effectiveCapacity(),chamberLevel,
+                SwarmConfig.NEST_MAX_POPULATION.get());
+    }
+
+    public boolean needsResource(SwarmNestColonyPolicy.Kind kind) {
+        int nutrition = nutrientPoints + legacyPoints;
+        if (!SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get()) {
+            return SwarmColonyGatherPolicy.needs(
+                    kind,soilPoints,timberPoints,nutrition,resources);
+        }
+        return SwarmNestLaborEconomyPolicy.needs(
+                kind,soilPoints,timberPoints,nutrition,resources,stockTargets());
+    }
+
+    public double resourceDeficit(SwarmNestColonyPolicy.Kind kind) {
+        if (!SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get()) {
+            return SwarmColonyEmergencePolicy.shortage(
+                    kind,soilPoints,timberPoints,nutrientPoints + legacyPoints);
+        }
+        return SwarmNestLaborEconomyPolicy.deficit(
+                kind,soilPoints,timberPoints,nutrientPoints + legacyPoints,
+                stockTargets());
+    }
+
     public int soilPoints() { return soilPoints; }
     public int timberPoints() { return timberPoints; }
     public int nutrientPoints() { return nutrientPoints; }
