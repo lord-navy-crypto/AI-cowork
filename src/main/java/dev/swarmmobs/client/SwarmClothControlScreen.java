@@ -484,6 +484,13 @@ public final class SwarmClothControlScreen {
                 true,
                 "Enable temporary task/specialization assignment.");
 
+        toggle(category, entries, values,
+                "Bonus tactical rounds: COVER / HOLD / ROTATE",
+                "tacticalRoundsEnabled",
+                "tactical_rounds_toggle",
+                false,
+                "EXPERIMENTAL and OFF by default. 100-tick synchronized phases coordinate safe Skeleton firing-lane repositioning when Zombies/Creepers share the same target. Never freezes vanilla melee, arrows, Creeper fuse, engineering, or other monster controls.");
+
         intField(category, entries, values,
                 "Formation lane hysteresis (ticks)",
                 "formationHysteresis",
