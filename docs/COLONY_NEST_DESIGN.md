@@ -876,173 +876,81 @@ The change stays on the existing unmerged PR branch. It must not be
 silently merged into main, published as a release or enabled in the
 user's live survival world without separate authorization.
 
-## Bonus battle: optional synchronized tactical rounds (safe real-time mode)
+## Local multi-agent support-position optimization (current design)
 
-The extra "turn-based" battle option is a **tactical planning cadence**, NOT
-a replacement of Minecraft's continuous combat system. The operator-facing
-`tacticalRoundsEnabled` switch is OFF by default.
+The previously proposed artificial turn/phase subsystem was **removed**,
+not renamed. There is no time-based rotation, no synchronized command
+cycle, no phase-dependent formation radius, no separate turn controller,
+and no artificial interruption of native entity behavior. The only
+retained element is a bounded, optional geometric local optimizer.
 
-- An observed real target UUID and shared game tick determine a deterministic
-  `HOLD -> COVER -> ROTATE` phase, 100 ticks each. Any two members pursuing
-  that same UUID compute the same phase without messaging a global master.
-- The base Zombie/Creeper/Skeleton target relay and formation assignment
-  remain the sole authoritative combat intents. Every mob keeps its normal
-  full-time melee, bow, fuse, pathfinding and engineering action windows.
-- Only the Skeleton's **planned support corridor** is influenced: HOLD/COVER
-  keep the stable side, ROTATE requests the opposite side. A requested
-  position must pass the existing real-world block collision ray and the
-  bounded teammate-occlusion test. If only one lane is clear, that lane wins;
-  if neither passes, no round-based steering is issued and the preexisting
-  plan is retained. No AI may force the Skeleton to fire along a blocked lane.
-- When the switch is OFF the exact preceding mixed-squad side selection is
-  preserved, including all combat Goal priorities and old fallback rules.
-- The model deliberately does not pause any mob for an enemy's 'turn',
-  manufacture damage, make shots homing, accelerate fuses or directly
-  control the vanilla bow. It is a safe, optional command-center experiment.
-- Fast deterministic tests check synchronized rounds, alternate positions
-  under equal clearance, and blocked-lane noninterference. The 3-species
-  Minecraft Runtime GameTest runs with tactical rounds enabled to protect
-  target sharing, original bow equipment, Creeper hazard movement and
-  engineering Goal registration.
+The existing WORK / ALERT / COMBAT / RECOVERY *activity* states are
+independent: WORK is allowed to carry out physically grounded colony
+tasks (real-item collection, transport, nest construction, and sensing);
+ALERT suspends those jobs when meaningful threat evidence arrives;
+COMBAT allows ordinary real-time game entity behavior; RECOVERY releases
+short-lived task memory and returns safely to WORK. These are ordinary
+state-management scopes, not turn-taking.
 
-## Work / Alert / Combat / Recovery context integration
+### Geometry and feasibility
 
-Research motivation: collective honeybee defense has been analyzed as
-"threat detection -> defender recruitment -> attack", an episodic
-division-of-labour process distinct from normal food collection.
-Reference (2025): https://pubmed.ncbi.nlm.nih.gov/40109103/
-The four-mode design, 20/30-tick hysteresis and 100-tick planning phases
-are Minecraft GAME ASSUMPTIONS, not biological timing measurements.
+For a directly observed target and same-target local peers, the
+existing swarm planner can propose two alternative support positions
+only when a real nearby frontline exists. Both positions are checked
+using the existing loaded-world visibility test and same-target
+teammate-occlusion estimate. Only feasible candidates may be selected.
 
-| Activity | Entry signal | Allowed swarm action |
-|---|---|---|
-| WORK | No target evidence, recovery finished | Real-resource scouting, collection, hauling, construction, and resource pheromones |
-| ALERT | Live relayed / remembered target information | Suspend labor, share and verify sensed information, retain vanilla combat rules |
-| COMBAT | Direct verified target, or same-target teammate with fresh DIRECT sighting | Keep vanilla real-time combat/engineering; apply coordinated formation phase when allies share target |
-| RECOVERY | Target truly lost | Brief no-labor cool-down, then resume WORK without phantom information |
+For a feasible candidate position p, the local objective is
 
-Every colony worker Goal, including Spider scouting, Zombie gathering,
-hauling, animal hunting, berry harvesting, nest founding and pheromone
-exploration, checks the same engagement mode in addition to its prior
-loaded-chunk, mobGriefing, resource and game-toggle guards. Entering
-ALERT or COMBAT therefore suppresses production jobs; no forced
-global survey has been introduced.
+    J(p) = distance(current,p)
+         + sum_{peer q} max(0, configured_separation - distance(p,q))
 
-An important anti-echo guard requires fresh DIRECT peer observations
-from the last 20 ticks to recruit COMBAT. A chain of forwarded reports
-cannot hold a fighting state alive forever when no monster actually
-sees the target. Relays alone can still generate ALERT and SEARCH.
-Recovery lasts 30 game ticks after evidence disappears, stopping
-work/fight task oscillation.
+All terms are measured in Minecraft blocks. The optimizer selects
+the lower-cost feasible position, subject to retaining a previously
+feasible side unless the alternative's estimated improvement exceeds
+the mob's physical width (a measured switch-cost proxy). If the old
+side becomes invalid, the safe alternative can be selected without
+waiting. If neither candidate is feasible, the optimizer contributes
+NO extra position adjustment and the normal swarm navigator remains
+responsible.
 
-The existing tactical-rounds switch is on by default for NEW config
-files and remains user-controllable. Its HOLD/COVER/ROTATE stages apply
-ONLY during COMBAT when local peers share a real target. The phase
-makes minor role-specific formation adjustments for Zombies,
-Skeletons, Creepers and Spiders; safe Skeleton support lane selection
-remains optional. None of this gates original vanilla attacks, fuse,
-or engineering. Existing saved configurations remain authoritative.
-The reset action restores a conservative, rounds-off baseline.
+This is a lightweight *sampled local positioning heuristic*, not
+global path optimization, predictive collision avoidance, ORCA, MPC,
+a control-barrier-function implementation, or a proven convergent
+algorithm. World obstacles are still handled by Minecraft navigation,
+and the two-dimensional teammate check cannot guarantee 3D trajectory
+separation. Existing goal priorities, vanilla actions, communication,
+resource economy, loaded-chunk discipline and operator permissions
+are unchanged.
 
-Tests: deterministic JUnit covers transition/recovery and no stale
-combat feedback, while real Minecraft GameTests check three-species
-combat transitions and worker return to WORK when the player leaves.
+### Configuration and observability
 
+The user-facing toggle is now supportPositionOptimizationEnabled,
+in Coordination & Labor. Turning it off restores the pre-optimizer
+support-side behavior while leaving all established colony/swarm
+controllers intact. The legacy tacticalRoundsEnabled config key is
+no longer read: on upgrade, existing configs get the new option's
+default (true) unless the operator explicitly turns it off.
 
-## Reactive tactical phases (supersedes the old fixed 100-tick clock)
-**Current implementation:** A "round" is a stable local controller decision, not
-a synchronized game-clock interval. Earlier descriptions of 100-tick
-HOLD/COVER/ROTATE cycling above are historical and NO LONGER apply.
+The user-facing snapshot reports support agents with an active
+selected feasible side, feasible/unavailable optimizer samples, and
+actual side switches. These are geometry diagnostics, not claims of
+real-world performance.
 
-A same-target COMBAT agent uses already-sensed local teammates and existing
-navigation telemetry. Its phase suggestion uses the following deterministic
-rules, in order: no fresh direct/squad evidence -> HOLD; persistent
-crowding or prior failed path feasibility -> ROTATE; mixed ranged-support
-and frontline presence -> COVER; otherwise HOLD. Each new candidate
-requires 12 game ticks of consistent evidence, and each confirmed phase
-must last at least 20 game ticks. No random phase change, no clock
-deadline and no unnecessary repeated world scans.
+Unit tests exercise feasibility, invalid numeric inputs, fixed-side
+baseline comparisons under identical local geometry, physically
+scaled switching thresholds, reset on target changes and stability
+under repeated samples. Minecraft Runtime GameTests verify original
+game entity goals and WORK/ALERT/COMBAT/RECOVERY interactions remain
+operational. The next evidence needed for performance claims is an
+A/B test in the same world and seed measuring actual route completion,
+collision/congestion events, navigation attempts and server TPS.
 
-Rotation only changes bounded formation geometry / a skeleton's verified
-safe support corridor. Path feasibility and teammate clearance remain
-authoritative; no forced movement when both corridors are unsafe.
-Zombies retain normal close combat and engineering, Skeletons retain
-vanilla bow behavior, Creepers retain native fuse behavior. Nest work
-remains guarded by WORK/ALERT/COMBAT/RECOVERY independently of phases.
-The operator can turn off event-triggered phases in Coordination & Labor
-without disabling ordinary swarm AI. The controller exposes live
-HOLD/COVER/ROTATE counts and local confirmed phase-switch counters.
-
-**Validation scope:** The JUnit suite tests prolonged stable scenes
-without clock-driven switching, transient-noise suppression, confirmed
-crowding and navigation events, minimum dwell time, phase reset on
-new targets, and unchanged lane safety. Minecraft Runtime GameTests
-exercise actual vanilla combat Goals and swarm coordination. These are
-software regression tests, not claims that this strategy necessarily
-improves combat effectiveness or matches physical military robotics.
-Game-specific A/B trials are still needed to quantify path length,
-replan counts, attack completion, and server tick performance.
-
-## Current scientific controller: sampled feasible-position selection (supersedes all earlier timed rounds)
-
-Important: Previous paragraphs on clock-driven phases, 12-tick confirmation
-and 20-tick phase holds describe **superseded historical implementations**.
-The code now implements sampled, local geometric decision-making, NOT
-physical turn-taking. No attacking, fuse or navigation Goal is gated by a
-planning cycle. Work, alert, combat and recovery remain separate.
-
-At each already-scheduled COMBAT planning sample, a ranged agent with
-a real directly observed target and same-target frontal peers may
-evaluate the *two positions* proposed by the existing formation planner.
-The prior world-visibility ray check and same-target occlusion check are
-HARD prerequisites: an unavailable position can never win merely because
-it is closer. If neither passes, no optional positioning overrides the
-ordinary planner. The policy does not force a risky position.
-
-For a geometrically admissible candidate position p, peer samples q_j
-and present position x, the local objective has distance units:
-
-    J(p) = ||p-x|| + sum_j max(0, d_clear - ||p-q_j||)
-
-where d_clear is the preexisting configurable separation distance in
-blocks. Term 1 approximates movement effort in blocks; term 2 measures
-total shortfall from peer spacing in blocks. There is no bonus damage,
-arbitrary score for "flanking" or 1.05x/1.10x caste radius rule.
-If the prior candidate is admissible, the controller retains it unless
-the alternative saves more than one agent-body width in estimated
-movement/clearance cost. An invalid prior candidate is abandoned without
-that threshold. Position validity, path feasibility and safety are NOT
-proved by this one-step Euclidean objective: real navigation remains
-handled by the existing Minecraft path planner, and this is NOT a
-certified real-world controller.
-
-HOLD/COVER/ROTATE are now interpreted as *labels of measured decisions*:
-HOLD = no justified optional support position; COVER = feasible position
-retained/selected; ROTATE = verified change of occupied support side.
-Other castes' navigation remains under the original swarm steering and
-native Goals; their COVER label describes verified squad composition,
-not a synthetic command. Separate labor and COMBAT activity controls
-remain untouched, and existing saved operator toggles are preserved.
-
-The practical research comparison is sampled decision vs sampled
-decision (the old deterministic slot parity baseline and the new
-small finite candidate optimizer). Suitable measurable metrics include:
-    - number of unnecessary lane switches per 1000 planning samples;
-    - total chosen Euclidean travel and clearance-deficit proxy J;
-    - actual navigation arrival and blocked-path fraction;
-    - server tick cost at different agent densities;
-    - loss of vanilla behaviors and violations of the no-work-in-combat
-      invariant.
-These must be evaluated under identical worlds and seeds. Local J
-improvement in unit tests cannot by itself establish better game combat
-outcomes, collision-free routes or biological/robotic validity.
-
-Conceptual background (NOT code copied or a certification):
-- Alonso-Mora et al., "Distributed multi-robot formation control in
-  dynamic environments", Autonomous Robots, 2019,
-  https://doi.org/10.1007/s10514-018-9783-9
-- Zhang, Garg & Fan, "Neural Graph Control Barrier Functions Guided
-  Distributed Collision-avoidance Multi-agent Control", CoRL 2023,
-  https://proceedings.mlr.press/v229/zhang23h.html
-The present mod does NOT implement model-predictive control, barrier
-function optimization, convergence proofs or safety certification.
+References informing high-level controller decomposition, **not
+implementations claimed by this mod**:
+- Optimal Reciprocal Collision Avoidance (van den Berg et al.):
+  https://gamma-web.iacs.umd.edu/ORCA/
+- Multi-robot collision avoidance survey (Vesentini et al., 2024):
+  https://doi.org/10.1016/j.robot.2024.104645
+- Autonomous robots and multi-robot navigation survey (2025):
+  https://doi.org/10.1016/j.birob.2024.100203
