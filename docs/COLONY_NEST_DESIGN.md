@@ -518,3 +518,79 @@ failed-path fractions, trips per worker, colony births, average task queue
 length, and TPS/MSPT across 10/50/100/200 loaded agents.
 Natural multi-minute movement, actual preference switching under high
 competition, and Spider sightings of *living prey* remain future work.
+
+## Spatial pheromone emergence: ant-inspired local rules (experimental)
+
+This increment adds an explicit **spatial**, short-lived signal field to the
+previous colony-wide response-threshold signals. It is inspired by:
+- Czaczkes, Grüter & Ratnieks (2015), *Trail Pheromones: An Integrative View of
+  Their Role in Social Insect Colony Organization*, Annual Review of
+  Entomology 60:581–599. DOI 10.1146/annurev-ento-010814-020627
+  (multiple signal functions, positive and negative feedback).
+- Czaczkes et al. (2013), *Negative feedback in ants: crowding results in
+  less trail pheromone deposition*, Biology Letters 9:20121009.
+  DOI 10.1098/rsbl.2012.1009 (local competition can reduce reinforcement).
+- Nieh (2010), *A Negative Feedback Signal That Is Triggered by Peril Curbs
+  Honey Bee Recruitment*, Current Biology 20:310–315.
+  DOI 10.1016/j.cub.2009.12.060 (targeted inhibitory feedback).
+- Sumpter (2006), *The principles of collective animal behaviour*,
+  Philosophical Transactions B 361:5–22. DOI 10.1098/rstb.2005.1733
+  (local interactions can form emergent route-level coordination).
+
+**Important:** Ant trail pheromones and bee dance/stop signaling are different
+real-world mechanisms. The mod borrows complementary computational
+principles; it does not assert that bees literally use ant-style pheromone
+trails or that any numerical simulation coefficients are measured rates.
+
+### Rules actually implemented
+
+Each loaded Nest Core owns a **128-cell maximum**, ephemeral, 3D 4-block grid
+(`SwarmNestPheromoneField`) supporting separate food, timber, soil and
+STOP channels. The field uses lazy exponential attenuation (400 game-tick
+half-life) and a neighborhood sensing kernel over seven nearby cells,
+rather than per-tick whole-world diffusion or persistent global arrays.
+Sources cannot report from more than 28 blocks from their own Nest Core.
+Signals reset on world reload. No biome/world/force-chunk search occurs.
+
+1. **Scouts observe**: idle, roaming Spiders recognize real dropped items;
+   when the relevant mechanic is enabled they also notice nearby living
+   adult farm animals and ripe/otherwise harvestable world blocks. They
+   leave *weak local resource marks*. They never create virtual food or
+   break blocks.
+2. **Workers prefer**: when a Zombie evaluates actual eligible local blocks
+   or item drops, pheromone concentration scales the score after inventory
+   need, dimension budget, claim and capacity rules. An existing source is
+   still required before harvesting.
+3. **Successful physical return strengthens a trail**: the hauling Goal
+   samples up to 16 worker positions along the real cargo return. Only
+   successful whole-item delivery credits positive route marks.
+   Attempted trips and phantom items create no success trail.
+4. **Failures leave temporary stop marks**: a stalled gather route or an
+   invalid expired drop hint adds local inhibitory scent. Local labor
+   feedback separately retains overall task-category inhibition.
+5. **Gradient following**: the lowest-priority Zombie task chooses only
+   one short hop toward a stronger *locally sensed* scent cell, provided
+   it has real stock demand and loaded walkable ground. There is no
+   all-knowing target coordinate and no long-distance teleport.
+6. **Self-limiting feedback**: every cell has a bounded intensity. Scent
+   capacity, source-distance checks, response score clamps and evaporative
+   forgetting prevent a resource from creating a permanent, infinitely
+   reinforced path.
+
+The Command Center exposes the pheromone and gradient-following toggles,
+occupied cell count and observed/reinforced/stop signal counts. Both toggles
+are included in colony and ALL baseline resets; all underlying world-modifying
+actions still require their own separate operator switches, currently OFF
+by default.
+
+### Tests and remaining frontiers
+
+Pure JUnit tests cover spatial localization, half-life, STOP response and
+sparse memory saturation. Runtime GameTests verify Spider notices actual
+live food and mature crops without collecting them, a Zombie can read a
+local gradient, and only real cargo delivery reinforces a trail.
+These are discrete deterministic checks. **Not yet established:** multi-hour
+10/50/100/200-mob TPS comparisons; real-world distributed optimization
+optimality; robust path-following over large natural obstacles; a true
+comparison against biological trail data; swarm crowding-dependent trail
+deposition rates.
