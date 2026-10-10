@@ -2,6 +2,7 @@ package dev.swarmmobs.agent;
 
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
+import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -21,6 +22,11 @@ public final class SwarmAgentState {
     private long nextPlanTick;
     private boolean planningScheduleInitialized;
     private boolean directObservation;
+    // Runtime-only context: never persisted into a save or used to decide
+    // whether a vanilla Mob may attack. The original target memory persists.
+    private SwarmEngagementPolicy.Mode engagementMode = SwarmEngagementPolicy.Mode.WORK;
+    private long lastCombatEvidenceTick = Long.MIN_VALUE;
+    private long lastLostTargetTick = Long.MIN_VALUE;
     // Hysteresis and temporary work leases must not cross target boundaries.
     private UUID tacticalAssignmentTarget;
     private int tacticalPeerCount;
@@ -161,6 +167,35 @@ public final class SwarmAgentState {
 
     public boolean directObservation() {
         return directObservation;
+    }
+
+    public SwarmEngagementPolicy.Mode engagementMode() {
+        return engagementMode;
+    }
+
+    /**
+     * Called once per staggered planner sample. Direct observation or
+     * fresh same-target squad combat enters COMBAT. Relay alone enters ALERT.
+     * A brief RECOVERY holds off nest work after target evidence disappears.
+     */
+    public void updateEngagement(boolean aware, boolean combatEvidence, long now) {
+        if (now < 0) return;
+        if (aware && combatEvidence) lastCombatEvidenceTick = now;
+        if (!aware && engagementMode != SwarmEngagementPolicy.Mode.RECOVERY
+                && engagementMode != SwarmEngagementPolicy.Mode.WORK) {
+            lastLostTargetTick = now;
+        }
+        long sinceDirect = lastCombatEvidenceTick == Long.MIN_VALUE
+                ? Long.MAX_VALUE : Math.max(0L,now-lastCombatEvidenceTick);
+        long sinceLost = lastLostTargetTick == Long.MIN_VALUE
+                ? Long.MAX_VALUE : Math.max(0L,now-lastLostTargetTick);
+        engagementMode = SwarmEngagementPolicy.next(
+                engagementMode, aware, combatEvidence, sinceDirect, sinceLost);
+        if (aware) lastLostTargetTick = Long.MIN_VALUE;
+        if (engagementMode == SwarmEngagementPolicy.Mode.WORK) {
+            lastCombatEvidenceTick = Long.MIN_VALUE;
+            lastLostTargetTick = Long.MIN_VALUE;
+        }
     }
 
     public boolean searchEpisodeActive() {
