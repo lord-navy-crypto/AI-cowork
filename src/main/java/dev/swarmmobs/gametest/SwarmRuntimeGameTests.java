@@ -5606,4 +5606,84 @@ public final class SwarmRuntimeGameTests {
             }
         });
     }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_combat_preemption",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void enabledNestWorkNeverStealsPlayerCombatMovementFromZombie(
+            GameTestHelper helper) {
+        BlockPos core=new BlockPos(0,1,2);
+        helper.setBlock(core,SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(new BlockPos(4,1,2),Blocks.OAK_LOG);
+        Zombie worker=helper.spawn(EntityType.ZOMBIE,new BlockPos(2,1,2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(core).asLong());
+        var handle=createTickingTestPlayer(helper,GameType.SURVIVAL);
+        ServerPlayer player=handle.player();
+        player.setNoGravity(true);
+        player.setPos(worker.getX()+2.0,worker.getY(),worker.getZ());
+        var state=worker.getData(SwarmAttachments.AGENT_STATE.get());
+        worker.setTarget(player);
+        state.rememberTarget(player.getUUID(),helper.getTick(),true);
+        boolean master=SwarmConfig.ENABLED.get();
+        boolean lifecycle=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling=SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean blockGather=SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean hunt=SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get();
+        boolean berry=SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get();
+        boolean pheromones=SwarmConfig.NEST_PHEROMONES_ENABLED.get();
+        boolean explore=SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.get();
+        boolean grief=helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(true);
+            SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(true);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+            SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true,helper.getLevel().getServer());
+            var all=worker.goalSelector.getAvailableGoals().stream()
+                    .map(w->w.getGoal()).toList();
+            if (all.stream().noneMatch(g->g instanceof SwarmZombieEngineerGoal)
+                    || all.stream().noneMatch(g->g instanceof SwarmApproachGoal)
+                    || all.stream().noneMatch(g->g instanceof SwarmZombieBreacherSafetyGoal)
+                    || all.stream().noneMatch(g->g instanceof SwarmZombieColonyHaulGoal)
+                    || all.stream().noneMatch(g->g instanceof SwarmZombieColonyGatherGoal)
+                    || all.stream().noneMatch(g->g instanceof SwarmZombieColonyHuntGoal)) {
+                helper.fail("Some original swarm engineering or colony labor Goals were removed");
+                return;
+            }
+            if(new SwarmZombieColonyHaulGoal(worker).canUse()
+                    || new SwarmZombieColonyGatherGoal(worker).canUse()
+                    || new SwarmZombieColonyHuntGoal(worker).canUse()
+                    || new SwarmZombieBerryForageGoal(worker).canUse()
+                    || new SwarmZombiePheromoneExploreGoal(worker).canUse()) {
+                helper.fail("Enabled nest ecology stole a live Zombie's normal Player combat");
+                return;
+            }
+            if(!helper.getLevel().getBlockState(helper.absolutePos(
+                    new BlockPos(4,1,2))).is(Blocks.OAK_LOG)) {
+                helper.fail("Colony labor changed terrain while Zombie was in combat");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(lifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(blockGather);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(hunt);
+            SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(berry);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(pheromones);
+            SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(explore);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief,helper.getLevel().getServer());
+            handle.close();
+        }
+    }
 }
