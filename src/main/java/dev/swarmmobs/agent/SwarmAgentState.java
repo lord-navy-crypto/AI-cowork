@@ -51,6 +51,7 @@ public final class SwarmAgentState {
     private int crowdLaneSide;
     private long crowdLaneLastSwitchTick = Long.MIN_VALUE;
     private long crowdLaneUses;
+    private long crowdLaneRejected;
     private boolean roleInitialized;
     private SwarmRole pendingRole;
     private long pendingRoleSinceTick = Long.MIN_VALUE;
@@ -316,6 +317,14 @@ public final class SwarmAgentState {
 
     public long crowdLaneUses() {
         return crowdLaneUses;
+    }
+
+    public long crowdLaneRejected() {
+        return crowdLaneRejected;
+    }
+
+    public void recordCrowdLaneRejected() {
+        crowdLaneRejected++;
     }
 
     /** Keep a lane for 20 ticks, except when its game waypoint is obstructed. */
