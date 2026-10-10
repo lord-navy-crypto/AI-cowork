@@ -17,9 +17,15 @@ temporarily occupy movement priority even when Minecraft had no route.
 
 - PathNavigation's returned **boolean** is now authoritative. The Goal
   records an issued command and its coordinates **only if moveTo accepted**.
-- On rejection, it marks the command not issued, clears stale navigation
-  state, increments `navigationCommandRejections`, and avoids using that
-  nonexistent route as evidence for movement progress.
+- On rejection, it marks the command not issued, stops stale physical
+  navigation, increments `navigationCommandRejections`, and avoids using that
+  nonexistent route as evidence for movement progress. The server retains
+  the **planner mode** (such as OBSTACLE_DETOUR) until its current plan is
+  revised: a proposed game detour is not the same thing as an accepted
+  route, and the separate rejection counter makes that distinction visible.
+- A legal, unobstructed native Skeleton bow shot always takes priority over
+  optional positioning in both relevant game Goals; a local movement idea
+  may not indefinitely suppress real shooting.
 - If the rejected route is an *active optional* Skeleton spacing or Zombie
   short-flank segment, that segment immediately expires through its
   existing per-target failed-waypoint memory and cooldown. This makes
