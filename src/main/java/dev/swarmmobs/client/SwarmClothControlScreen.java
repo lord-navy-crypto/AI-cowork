@@ -485,11 +485,11 @@ public final class SwarmClothControlScreen {
                 "Enable temporary task/specialization assignment.");
 
         toggle(category, entries, values,
-                "Combat-only tactical rounds: HOLD / COVER / ROTATE",
-                "tacticalRoundsEnabled",
-                "tactical_rounds_toggle",
+                "Local support-position optimization",
+                "supportPositionOptimizationEnabled",
+                "support_position_toggle",
                 true,
-                "Sampled kinematic decision for active same-target teams. HOLD = no verified support lane, COVER = current feasible positioning, ROTATE = measured beneficial/safety-required change. Distances and clearance in blocks; no 100-tick phases or arbitrary per-caste radius multipliers. Separate WORK/ALERT/RECOVERY remains intact. Switch OFF for old formation behavior.");
+                "Geometry-only assist for real same-target ranged support: filter blocked/teammate-occupied options and compare travel distance plus separation deficit. The local planner and vanilla mob behavior remain in control. Turn OFF for original side selection.");
 
         intField(category, entries, values,
                 "Formation lane hysteresis (ticks)",
@@ -535,11 +535,11 @@ public final class SwarmClothControlScreen {
                         + ", lead breacher " + integer(values, "specLeadBreacher"));
 
         status(category, entries,
-                "Local positioning decisions [HOLD / COVER / ROTATE]: "
-                        + integer(values, "roundHoldAgents") + " / "
-                        + integer(values, "roundCoverAgents") + " / "
-                        + integer(values, "roundRotateAgents")
-                        + "  | phase switches " + integer(values, "roundPhaseSwitches"));
+                "Support positions: active agents " + integer(values, "optimizedSupportAgents")
+                        + "  | lane switches " + integer(values, "supportLaneSwitches"));
+        status(category, entries,
+                "Local feasibility samples: valid " + integer(values, "supportFeasibleSamples")
+                        + "  | no feasible side " + integer(values, "supportUnavailableSamples"));
         status(category, entries,
                 "Live activity modes [WORK / ALERT / COMBAT / RECOVERY]: "
                         + integer(values, "modeWorkAgents") + " / "
@@ -547,7 +547,7 @@ public final class SwarmClothControlScreen {
                         + integer(values, "modeCombatAgents") + " / "
                         + integer(values, "modeRecoveryAgents"));
         status(category, entries,
-                "Tactical phases only affect COMBAT squads. Work pheromones and nest tasks stop on alert; vanilla combat always continues.");
+                "Work uses resource supply, pheromones and task allocation; sensing/coordination runs in active encounters. There is no artificial combat turn system.");
 
         status(category, entries,
                 "Target-scoped squads: agents with allies "
