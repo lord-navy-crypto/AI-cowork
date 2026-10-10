@@ -904,3 +904,46 @@ a replacement of Minecraft's continuous combat system. The operator-facing
   Minecraft Runtime GameTest runs with tactical rounds enabled to protect
   target sharing, original bow equipment, Creeper hazard movement and
   engineering Goal registration.
+
+## Work / Alert / Combat / Recovery context integration
+
+Research motivation: collective honeybee defense has been analyzed as
+"threat detection -> defender recruitment -> attack", an episodic
+division-of-labour process distinct from normal food collection.
+Reference (2025): https://pubmed.ncbi.nlm.nih.gov/40109103/
+The four-mode design, 20/30-tick hysteresis and 100-tick planning phases
+are Minecraft GAME ASSUMPTIONS, not biological timing measurements.
+
+| Activity | Entry signal | Allowed swarm action |
+|---|---|---|
+| WORK | No target evidence, recovery finished | Real-resource scouting, collection, hauling, construction, and resource pheromones |
+| ALERT | Live relayed / remembered target information | Suspend labor, share and verify sensed information, retain vanilla combat rules |
+| COMBAT | Direct verified target, or same-target teammate with fresh DIRECT sighting | Keep vanilla real-time combat/engineering; apply coordinated formation phase when allies share target |
+| RECOVERY | Target truly lost | Brief no-labor cool-down, then resume WORK without phantom information |
+
+Every colony worker Goal, including Spider scouting, Zombie gathering,
+hauling, animal hunting, berry harvesting, nest founding and pheromone
+exploration, checks the same engagement mode in addition to its prior
+loaded-chunk, mobGriefing, resource and game-toggle guards. Entering
+ALERT or COMBAT therefore suppresses production jobs; no forced
+global survey has been introduced.
+
+An important anti-echo guard requires fresh DIRECT peer observations
+from the last 20 ticks to recruit COMBAT. A chain of forwarded reports
+cannot hold a fighting state alive forever when no monster actually
+sees the target. Relays alone can still generate ALERT and SEARCH.
+Recovery lasts 30 game ticks after evidence disappears, stopping
+work/fight task oscillation.
+
+The existing tactical-rounds switch is on by default for NEW config
+files and remains user-controllable. Its HOLD/COVER/ROTATE stages apply
+ONLY during COMBAT when local peers share a real target. The phase
+makes minor role-specific formation adjustments for Zombies,
+Skeletons, Creepers and Spiders; safe Skeleton support lane selection
+remains optional. None of this gates original vanilla attacks, fuse,
+or engineering. Existing saved configurations remain authoritative.
+The reset action restores a conservative, rounds-off baseline.
+
+Tests: deterministic JUnit covers transition/recovery and no stale
+combat feedback, while real Minecraft GameTests check three-species
+combat transitions and worker return to WORK when the player leaves.
