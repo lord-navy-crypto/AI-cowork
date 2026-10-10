@@ -85,10 +85,10 @@ class SwarmFourSpeciesRoutePolicyTest {
 
     @Test void choicesNeverPreferEqualOrMoreCrowdedPosition() {
         var o=propose(SwarmAgentArchetype.RANGED_SUPPORT,
-                List.of(WAYPOINT, new Vec2(5,2.25)));
+                List.of(WAYPOINT, new Vec2(5,1)));
         assertEquals(2,o.originalOccupancy());
         assertEquals(1,o.leftOccupancy());
-        assertEquals(1,o.rightOccupancy());
+        assertEquals(0,o.rightOccupancy());
         var selected=SwarmFourSpeciesRoutePolicy.choose(o,true,true,0,0);
         assertTrue(selected.changed());
         assertTrue(selected.finalOccupancy() < selected.originalOccupancy());
