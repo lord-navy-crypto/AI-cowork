@@ -947,3 +947,38 @@ The reset action restores a conservative, rounds-off baseline.
 Tests: deterministic JUnit covers transition/recovery and no stale
 combat feedback, while real Minecraft GameTests check three-species
 combat transitions and worker return to WORK when the player leaves.
+
+
+## Reactive tactical phases (supersedes the old fixed 100-tick clock)
+**Current implementation:** A "round" is a stable local controller decision, not
+a synchronized game-clock interval. Earlier descriptions of 100-tick
+HOLD/COVER/ROTATE cycling above are historical and NO LONGER apply.
+
+A same-target COMBAT agent uses already-sensed local teammates and existing
+navigation telemetry. Its phase suggestion uses the following deterministic
+rules, in order: no fresh direct/squad evidence -> HOLD; persistent
+crowding or prior failed path feasibility -> ROTATE; mixed ranged-support
+and frontline presence -> COVER; otherwise HOLD. Each new candidate
+requires 12 game ticks of consistent evidence, and each confirmed phase
+must last at least 20 game ticks. No random phase change, no clock
+deadline and no unnecessary repeated world scans.
+
+Rotation only changes bounded formation geometry / a skeleton's verified
+safe support corridor. Path feasibility and teammate clearance remain
+authoritative; no forced movement when both corridors are unsafe.
+Zombies retain normal close combat and engineering, Skeletons retain
+vanilla bow behavior, Creepers retain native fuse behavior. Nest work
+remains guarded by WORK/ALERT/COMBAT/RECOVERY independently of phases.
+The operator can turn off event-triggered phases in Coordination & Labor
+without disabling ordinary swarm AI. The controller exposes live
+HOLD/COVER/ROTATE counts and local confirmed phase-switch counters.
+
+**Validation scope:** The JUnit suite tests prolonged stable scenes
+without clock-driven switching, transient-noise suppression, confirmed
+crowding and navigation events, minimum dwell time, phase reset on
+new targets, and unchanged lane safety. Minecraft Runtime GameTests
+exercise actual vanilla combat Goals and swarm coordination. These are
+software regression tests, not claims that this strategy necessarily
+improves combat effectiveness or matches physical military robotics.
+Game-specific A/B trials are still needed to quantify path length,
+replan counts, attack completion, and server tick performance.
