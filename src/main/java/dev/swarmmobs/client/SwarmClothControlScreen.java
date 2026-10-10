@@ -485,11 +485,11 @@ public final class SwarmClothControlScreen {
                 "Enable temporary task/specialization assignment.");
 
         toggle(category, entries, values,
-                "Bonus tactical rounds: COVER / HOLD / ROTATE",
+                "Combat-only tactical rounds: HOLD / COVER / ROTATE",
                 "tacticalRoundsEnabled",
                 "tactical_rounds_toggle",
-                false,
-                "EXPERIMENTAL and OFF by default. 100-tick synchronized phases coordinate safe Skeleton firing-lane repositioning when Zombies/Creepers share the same target. Never freezes vanilla melee, arrows, Creeper fuse, engineering, or other monster controls.");
+                true,
+                "ON by default for active same-target COMBAT squads only: synchronized formation/cross-species coordination. WORK uses nest resources and pheromones; ALERT and RECOVERY pause labor but do not impose attack turns. Vanilla combat and engineering remain real-time. Turn OFF to restore previous formation behavior.");
 
         intField(category, entries, values,
                 "Formation lane hysteresis (ticks)",
