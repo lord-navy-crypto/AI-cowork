@@ -17,7 +17,7 @@ public final class SwarmNestScienceTelemetry {
             double averagePopulation, int chamberLevel, int visibleChamberLevel,
             int colonyCapacity, int soilPoints, int timberPoints,
             int nutrientPoints, int legacyPoints, int resourceTotal,
-            long births, long hauledItems, long haulTrips,
+            long births, long hauledItems, long haulTrips, long foragedBerries,
             SwarmColonySciencePolicy.Sample science
     ) {
         public boolean available() { return sampleTick >= 0; }
@@ -28,7 +28,7 @@ public final class SwarmNestScienceTelemetry {
             SwarmColonySciencePolicy.evaluate(0, 0, 0, 0, 1, 0, 0.4, 0.25, 0.55);
     private static final Snapshot EMPTY = new Snapshot(
             -1L, 0, 0, 0, 0, 0, 0, 0, 0.0,
-            0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, EMPTY_MODEL);
+            0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, EMPTY_MODEL);
 
     public static void record(ServerLevel level, BlockPos pos,
                               SwarmNestBlockEntity nest,
@@ -40,7 +40,7 @@ public final class SwarmNestScienceTelemetry {
                 nest.chamberLevel(), nest.visibleChamberLevel(), nest.effectiveCapacity(),
                 nest.soilPoints(), nest.timberPoints(), nest.nutrientPoints(),
                 nest.legacyPoints(), nest.resources(), nest.births(),
-                nest.hauledItems(), nest.haulTrips(), model
+                nest.hauledItems(), nest.haulTrips(), nest.foragedBerries(), model
         ));
     }
 
