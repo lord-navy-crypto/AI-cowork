@@ -5227,4 +5227,71 @@ public final class SwarmRuntimeGameTests {
                     .set(grief,helper.getLevel().getServer());
         }
     }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_emergent_resource_choice",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void sharedSwarmThresholdsAndPheromonePreferDiscoveredLogSite(
+            GameTestHelper helper) {
+        BlockPos core = new BlockPos(0,1,2);
+        BlockPos left = new BlockPos(0,1,0);
+        BlockPos right = new BlockPos(4,1,0);
+        helper.setBlock(core,SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(left,Blocks.OAK_LOG);
+        helper.setBlock(right,Blocks.OAK_LOG);
+        var block=helper.getLevel().getBlockEntity(helper.absolutePos(core));
+        if (!(block instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Missing nest for emergent work choice");return;
+        }
+        Zombie worker=helper.spawn(EntityType.ZOMBIE,new BlockPos(2,1,0));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(core).asLong());
+        boolean wasMaster=SwarmConfig.ENABLED.get();
+        boolean wasLife=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean wasHaul=SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean wasGather=SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean wasPheromones=SwarmConfig.NEST_PHEROMONES_ENABLED.get();
+        boolean wasGrief=helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true,helper.getLevel().getServer());
+            long tick=helper.getLevel().getGameTime();
+            if (!nest.markPheromone(helper.absolutePos(right),
+                    SwarmNestColonyPolicy.Kind.TIMBER,tick)) {
+                helper.fail("Worker did not receive real site scent");return;
+            }
+            // Both blocks are equally distant. The concentrated real signal
+            // at the right-hand log must break the tie without giving wood
+            // magically to the core or removing the other candidate.
+            var goal=new SwarmZombieColonyGatherGoal(worker);
+            if (!goal.canUse()) {
+                helper.fail("Worker cannot choose between real log sites");return;
+            }
+            goal.start();
+            goal.tick();
+            goal.stop();
+            if (!helper.getLevel().getBlockState(helper.absolutePos(right)).isAir()
+                    || !helper.getLevel().getBlockState(helper.absolutePos(left)).is(Blocks.OAK_LOG)
+                    || nest.resources()!=0) {
+                helper.fail("Local scent did not guide the worker to the preferred physical log");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(wasMaster);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(wasLife);
+            SwarmConfig.NEST_HAULING_ENABLED.set(wasHaul);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(wasGather);
+            SwarmConfig.NEST_PHEROMONES_ENABLED.set(wasPheromones);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(wasGrief,helper.getLevel().getServer());
+        }
+    }
 }
