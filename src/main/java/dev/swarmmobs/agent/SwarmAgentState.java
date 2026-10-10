@@ -56,6 +56,11 @@ public final class SwarmAgentState {
     private long rangedSpacingStartedAt = Long.MIN_VALUE;
     private long rangedSpacingRetryAfter = Long.MIN_VALUE;
     private long rangedSpacingFallbacks;
+    // A failed, already-tested Minecraft destination is not automatically
+    // a good destination again on the very next game tick.
+    private double rangedFailedWaypointX;
+    private double rangedFailedWaypointZ;
+    private long rangedFailedWaypointUntil = Long.MIN_VALUE;
     private long zombieFlankStartedAt = Long.MIN_VALUE;
     private long zombieFlankRetryAfter = Long.MIN_VALUE;
     private long zombieFlankFallbacks;
@@ -166,6 +171,7 @@ public final class SwarmAgentState {
         rangedSpacingActive = false;
         rangedSpacingStartedAt = Long.MIN_VALUE;
         rangedSpacingRetryAfter = Long.MIN_VALUE;
+        rangedFailedWaypointUntil = Long.MIN_VALUE;
         zombieFlankStartedAt = Long.MIN_VALUE;
         zombieFlankRetryAfter = Long.MIN_VALUE;
         crowdLaneSide = 0;
@@ -366,6 +372,27 @@ public final class SwarmAgentState {
     }
 
     /**
+     * An alternative Skeleton game square must pass both global retry
+     * cooldown and the per-target recently failed waypoint check.
+     * Rejecting a candidate has no side effects: UI counters remain real.
+     */
+    public boolean canUseRangedWaypoint(double x, double z, long tick) {
+        if (!Double.isFinite(x) || !Double.isFinite(z)
+                || !mayAttemptRangedSpacing(tick)) {
+            return false;
+        }
+        return rangedFailedWaypointUntil == Long.MIN_VALUE
+                || tick < 0 || tick >= rangedFailedWaypointUntil
+                || Math.hypot(x - rangedFailedWaypointX,
+                        z - rangedFailedWaypointZ) >= 2.0;
+    }
+
+    public boolean hasRecentlyFailedRangedWaypoint(long tick) {
+        return rangedFailedWaypointUntil != Long.MIN_VALUE && tick >= 0
+                && tick < rangedFailedWaypointUntil;
+    }
+
+    /**
      * A Skeleton reposition which lasts too long yields to native bow
      * controls instead of locking MOVE on an unreachable game square.
      */
@@ -379,6 +406,13 @@ public final class SwarmAgentState {
         rangedSpacingStartedAt = Long.MIN_VALUE;
         rangedSpacingRetryAfter = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
                 tick, SwarmGameHandoffTimeoutPolicy.SKELETON_RETRY_COOLDOWN_TICKS);
+        if (hasDestination && Double.isFinite(destinationX)
+                && Double.isFinite(destinationZ)) {
+            rangedFailedWaypointX = destinationX;
+            rangedFailedWaypointZ = destinationZ;
+            rangedFailedWaypointUntil = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
+                    tick, 180);
+        }
         rangedSpacingFallbacks++;
         return true;
     }
