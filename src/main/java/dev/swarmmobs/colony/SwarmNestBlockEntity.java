@@ -295,7 +295,16 @@ public final class SwarmNestBlockEntity extends BlockEntity {
             return 0;
         }
         ItemStack stack = item.getItem();
-        int accepted = deposit(classify(stack), Math.min(maxItems, stack.getCount()));
+        SwarmNestColonyPolicy.Kind kind = classify(stack);
+        int offered = Math.min(maxItems, stack.getCount());
+        if (SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get()) {
+            // Demand-limited physical intake: a large dropped stack must
+            // leave storage capacity for the other resource categories.
+            offered = SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                    kind, offered, resources, soilPoints, timberPoints,
+                    nutrientPoints + legacyPoints, stockTargets());
+        }
+        int accepted = deposit(kind, offered);
         if (accepted <= 0) return 0;
         stack.shrink(accepted);
         if (stack.isEmpty()) {
