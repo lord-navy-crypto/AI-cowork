@@ -49,6 +49,9 @@ public final class SwarmAgentState {
     private long searchRallyEpisodes;
     // Updated by local same-target sightings, consulted by vanilla bow handoff.
     private boolean bowLaneClear = true;
+    // Minecraft Skeleton has a locally checked open square to regain distance.
+    private boolean rangedSpacingActive;
+    private long rangedSpacingEpisodes;
     // Local crowd-avoidance lane; reset on target switches.
     private int crowdLaneSide;
     private long crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -153,6 +156,7 @@ public final class SwarmAgentState {
         searchRallyActive = false;
         coveringVacantFlank = false;
         bowLaneClear = true;
+        rangedSpacingActive = false;
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
 
@@ -319,6 +323,20 @@ public final class SwarmAgentState {
     }
 
     /** Same-target nearby members, excluding self. */
+    public boolean rangedSpacingActive() {
+        return rangedSpacingActive;
+    }
+
+    public long rangedSpacingEpisodes() {
+        return rangedSpacingEpisodes;
+    }
+
+    /** Count actual starts, not every planning update. */
+    public void updateRangedSpacing(boolean active) {
+        if (active && !rangedSpacingActive) rangedSpacingEpisodes++;
+        rangedSpacingActive = active;
+    }
+
     public int crowdLaneSide() {
         return crowdLaneSide;
     }
@@ -1114,6 +1132,7 @@ public final class SwarmAgentState {
         this.pendingRole = null;
         this.pendingRoleSinceTick = Long.MIN_VALUE;
         this.hasDestination = false;
+        this.rangedSpacingActive = false;
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
         this.searchRadius = 0.0;
         clearPredictionTelemetry();
