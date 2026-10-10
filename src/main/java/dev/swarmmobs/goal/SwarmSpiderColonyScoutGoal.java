@@ -127,6 +127,7 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
         // A scout can recognize living food and ripe plants, not just
         // previously dropped cargo. Passive sensors never attack or dig.
         if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
+                && SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()
                 && SwarmColonyGatherPolicy.needs(
                         SwarmNestColonyPolicy.Kind.NUTRIENT,
                         nest.soilPoints(), nest.timberPoints(),
@@ -146,6 +147,7 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
             }
         }
         if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
+                && SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()
                 && marked < MAX_MARKS_PER_SURVEY) {
             BlockPos center = spider.blockPosition();
             // Bounded 5x5x3 physical plant/wood/soil observation;
