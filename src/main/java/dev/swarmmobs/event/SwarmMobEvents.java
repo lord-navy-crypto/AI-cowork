@@ -21,6 +21,7 @@ import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
 import dev.swarmmobs.algorithm.SwarmZombieBowLaneYieldPolicy;
 import dev.swarmmobs.algorithm.SwarmFourSpeciesRoutePolicy;
+import dev.swarmmobs.algorithm.SwarmSpiderFlankBalancePolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import dev.swarmmobs.algorithm.SwarmRangedSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSkeletonSightlinePolicy;
@@ -460,9 +461,25 @@ public final class SwarmMobEvents {
                 }).toList(),
                 SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
                         && !searchMode && squadCombat && confidence >= 0.65);
-        boolean urgentVacancy = coverage.fillingMissingFlank() || coverage.frontAnchor();
+        // Spiders should cover both observed game flanks before Zombies
+        // spend effort replacing a missing side. UUID order makes this
+        // reproducible despite neighbor iteration order. No global squad.
+        SwarmRole proposedRole = coverage.role();
+        if (mob instanceof Spider && !searchMode
+                && squadCombat && confidence >= 0.65) {
+            proposedRole = SwarmSpiderFlankBalancePolicy.choose(
+                    mob.getUUID(), proposedRole,
+                    tacticalNeighbors.stream()
+                            .filter(peer -> peer instanceof Spider)
+                            .map(peer -> peer.getUUID())
+                            .toList(),
+                    SwarmConfig.DIVISION_OF_LABOR_ENABLED.get());
+        }
+        boolean urgentVacancy = coverage.fillingMissingFlank()
+                || coverage.frontAnchor()
+                || (mob instanceof Spider && proposedRole != state.role());
         SwarmRole tacticalRole = state.stabilizeRole(
-                coverage.role(),
+                proposedRole,
                 gameTick,
                 urgentVacancy
                         ? Math.min(8, SwarmConfig.ROLE_HYSTERESIS_TICKS.get())
