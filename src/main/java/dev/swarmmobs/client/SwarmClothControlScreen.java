@@ -379,6 +379,18 @@ public final class SwarmClothControlScreen {
                             + " | Spider dropped-item leads "
                             + integer(values, "colonyScoutItemLeads"));
             status(category, entries,
+                    "Spider resource/prey sightings: "
+                            + integer(values, "colonyOpportunityLeads")
+                            + " active leads | "
+                            + integer(values, "colonyOpportunityWorkers")
+                            + " worker reservations (max 6)");
+            status(category, entries,
+                    "Shared task intelligence: "
+                            + integer(values, "colonyOpportunityReports")
+                            + " recorded observations | "
+                            + integer(values, "colonyOpportunityInvalidations")
+                            + " stale/completed reports removed");
+            status(category, entries,
                     "Returning-forager feedback: successful cargo trips "
                             + integer(values, "colonyReinforcedTrips")
                             + " | failed/unreachable work signals "
