@@ -70,6 +70,8 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NEST_BERRY_FORAGING_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_BLOCK_GATHER_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_ANIMAL_HUNT_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_PHEROMONES_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_PHEROMONE_EXPLORATION_ENABLED;
     public static final ModConfigSpec.IntValue NEST_GATHER_INTERVAL;
     public static final ModConfigSpec.IntValue NEST_BERRY_FORAGE_INTERVAL;
     public static final ModConfigSpec.IntValue NEST_HAUL_SEARCH_RADIUS;
@@ -376,6 +378,14 @@ public final class SwarmConfig {
         NEST_GATHER_INTERVAL = BUILDER
                 .comment("Ticks between bounded colony block or animal surveys per worker.")
                 .defineInRange("nestGatherInterval", 160, 60, 800);
+
+        NEST_PHEROMONES_ENABLED = BUILDER
+                .comment("Use sparse decaying food, timber, soil and stop pheromone-like local cues in colony labor decisions. Only active with opt-in colony lifecycle and hauling.")
+                .define("nestPheromonesEnabled", true);
+
+        NEST_PHEROMONE_EXPLORATION_ENABLED = BUILDER
+                .comment("Allow idle workers to make short, loaded-chunk-only exploratory hops toward locally sensed resource pheromones. Needs colony lifecycle, hauling, and pheromones.")
+                .define("nestPheromoneExplorationEnabled", true);
 
         NEST_BERRY_FORAGE_INTERVAL = BUILDER
                 .comment("Minimum per-worker ticks between bounded nearby ripe-berry foraging surveys.")
