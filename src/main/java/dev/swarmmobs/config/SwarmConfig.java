@@ -348,11 +348,14 @@ public final class SwarmConfig {
 
         BUILDER.pop();
 
+        // Dedicated open-PR playtest branch: all opt-in colony features default ON in NEW worlds.
+        // Existing serverconfig values still take precedence: use /swarmmobs debug testmode on.
+        // WARNING: block gathering and hunting can modify player-built structures and farms.
         BUILDER.push("colonies");
 
         NEST_CONSTRUCTION_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: allow idle Zombie workers to place a persistent Nest Core on suitable natural soil; OFF by default to protect player worlds.")
-                .define("nestConstructionEnabled", false);
+                .define("nestConstructionEnabled", true);
 
         NEST_BUILD_INTERVAL_TICKS = BUILDER
                 .comment("Minimum interval between idle nest-building site surveys for each worker (game ticks).")
@@ -364,19 +367,19 @@ public final class SwarmConfig {
 
         NEST_LIFECYCLE_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: activate resource-fed nest lifecycle and capped colony spawning; OFF by default.")
-                .define("nestLifecycleEnabled", false);
+                .define("nestLifecycleEnabled", true);
 
         NEST_HAULING_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombies assigned to a loaded Nest Core carry actual nearby dropped resources to it. OFF by default.")
-                .define("nestHaulingEnabled", false);
+                .define("nestHaulingEnabled", true);
 
         NEST_BERRY_FORAGING_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle colony Zombies may pick renewable ripe sweet berries near a loaded nest and create real dropped berry items. OFF by default. Can touch player farms; use only in a designated test world. Requires nest lifecycle, hauling and mobGriefing.")
-                .define("nestBerryForagingEnabled", false);
+                .define("nestBerryForagingEnabled", true);
 
         NEST_BLOCK_GATHER_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombie workers may mine actual soil/log blocks and harvest ripe crops for colony resources; affects player builds and farms intentionally when enabled. Requires lifecycle, hauling and mobGriefing.")
-                .define("nestBlockGatherEnabled", false);
+                .define("nestBlockGatherEnabled", true);
 
         NEST_ADAPTIVE_STOCK_ENABLED = BUILDER
                 .comment("When colony lifecycle is enabled, adapt food/soil/log worker demand to population and capacity. Real dropped-item intake is limited to each category's outstanding demand so one large stack cannot starve the others; surplus items stay physical. Explicit manual resource accounting remains bounded by the global store.")
@@ -384,11 +387,11 @@ public final class SwarmConfig {
 
         NEST_CROP_REPLANT_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: after harvesting ripe vanilla field crops, use ONE newly physically dropped planting item to replant. WHEAT/CARROTS/POTATOES/BEETROOTS/NETHER_WART only. No free items. Requires block gathering. OFF by default.")
-                .define("nestCropReplantEnabled", false);
+                .define("nestCropReplantEnabled", true);
 
         NEST_ANIMAL_HUNT_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombie workers may hunt adult farm animals to create vanilla physical food drops. Requires lifecycle, hauling and mobGriefing.")
-                .define("nestAnimalHuntEnabled", false);
+                .define("nestAnimalHuntEnabled", true);
 
         NEST_GATHER_INTERVAL = BUILDER
                 .comment("Ticks between bounded colony block or animal surveys per worker.")
@@ -420,7 +423,7 @@ public final class SwarmConfig {
 
         NEST_VISIBLE_EXPANSION_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: physically place conservative soil/timber nest shell blocks when chambers expand. OFF by default. Requires mobGriefing; blocked sites defer upgrades.")
-                .define("nestVisibleExpansionEnabled", false);
+                .define("nestVisibleExpansionEnabled", true);
 
         NEST_MAX_POPULATION = BUILDER
                 .comment("Maximum locally counted colony members before reproduction stops.")
