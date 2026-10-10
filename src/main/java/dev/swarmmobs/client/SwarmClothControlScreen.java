@@ -53,7 +53,7 @@ public final class SwarmClothControlScreen {
             Map<String, String> values
     ) {
         status(category, entries, bool(values, "canEdit")
-                ? "Server-authoritative live controls. Changes are sent to the server when you Save."
+                ? "Server-authoritative live controls. Save writes the SERVER configuration. Reopen to verify persisted values."
                 : "Read-only view. Server operator permission is required to change Swarm settings.");
         status(category, entries,
                 "Agents: " + integer(values, "liveAgents")
@@ -89,6 +89,27 @@ public final class SwarmClothControlScreen {
                 "AI: " + (bool(values, "aiActive")
                         ? "ACTIVE " + text(values, "aiActiveMode", "BASELINE")
                         : (bool(values, "aiEnabled") ? "SHADOW READY" : "OFF")));
+
+        boolean fullColonyTest =
+                bool(values, "nestEnabled")
+                && bool(values, "nestLifecycleEnabled")
+                && bool(values, "nestHaulingEnabled")
+                && bool(values, "nestBlockGatherEnabled")
+                && bool(values, "nestAnimalHuntEnabled")
+                && bool(values, "nestBerryForagingEnabled")
+                && bool(values, "nestCropReplantEnabled")
+                && bool(values, "nestVisibleExpansionEnabled");
+        status(category, entries, "Colony experimental profile: "
+                + (fullColonyTest ? "ALL ACTIVE" : "PARTIALLY ENABLED / OFF")
+                + " (server-verified snapshot)");
+        status(category, entries,
+                "CAUTION: colony harvesting may alter terrain, trees, crops and animals. Use a disposable world.");
+        action(category, entries, "Enable ALL colony experiments (test world)",
+                "playtest_enable", "Tick and Save to enable founding, gathering, hauling, hunting, "
+                        + "breeding and visible expansion; also enables relevant world gamerules.");
+        action(category, entries, "Disable destructive colony experiments",
+                "playtest_disable", "Tick and Save to disable jobs, breeding and shell placement. "
+                        + "Previous world gamerules are not reset.");
 
         status(category, entries,
                 "Tasks: ENG " + integer(values, "taskEngineering")
@@ -891,7 +912,7 @@ public final class SwarmClothControlScreen {
                 .setTooltip(Component.literal(tooltip))
                 .setSaveConsumer(next -> {
                     if (next != initial) {
-                        SwarmControlClient.sendAction(action, 0.0);
+                        SwarmControlClient.sendAction("set:" + action, next ? 1.0 : 0.0);
                     }
                 })
                 .build());
@@ -912,9 +933,8 @@ public final class SwarmClothControlScreen {
                 .setDefaultValue(defaultValue)
                 .setTooltip(Component.literal(tooltip))
                 .setSaveConsumer(next -> {
-                    int delta = next - initial;
-                    if (delta != 0) {
-                        SwarmControlClient.sendAction(action, delta);
+                    if (next != initial) {
+                        SwarmControlClient.sendAction("set:" + action, next);
                     }
                 })
                 .build());
@@ -935,9 +955,8 @@ public final class SwarmClothControlScreen {
                 .setDefaultValue(defaultValue)
                 .setTooltip(Component.literal(tooltip))
                 .setSaveConsumer(next -> {
-                    double delta = next - initial;
-                    if (Math.abs(delta) > 1.0e-9) {
-                        SwarmControlClient.sendAction(action, delta);
+                    if (Math.abs(next - initial) > 1.0e-9) {
+                        SwarmControlClient.sendAction("set:" + action, next);
                     }
                 })
                 .build());

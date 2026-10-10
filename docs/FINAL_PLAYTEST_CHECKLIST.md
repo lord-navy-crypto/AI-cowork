@@ -2,15 +2,17 @@
 
 **Target:** Minecraft 1.21.1 / NeoForge 21.1.x / Java 21 (check the
 current build and mod dependency versions). This checklist tests the
-current open PR, not an already released build. Test in a BACKUP/NEW
+current development build, not an already released build. Test in a BACKUP/NEW
 world, never a valued survival world.
 
 ## 0. Safety and configuration
 
-- Keep **NEST_CONSTRUCTION**, **NEST_LIFECYCLE**, **NEST_HAULING**,
-  **NEST_BLOCK_GATHER**, **NEST_ANIMAL_HUNT**, **NEST_BERRY_FORAGING**
-  and **NEST_VISIBLE_EXPANSION** disabled until each corresponding
-  test. These opt-in features can alter world blocks and animals.
+- In a NEW development world the colony experiment switches start ON.
+  Test only in a disposable world. In an EXISTING world the saved toggles
+  persist; use `/swarmmobs debug testmode on` to enable all.
+  The same option is available in Command Center → Overview.
+  These features can alter blocks, crops and animals; disable individual
+  experiments during isolated comparisons.
 - Use the **Coordination & Labor** screen. Verify master swarm
   enablement, world gamerules (`mobGriefing`, `doMobSpawning`), and
   Peaceful difficulty are not accidentally preventing the intended test.

@@ -233,6 +233,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -253,6 +255,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -338,6 +342,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -453,6 +459,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -954,6 +962,8 @@ public final class SwarmCommands {
                 () -> Component.literal("Swarm communication runtime switch: " + (enabled ? "ON" : "OFF")),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -968,6 +978,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -978,6 +990,8 @@ public final class SwarmCommands {
                 () -> Component.literal("Swarm communication runtime latencyTicks=" + ticks),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return ticks;
     }
 
@@ -991,6 +1005,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1004,6 +1020,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1014,6 +1032,8 @@ public final class SwarmCommands {
                 () -> Component.literal("Swarm communication runtime experimentSeed=" + seed),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1024,6 +1044,8 @@ public final class SwarmCommands {
                 () -> Component.literal("Swarm sensing imperfections: " + (enabled ? "ON" : "OFF")),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1038,6 +1060,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1053,6 +1077,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1068,6 +1094,8 @@ public final class SwarmCommands {
                 ),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1078,6 +1106,8 @@ public final class SwarmCommands {
                 () -> Component.literal("Swarm sensing runtime experimentSeed=" + seed),
                 true
         );
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
@@ -1145,6 +1175,8 @@ public final class SwarmCommands {
                         : "PLAYTEST OFF: optional destructive colony jobs and reproduction disabled. "
                                 + "GameRules were NOT reverted; check mobGriefing yourself."),
                 true);
+        // CLI updates must survive world reload like saved control-panel edits.
+        SwarmConfig.SPEC.save();
         return 1;
     }
 
