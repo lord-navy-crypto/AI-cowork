@@ -11,6 +11,7 @@ import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
 import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
 import dev.swarmmobs.algorithm.SwarmPathProbePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandPolicy;
+import dev.swarmmobs.algorithm.SwarmNavigationEpisodePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
@@ -37,6 +38,7 @@ import net.minecraft.world.entity.player.Player;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Owns movement while a supported swarm member is repositioning.
@@ -56,6 +58,11 @@ public final class SwarmApproachGoal extends Goal {
     private double recoveryX;
     private double recoveryZ;
     private long recoveryUntilTick = Long.MIN_VALUE;
+    private double recoveryPlanAnchorX;
+    private double recoveryPlanAnchorZ;
+    private UUID activeEpisodeTarget;
+    private SwarmBehaviorMode activeEpisodeMode;
+    private boolean activeEpisodeKnown;
     private boolean commandIssued;
     private long lastCommandTick = Long.MIN_VALUE;
     private double lastCommandX;
@@ -168,6 +175,9 @@ public final class SwarmApproachGoal extends Goal {
 
     @Override
     public void start() {
+        // A reused Goal object may have finished under another target.
+        activeEpisodeKnown = false;
+        refreshMovementEpisode();
         commandIssued = false;
         resetProgressSample();
         moveToLatestPlan();
@@ -175,6 +185,7 @@ public final class SwarmApproachGoal extends Goal {
 
     @Override
     public void tick() {
+        refreshMovementEpisode();
         updateRecoveryState();
 
         if (mob.tickCount % 3 == 0 || mob.getNavigation().isDone()) {
@@ -192,10 +203,49 @@ public final class SwarmApproachGoal extends Goal {
         recoveryUntilTick = Long.MIN_VALUE;
         obstacleDetourActive = false;
         obstacleDetourUntilTick = Long.MIN_VALUE;
+        activeEpisodeKnown = false;
+        activeEpisodeTarget = null;
+        activeEpisodeMode = null;
         mob.getData(SwarmAttachments.AGENT_STATE.get()).clearNavigationTelemetry();
         progressSampleTick = Long.MIN_VALUE;
         commandIssued = false;
         lastCommandTick = Long.MIN_VALUE;
+    }
+
+    /**
+     * The Goal may remain selected while the target ID or SEARCH/ENGAGE mode
+     * changes. Retaining old recovery waypoints can keep an NPC following
+     * an obsolete route.
+     */
+    private void refreshMovementEpisode() {
+        SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
+        UUID target = state.targetId();
+        SwarmBehaviorMode mode = state.behaviorMode();
+        boolean changed = SwarmNavigationEpisodePolicy.changed(
+                activeEpisodeKnown, activeEpisodeTarget, activeEpisodeMode,
+                target, mode);
+        if (changed) {
+            clearObsoleteNavigation(state);
+            state.recordNavigationEpisodeReset();
+        }
+        activeEpisodeTarget = target;
+        activeEpisodeMode = mode;
+        activeEpisodeKnown = true;
+    }
+
+    private void clearObsoleteNavigation(SwarmAgentState state) {
+        recoveryActive = false;
+        recoveryUntilTick = Long.MIN_VALUE;
+        obstacleDetourActive = false;
+        obstacleDetourUntilTick = Long.MIN_VALUE;
+        commandIssued = false;
+        lastCommandTick = Long.MIN_VALUE;
+        mob.getNavigation().stop();
+        if (mob.level() instanceof ServerLevel level) {
+            SwarmPathBudgetRegistry.cancel(level, mob);
+        }
+        state.clearNavigationTelemetry();
+        resetProgressSample();
     }
 
     private void moveToLatestPlan() {
@@ -661,6 +711,15 @@ public final class SwarmApproachGoal extends Goal {
         }
 
         long gameTick = level.getGameTime();
+        SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
+        if (SwarmNavigationEpisodePolicy.abandonStaleRecovery(
+                recoveryActive, state.directObservation(),
+                state.behaviorMode(), recoveryPlanAnchorX, recoveryPlanAnchorZ,
+                state.destinationX(), state.destinationZ())) {
+            clearObsoleteNavigation(state);
+            state.recordNavigationEpisodeReset();
+            return;
+        }
         if (recoveryActive) {
             if (gameTick >= recoveryUntilTick) {
                 recoveryActive = false;
@@ -683,8 +742,6 @@ public final class SwarmApproachGoal extends Goal {
                 mob.getX() - progressSampleX,
                 mob.getZ() - progressSampleZ
         );
-
-        SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
         if (!state.hasDestination()) {
             resetProgressSample();
             return;
@@ -712,6 +769,8 @@ public final class SwarmApproachGoal extends Goal {
                 obstacleDetourActive = false;
                 obstacleDetourUntilTick = Long.MIN_VALUE;
                 recoveryActive = true;
+                recoveryPlanAnchorX = state.destinationX();
+                recoveryPlanAnchorZ = state.destinationZ();
                 recoveryX = recovery.waypoint().x();
                 recoveryZ = recovery.waypoint().z();
                 state.updateNavigationTelemetry(
