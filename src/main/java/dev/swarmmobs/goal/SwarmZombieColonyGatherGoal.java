@@ -137,7 +137,8 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                             SwarmColonyEmergencePolicy.sensedAttraction(
                                     zombie.getUUID(),scent),stop,
                             localPeers,zombie.getData(
-                                    SwarmAttachments.AGENT_STATE.get()).taskExperience(task));
+                                    SwarmAttachments.AGENT_STATE.get()).taskExperience(task),
+                            nest.resourceDeficit(kind));
                     if (score < best) {
                         best = score;
                         chosen = test;
