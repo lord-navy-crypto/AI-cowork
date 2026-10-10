@@ -121,6 +121,9 @@ public final class SwarmClothControlScreen {
                         + " actively repositioning / " + integer(values, "skeletonSpacingEpisodes")
                         + " spacing episodes");
         status(category, entries,
+                "AI movement fallback (real): Skeleton " + integer(values, "skeletonMoveFallbacks")
+                        + " / Zombie flank " + integer(values, "zombieFlankFallbacks"));
+        status(category, entries,
                 "Vacant flank coverage: " + integer(values, "activeFlankFillers")
                         + " active Zombies / " + integer(values, "flankFillEpisodes")
                         + " replacement episodes (server observed)");
