@@ -41,6 +41,8 @@ neoForge {
         gameTestServer {
             type = "gameTestServer"
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            // Fixture isolation: don't auto-enable destructive colony jobs in GameTests.
+            systemProperty 'swarmmobs.gametest', 'true'
         }
     }
 
