@@ -12,6 +12,7 @@ import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
 import dev.swarmmobs.algorithm.SwarmPathProbePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationEpisodePolicy;
+import dev.swarmmobs.algorithm.SwarmOptionalWaypointProgressPolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.algorithm.SwarmMovementPolicy;
 import dev.swarmmobs.algorithm.SwarmLocalPlannerPolicy;
@@ -34,6 +35,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 
@@ -56,6 +58,13 @@ public final class SwarmApproachGoal extends Goal {
     private double progressSampleX;
     private double progressSampleZ;
     private long progressSampleTick = Long.MIN_VALUE;
+    // Separate from long-term obstacle recovery: short attack-related
+    // waypoints need proof of progress before their 18/30-tick leases end.
+    private long optionalSampleTick = Long.MIN_VALUE;
+    private double optionalSampleDistance;
+    private double optionalSampleWaypointX;
+    private double optionalSampleWaypointZ;
+    private boolean optionalSampleSkeleton;
     private boolean recoveryActive;
     private double recoveryX;
     private double recoveryZ;
@@ -212,12 +221,14 @@ public final class SwarmApproachGoal extends Goal {
         refreshMovementEpisode();
         commandIssued = false;
         resetProgressSample();
+        resetOptionalProgressSample();
         moveToLatestPlan();
     }
 
     @Override
     public void tick() {
         refreshMovementEpisode();
+        if (updateOptionalWaypointProgress()) return;
         updateRecoveryState();
 
         if (mob.tickCount % 3 == 0 || mob.getNavigation().isDone()) {
@@ -240,6 +251,7 @@ public final class SwarmApproachGoal extends Goal {
         activeEpisodeMode = null;
         mob.getData(SwarmAttachments.AGENT_STATE.get()).clearNavigationTelemetry();
         progressSampleTick = Long.MIN_VALUE;
+        resetOptionalProgressSample();
         commandIssued = false;
         lastCommandTick = Long.MIN_VALUE;
     }
@@ -278,6 +290,82 @@ public final class SwarmApproachGoal extends Goal {
         }
         state.clearNavigationTelemetry();
         resetProgressSample();
+        resetOptionalProgressSample();
+    }
+
+    /**
+     * An optional game positioning move should make actual progress toward
+     * its waypoint. Moving sideways in place or repeatedly receiving an
+     * impossible path must not hold the native bow/melee MOVE handoff.
+     * Only the existing planned destination and physical mob position are
+     * consulted, with no extra pathfinding or entity queries.
+     */
+    private boolean updateOptionalWaypointProgress() {
+        if (!(mob.level() instanceof ServerLevel level)) return false;
+        SwarmAgentState state = mob.getData(SwarmAttachments.AGENT_STATE.get());
+        boolean skeleton = state.rangedSpacingActive()
+                && SwarmAgentProfiles.profile(mob).archetype()
+                        == SwarmAgentArchetype.RANGED_SUPPORT;
+        boolean zombie = mob instanceof Zombie && state.shortZombieFlankActive();
+        if ((!skeleton && !zombie) || !state.hasDestination()
+                || !commandIssued || recoveryActive || obstacleDetourActive) {
+            resetOptionalProgressSample();
+            return false;
+        }
+
+        double x = state.destinationX();
+        double z = state.destinationZ();
+        double remaining = Math.hypot(x - mob.getX(), z - mob.getZ());
+        long tick = level.getGameTime();
+        double shifted = Math.hypot(x - optionalSampleWaypointX,
+                z - optionalSampleWaypointZ);
+        if (optionalSampleTick == Long.MIN_VALUE
+                || optionalSampleSkeleton != skeleton) {
+            beginOptionalProgressSample(tick, x, z, remaining, skeleton);
+            return false;
+        }
+
+        var decision = SwarmOptionalWaypointProgressPolicy.assess(
+                tick, optionalSampleTick, optionalSampleDistance, remaining,
+                shifted, mob.getNavigation().isDone());
+        if (decision == SwarmOptionalWaypointProgressPolicy.Decision.RESET
+                || decision == SwarmOptionalWaypointProgressPolicy.Decision.PROGRESS) {
+            beginOptionalProgressSample(tick, x, z, remaining, skeleton);
+            return false;
+        }
+        if (decision == SwarmOptionalWaypointProgressPolicy.Decision.ARRIVED) {
+            resetOptionalProgressSample();
+            return false;
+        }
+        if (decision != SwarmOptionalWaypointProgressPolicy.Decision.STALLED) {
+            return false;
+        }
+
+        boolean stopped = skeleton
+                ? state.failRangedSpacingForNoProgress(tick)
+                : state.failShortZombieFlankForNoProgress(tick);
+        resetOptionalProgressSample();
+        if (!stopped) return false;
+        mob.getNavigation().stop();
+        SwarmPathBudgetRegistry.cancel(level, mob);
+        state.clearNavigationTelemetry();
+        resetProgressSample();
+        commandIssued = false;
+        lastCommandTick = Long.MIN_VALUE;
+        return true;
+    }
+
+    private void beginOptionalProgressSample(long tick, double x, double z,
+            double distance, boolean skeleton) {
+        optionalSampleTick = tick;
+        optionalSampleWaypointX = x;
+        optionalSampleWaypointZ = z;
+        optionalSampleDistance = distance;
+        optionalSampleSkeleton = skeleton;
+    }
+
+    private void resetOptionalProgressSample() {
+        optionalSampleTick = Long.MIN_VALUE;
     }
 
     private void moveToLatestPlan() {
