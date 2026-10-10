@@ -117,6 +117,10 @@ public final class SwarmClothControlScreen {
                         + "  STANDARD " + integer(values, "tacticStandard")
                         + "  SEARCH " + integer(values, "tacticSearch"));
         status(category, entries,
+                "Active crowd lane diversions: " + integer(values, "laneDiverted")
+                        + "  / total planning samples " + integer(values, "laneDiversionSamples")
+                        + "  / blocked fallback " + integer(values, "laneBlockedFallbacks"));
+        status(category, entries,
                 "These are live server measurements. Move in Survival to test SWEEP; "
                         + "stand still near a same-target group to test SURROUND.");
 

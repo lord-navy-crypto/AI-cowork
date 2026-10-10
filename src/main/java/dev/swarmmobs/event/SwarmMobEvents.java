@@ -11,6 +11,8 @@ import dev.swarmmobs.agent.SwarmTaskType;
 import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmAdaptiveTacticsPolicy;
+import dev.swarmmobs.algorithm.SwarmPackDecongestionPolicy;
+import dev.swarmmobs.algorithm.SwarmCrowdWaypointWorldPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
@@ -561,6 +563,45 @@ public final class SwarmMobEvents {
                     tacticalFrame, plannedDestination,
                     new Vec2(prediction.x(), prediction.z()),
                     effectiveFormationRadius, tacticalRole, profile.archetype());
+
+            // Crowded assault agents choose a less occupied local game lane
+            // instead of all trying to occupy the same waypoint. No extra
+            // scans: reuse the same-target peer positions already collected.
+            var crowdChoice = SwarmPackDecongestionPolicy.choose(
+                    new Vec2(mob.getX(), mob.getZ()),
+                    plannedDestination, tacticalFrame.forward(),
+                    tacticalNeighbors.stream()
+                            .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                            .toList(),
+                    tacticalRole, profile.archetype(), assignedSlot,
+                    state.crowdLaneSide(),
+                    state.engagementMode() == SwarmEngagementPolicy.Mode.COMBAT
+                            && selection.direct() && confidence >= 0.65);
+            if (crowdChoice.active()) {
+                // Cheap block-shape probes only in already-loaded chunks.
+                // Do not force chunks or spend an extra pathfinding query.
+                Vec2 right = SwarmPackDecongestionPolicy.waypoint(
+                        plannedDestination, tacticalFrame.forward(), 1);
+                Vec2 left = SwarmPackDecongestionPolicy.waypoint(
+                        plannedDestination, tacticalFrame.forward(), -1);
+                boolean rightUsable = SwarmCrowdWaypointWorldPolicy.locallyTraversable(level, mob.getY(), right);
+                boolean leftUsable = SwarmCrowdWaypointWorldPolicy.locallyTraversable(level, mob.getY(), left);
+                var feasible = SwarmPackDecongestionPolicy.chooseFeasible(
+                        crowdChoice, rightUsable, leftUsable);
+                boolean priorLaneBlocked = (state.crowdLaneSide() > 0 && !rightUsable)
+                        || (state.crowdLaneSide() < 0 && !leftUsable);
+                int crowdSide = state.acceptCrowdLane(
+                        feasible.active() ? feasible.side() : 0,
+                        gameTick, priorLaneBlocked);
+                if (feasible.active() && crowdSide != 0) {
+                    plannedDestination = SwarmPackDecongestionPolicy.waypoint(
+                            plannedDestination, tacticalFrame.forward(), crowdSide);
+                } else {
+                    state.recordCrowdLaneRejected();
+                }
+            } else {
+                state.acceptCrowdLane(0, gameTick);
+            }
 
             if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT) {
                 // Only allies on the same active target count. Do not let

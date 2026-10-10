@@ -12,6 +12,8 @@ import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.agent.SwarmPlannerContext;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
+import dev.swarmmobs.algorithm.SwarmCrowdWaypointWorldPolicy;
+import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.config.SwarmConfig;
@@ -66,6 +68,53 @@ public final class SwarmRuntimeGameTests {
     private static final String TEMPLATE = "empty5x4x5";
 
     private SwarmRuntimeGameTests() {}
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_npc_crowd_terrain", templateNamespace = SwarmMobs.MOD_ID,
+            template = TEMPLATE, timeoutTicks = 50)
+    public static void alternateNpcWaypointRequiresLoadedFreeSupportedGameBlocks(
+            GameTestHelper helper) {
+        BlockPos ground = new BlockPos(2, 0, 2);
+        BlockPos feet = new BlockPos(2, 1, 2);
+        BlockPos head = new BlockPos(2, 2, 2);
+        helper.setBlock(ground, Blocks.STONE);
+        helper.setBlock(feet, Blocks.AIR);
+        helper.setBlock(head, Blocks.AIR);
+        Vec3 worldPosition = helper.absoluteVec(new Vec3(2.5, 1.0, 2.5));
+        Vec2 waypoint = new Vec2(worldPosition.x, worldPosition.z);
+        double footY = worldPosition.y;
+
+        if (!SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                helper.getLevel(), footY, waypoint)) {
+            helper.fail("Unobstructed grounded game waypoint was rejected");
+            return;
+        }
+
+        helper.setBlock(feet, Blocks.STONE);
+        if (SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                helper.getLevel(), footY, waypoint)) {
+            helper.fail("Solid occupied block was accepted as free waypoint");
+            return;
+        }
+
+        helper.setBlock(feet, Blocks.AIR);
+        helper.setBlock(ground, Blocks.AIR);
+        if (SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                helper.getLevel(), footY, waypoint)) {
+            helper.fail("Unsupported waypoint over air was accepted");
+            return;
+        }
+
+        helper.setBlock(ground, Blocks.STONE);
+        helper.setBlock(head, Blocks.STONE);
+        if (SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                helper.getLevel(), footY, waypoint)) {
+            helper.fail("Solid upper-body obstruction was accepted");
+            return;
+        }
+
+        helper.succeed();
+    }
 
     @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_integration", templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 60)

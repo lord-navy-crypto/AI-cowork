@@ -746,6 +746,9 @@ public final class SwarmControlNetwork {
         int agentsWithTacticalBreacher = 0;
         int workAgents = 0, alertAgents = 0, combatAgents = 0, recoveringAgents = 0;
         int tacticSweep = 0, tacticSurround = 0, tacticStandard = 0, tacticSearch = 0;
+        int laneDiverted = 0;
+        long laneDiversionSamples = 0;
+        long laneBlockedFallbacks = 0;
         int optimizedSupportAgents = 0;
         long supportLaneSwitches = 0, supportFeasibleSamples = 0,
                 supportUnavailableSamples = 0;
@@ -778,6 +781,9 @@ public final class SwarmControlNetwork {
                 SwarmAgentState tacticalState =
                         mob.getData(SwarmAttachments.AGENT_STATE.get());
                 if (tacticalState.targetId() != null) {
+                    if (tacticalState.crowdLaneSide() != 0) laneDiverted++;
+                    laneDiversionSamples += tacticalState.crowdLaneUses();
+                    laneBlockedFallbacks += tacticalState.crowdLaneRejected();
                     switch (tacticalState.tacticalPattern()) {
                         case "SWEEP" -> tacticSweep++;
                         case "SURROUND" -> tacticSurround++;
@@ -841,6 +847,9 @@ public final class SwarmControlNetwork {
                 pair("aiLastError", ai.lastError()),
                 pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
+                pair("laneBlockedFallbacks", Math.min(Integer.MAX_VALUE, laneBlockedFallbacks)),
+                pair("laneDiverted", laneDiverted),
+                pair("laneDiversionSamples", Math.min(Integer.MAX_VALUE, laneDiversionSamples)),
                 pair("tacticSweep", tacticSweep),
                 pair("tacticSurround", tacticSurround),
                 pair("tacticStandard", tacticStandard),
