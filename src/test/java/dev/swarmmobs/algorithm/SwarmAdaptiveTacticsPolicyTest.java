@@ -84,6 +84,36 @@ class SwarmAdaptiveTacticsPolicyTest {
                 frame,base,SwarmRole.REAR_PRESSURE,SwarmAgentArchetype.ASSAULT));
     }
 
+    @Test void realSurroundPlacesOnlyRearPressureZombieOnFarSideOfStationaryTarget() {
+        var frame = SwarmAdaptiveTacticsPolicy.choose(
+                sighting(100,0,0),100,1.0,GROUP,true);
+        Vec2 old = new Vec2(0,-4);
+        Vec2 destination = SwarmAdaptiveTacticsPolicy.farSideWaypoint(
+                frame,old,new Vec2(0,0),6.0,
+                SwarmRole.REAR_PRESSURE,SwarmAgentArchetype.ASSAULT);
+        assertEquals(new Vec2(0,3),destination);
+        assertEquals(old,SwarmAdaptiveTacticsPolicy.farSideWaypoint(
+                frame,old,new Vec2(0,0),6.0,
+                SwarmRole.CHASER,SwarmAgentArchetype.ASSAULT));
+        assertEquals(old,SwarmAdaptiveTacticsPolicy.farSideWaypoint(
+                frame,old,new Vec2(0,0),6.0,
+                SwarmRole.REAR_PRESSURE,SwarmAgentArchetype.BREACHER));
+    }
+
+    @Test void stationaryFarSideWaypointIsBoundedAndDisabledForStaleStandard() {
+        var surround = new SwarmAdaptiveTacticsPolicy.Frame(
+                Pattern.SURROUND,new Vec2(0,1),0);
+        var result = SwarmAdaptiveTacticsPolicy.farSideWaypoint(
+                surround,new Vec2(1,-4),new Vec2(10,10),100,
+                SwarmRole.REAR_PRESSURE,SwarmAgentArchetype.ASSAULT);
+        assertEquals(new Vec2(10,13),result);
+        var standard = new SwarmAdaptiveTacticsPolicy.Frame(
+                Pattern.STANDARD,new Vec2(0,1),0);
+        assertEquals(new Vec2(1,-4),SwarmAdaptiveTacticsPolicy.farSideWaypoint(
+                standard,new Vec2(1,-4),new Vec2(10,10),100,
+                SwarmRole.REAR_PRESSURE,SwarmAgentArchetype.ASSAULT));
+    }
+
     @Test void boundedOffsetNeverExceedsTwoBlocks() {
         var frame = new SwarmAdaptiveTacticsPolicy.Frame(
                 Pattern.SWEEP,new Vec2(1,0),1000);
