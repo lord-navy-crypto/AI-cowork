@@ -467,6 +467,8 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
                 SwarmConfig.NEST_HAULING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
                 SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
                 SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
                 SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
