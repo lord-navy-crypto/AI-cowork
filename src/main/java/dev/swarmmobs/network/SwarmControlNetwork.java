@@ -749,6 +749,7 @@ public final class SwarmControlNetwork {
         int activeFlankFillers = 0;
         int skeletonSpacing = 0;
         long skeletonSpacingEpisodes = 0;
+        long skeletonWaypointHolds = 0;
         long skeletonMoveFallbacks = 0;
         long zombieFlankFallbacks = 0;
         long skeletonNoProgress = 0;
@@ -797,6 +798,7 @@ public final class SwarmControlNetwork {
                     if (tacticalState.coveringVacantFlank()) activeFlankFillers++;
                     if (tacticalState.rangedSpacingActive()) skeletonSpacing++;
                     skeletonSpacingEpisodes += tacticalState.rangedSpacingEpisodes();
+                    skeletonWaypointHolds += tacticalState.rangedWaypointHoldSamples();
                     skeletonMoveFallbacks += tacticalState.rangedSpacingFallbacks();
                     zombieFlankFallbacks += tacticalState.zombieFlankFallbacks();
                     skeletonNoProgress += tacticalState.rangedNoProgressFallbacks();
@@ -879,6 +881,7 @@ public final class SwarmControlNetwork {
                 pair("laneDiversionSamples", Math.min(Integer.MAX_VALUE, laneDiversionSamples)),
                 pair("skeletonSpacing", skeletonSpacing),
                 pair("skeletonSpacingEpisodes", Math.min(Integer.MAX_VALUE, skeletonSpacingEpisodes)),
+                pair("skeletonWaypointHolds", Math.min(Integer.MAX_VALUE, skeletonWaypointHolds)),
                 pair("skeletonMoveFallbacks", Math.min(Integer.MAX_VALUE, skeletonMoveFallbacks)),
                 pair("zombieFlankFallbacks", Math.min(Integer.MAX_VALUE, zombieFlankFallbacks)),
                 pair("skeletonNoProgress", Math.min(Integer.MAX_VALUE, skeletonNoProgress)),
