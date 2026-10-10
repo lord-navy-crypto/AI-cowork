@@ -22,6 +22,8 @@ public final class SwarmNestScienceTelemetry {
             long reinforcedTrips, long inhibitedJobs,
             double foodRecruitment, double timberRecruitment, double soilRecruitment,
             double foodInhibition, double timberInhibition, double soilInhibition,
+            int pheromoneCells, int pheromoneObservations,
+            int pheromoneReinforcements, int pheromoneStopSignals,
             SwarmColonySciencePolicy.Sample science
     ) {
         public boolean available() { return sampleTick >= 0; }
@@ -33,7 +35,8 @@ public final class SwarmNestScienceTelemetry {
     private static final Snapshot EMPTY = new Snapshot(
             -1L, 0, 0, 0, 0, 0, 0, 0, 0.0,
             0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, EMPTY_MODEL);
+            0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0, 0, 0, 0, EMPTY_MODEL);
 
     public static void record(ServerLevel level, BlockPos pos,
                               SwarmNestBlockEntity nest,
@@ -60,7 +63,11 @@ public final class SwarmNestScienceTelemetry {
                 nest.laborFeedback().inhibition(
                         SwarmNestColonyPolicy.Kind.TIMBER, level.getGameTime()),
                 nest.laborFeedback().inhibition(
-                        SwarmNestColonyPolicy.Kind.SOIL, level.getGameTime()), model
+                        SwarmNestColonyPolicy.Kind.SOIL, level.getGameTime()),
+                nest.pheromones().size(level.getGameTime()),
+                nest.pheromones().observations(),
+                nest.pheromones().reinforcements(),
+                nest.pheromones().inhibitions(), model
         ));
     }
 
