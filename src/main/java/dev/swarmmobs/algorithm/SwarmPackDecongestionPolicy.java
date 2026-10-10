@@ -56,6 +56,28 @@ public final class SwarmPackDecongestionPolicy {
         return new Choice(side, true, leftCount, rightCount);
     }
 
+    /**
+     * The preferred crowd lane is only a proposal. World feasibility must
+     * be checked by the caller (loaded chunks, footing, headroom) before a
+     * waypoint is applied; a blocked lane must never stall the NPC.
+     */
+    public static Choice chooseFeasible(Choice proposed, boolean rightWalkable,
+            boolean leftWalkable) {
+        if (proposed == null || !proposed.active()) {
+            return new Choice(0, false, 0, 0);
+        }
+        if (!rightWalkable && !leftWalkable) {
+            return new Choice(0, false,
+                    proposed.leftOccupancy(), proposed.rightOccupancy());
+        }
+        int side = proposed.side();
+        if (side > 0 && rightWalkable || side < 0 && leftWalkable) {
+            return proposed;
+        }
+        return new Choice(rightWalkable ? 1 : -1, true,
+                proposed.leftOccupancy(), proposed.rightOccupancy());
+    }
+
     public static Vec2 waypoint(Vec2 base, Vec2 forward, int side) {
         if (!finite(base) || !finite(forward) || forward.length() < 0.01
                 || side == 0) return base;
