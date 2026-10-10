@@ -754,6 +754,8 @@ public final class SwarmControlNetwork {
         long zombieFlankFallbacks = 0;
         long skeletonNoProgress = 0;
         long zombieNoProgress = 0;
+        int zombieBowLanePlanned = 0;
+        long zombieBowLaneAccepted = 0;
         long gamePathRejects = 0;
         long skeletonPathRejects = 0;
         long zombiePathRejects = 0;
@@ -806,6 +808,8 @@ public final class SwarmControlNetwork {
                     zombieFlankFallbacks += tacticalState.zombieFlankFallbacks();
                     skeletonNoProgress += tacticalState.rangedNoProgressFallbacks();
                     zombieNoProgress += tacticalState.zombieNoProgressFallbacks();
+                    if (tacticalState.zombieBowLaneYieldPlanned()) zombieBowLanePlanned++;
+                    zombieBowLaneAccepted += tacticalState.zombieBowLaneYieldAcceptedCommands();
                     gamePathRejects += tacticalState.navigationCommandRejections();
                     skeletonPathRejects += tacticalState.skeletonPathRejectFallbacks();
                     zombiePathRejects += tacticalState.zombiePathRejectFallbacks();
@@ -892,6 +896,8 @@ public final class SwarmControlNetwork {
                 pair("zombieFlankFallbacks", Math.min(Integer.MAX_VALUE, zombieFlankFallbacks)),
                 pair("skeletonNoProgress", Math.min(Integer.MAX_VALUE, skeletonNoProgress)),
                 pair("zombieNoProgress", Math.min(Integer.MAX_VALUE, zombieNoProgress)),
+                pair("zombieBowLanePlanned", zombieBowLanePlanned),
+                pair("zombieBowLaneAccepted", Math.min(Integer.MAX_VALUE, zombieBowLaneAccepted)),
                 pair("gamePathRejects", Math.min(Integer.MAX_VALUE, gamePathRejects)),
                 pair("skeletonPathRejects", Math.min(Integer.MAX_VALUE, skeletonPathRejects)),
                 pair("zombiePathRejects", Math.min(Integer.MAX_VALUE, zombiePathRejects)),

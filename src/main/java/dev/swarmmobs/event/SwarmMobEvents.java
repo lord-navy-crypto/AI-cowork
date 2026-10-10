@@ -19,6 +19,7 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
+import dev.swarmmobs.algorithm.SwarmZombieBowLaneYieldPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import dev.swarmmobs.algorithm.SwarmRangedSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmSkeletonSightlinePolicy;
@@ -179,6 +180,7 @@ public final class SwarmMobEvents {
         TargetSelection selection = findTarget(level, mob, state, gameTick);
 
         if (selection == null) {
+            state.updateZombieBowLaneYieldPlan(false);
             state.updateEngagement(false,false,gameTick);
             state.updateTacticalSquadTelemetry(0, 0);
             state.recordSearchFailure();
@@ -468,6 +470,7 @@ public final class SwarmMobEvents {
                 coverage.fillingMissingFlank() && tacticalRole == coverage.role());
 
         if (searchMode) {
+            state.updateZombieBowLaneYieldPlan(false);
             state.updateRangedSpacing(false);
             state.setTacticalPattern("SEARCH");
             state.beginSearchEpisode(gameTick, observation.targetId());
@@ -644,6 +647,57 @@ public final class SwarmMobEvents {
             } else {
                 state.acceptCrowdLane(0, gameTick);
             }
+
+            // Cross-species movement, not extra attack power: if the Zombie's
+            // next planned Minecraft square sits in a directly observing,
+            // same-target Skeleton's bow corridor, try one locally supported
+            // lateral square. Existing melee handoff still wins near player.
+            // No extra entity scan or hidden target information.
+            boolean yieldedBowLane = false;
+            if (mob instanceof Zombie && selection.direct()
+                    && selection.player() != null && confidence >= 0.7
+                    && squadCombat && SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
+                    && state.currentTask() != SwarmTaskType.ENGINEERING
+                    && state.currentTask() != SwarmTaskType.MATERIAL) {
+                List<Vec2> shootingPeers = tacticalNeighbors.stream()
+                        .filter(peer -> peer instanceof Skeleton)
+                        // This is a 2-D corridor estimate; a Skeleton on
+                        // another floor must not divert a Zombie below it.
+                        .filter(peer -> Math.abs(peer.getY() - mob.getY()) <= 2.0)
+                        .limit(4)
+                        .filter(peer -> peer.hasLineOfSight(selection.player())
+                                && peer.distanceToSqr(selection.player())
+                                        < 15.0 * 15.0)
+                        .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                        .toList();
+                Vec2 playerPoint = new Vec2(
+                        selection.player().getX(), selection.player().getZ());
+                Vec2 selfPoint = new Vec2(mob.getX(), mob.getZ());
+                for (Vec2 shooterPoint : shootingPeers) {
+                    var yieldOptions = SwarmZombieBowLaneYieldPolicy.propose(
+                            selfPoint, plannedDestination, shooterPoint,
+                            playerPoint, true, confidence);
+                    if (!yieldOptions.applicable()) continue;
+                    boolean leftFeasible = SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                            level, mob.getY(), yieldOptions.left())
+                            && shootingPeers.stream().allMatch(shooter ->
+                                SwarmFriendlyFireLanePolicy.isClear(shooter,
+                                        playerPoint, List.of(yieldOptions.left())));
+                    boolean rightFeasible = SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                            level, mob.getY(), yieldOptions.right())
+                            && shootingPeers.stream().allMatch(shooter ->
+                                SwarmFriendlyFireLanePolicy.isClear(shooter,
+                                        playerPoint, List.of(yieldOptions.right())));
+                    Vec2 clearWaypoint = SwarmZombieBowLaneYieldPolicy.choose(
+                            yieldOptions, leftFeasible, rightFeasible, assignedSlot);
+                    if (clearWaypoint != null) {
+                        plannedDestination = clearWaypoint;
+                        yieldedBowLane = true;
+                    }
+                    break;
+                }
+            }
+            state.updateZombieBowLaneYieldPlan(yieldedBowLane);
 
             if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT) {
                 // Only allies on the same active target count. Do not let

@@ -125,6 +125,10 @@ public final class SwarmClothControlScreen {
                 "AI movement fallback (real): Skeleton " + integer(values, "skeletonMoveFallbacks")
                         + " / Zombie flank " + integer(values, "zombieFlankFallbacks"));
         status(category, entries,
+                "Zombie bow-lane cooperation: " + integer(values, "zombieBowLanePlanned")
+                        + " proposed / " + integer(values, "zombieBowLaneAccepted")
+                        + " navigator-accepted MOVE commands");
+        status(category, entries,
                 "Measured stalled waypoints: Skeleton " + integer(values, "skeletonNoProgress")
                         + " / Zombie " + integer(values, "zombieNoProgress"));
         status(category, entries,

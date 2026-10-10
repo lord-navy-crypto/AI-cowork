@@ -675,6 +675,8 @@ public final class SwarmCommands {
                                 + " skeletonPathRejects=" + state.skeletonPathRejectFallbacks()
                                 + " zombiePathRejects=" + state.zombiePathRejectFallbacks()
                                 + " zombieNoProgress=" + state.zombieNoProgressFallbacks()
+                                + " zombieBowLanePlanned=" + state.zombieBowLaneYieldPlanned()
+                                + " zombieBowLaneAccepted=" + state.zombieBowLaneYieldAcceptedCommands()
                                 + " knownFailedSkeletonSites=" + state.recentRangedFailureLocations(source.getLevel().getGameTime())
                                 + " knownFailedZombieSites=" + state.recentZombieFailureLocations(source.getLevel().getGameTime())
                                 + " zombieFlankFallbacks=" + state.zombieFlankFallbacks()
@@ -817,6 +819,8 @@ public final class SwarmCommands {
         long zombieFlankFallbacks = 0L;
         long skeletonNoProgress = 0L;
         long zombieNoProgress = 0L;
+        int zombieBowLanePlanned = 0;
+        long zombieBowLaneAccepted = 0L;
         long gamePathRejects = 0L;
         long skeletonPathRejects = 0L;
         long zombiePathRejects = 0L;
@@ -880,6 +884,8 @@ public final class SwarmCommands {
             zombieFlankFallbacks += state.zombieFlankFallbacks();
             skeletonNoProgress += state.rangedNoProgressFallbacks();
             zombieNoProgress += state.zombieNoProgressFallbacks();
+            if (state.zombieBowLaneYieldPlanned()) zombieBowLanePlanned++;
+            zombieBowLaneAccepted += state.zombieBowLaneYieldAcceptedCommands();
             gamePathRejects += state.navigationCommandRejections();
             skeletonPathRejects += state.skeletonPathRejectFallbacks();
             zombiePathRejects += state.zombiePathRejectFallbacks();
@@ -1023,7 +1029,7 @@ public final class SwarmCommands {
 
         // Aggregate of actual per-agent game tactic states, not claimed wins.
         String patternsText = patterns.toString();
-        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", skeletonWaypointHolds=" + skeletonWaypointHolds + ", skeletonMoveFallbacks=" + spacingTimeouts + ", zombieFlankFallbacks=" + zombieFlankFallbacks + ", skeletonNoProgress=" + skeletonNoProgress + ", zombieNoProgress=" + zombieNoProgress + ", gamePathRejects=" + gamePathRejects + ", skeletonPathRejects=" + skeletonPathRejects + ", zombiePathRejects=" + zombiePathRejects + ", skeletonFailedSites=" + skeletonFailedSites + ", zombieFailedSites=" + zombieFailedSites + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
+        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", skeletonWaypointHolds=" + skeletonWaypointHolds + ", skeletonMoveFallbacks=" + spacingTimeouts + ", zombieFlankFallbacks=" + zombieFlankFallbacks + ", skeletonNoProgress=" + skeletonNoProgress + ", zombieNoProgress=" + zombieNoProgress + ", zombieBowLanePlanned=" + zombieBowLanePlanned + ", zombieBowLaneAccepted=" + zombieBowLaneAccepted + ", gamePathRejects=" + gamePathRejects + ", skeletonPathRejects=" + skeletonPathRejects + ", zombiePathRejects=" + zombiePathRejects + ", skeletonFailedSites=" + skeletonFailedSites + ", zombieFailedSites=" + zombieFailedSites + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
         source.sendSuccess(() -> Component.literal(summary + ", patterns=" + patternsText + mobility), false);
         return total;
     }
