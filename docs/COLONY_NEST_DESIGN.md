@@ -673,3 +673,63 @@ should break the tie, while exactly one physical log gets mined. This does
 not yet establish whole-colony self-organized route optimality in varying
 natural terrain; that requires a separate multi-agent benchmark with
 experimental controls.
+
+## Scout-to-worker ecology handoff (implementation milestone)
+
+This addresses a gap between the earlier spatial pheromone field and the
+older ant/bee-like swarm labor system. Local pheromone concentration alone
+could bias already-nearby harvesting, but it did not assign an observed
+**living prey** or **mature crop / raw log / soil block** beyond a worker's
+immediate physical scan radius.
+
+The new `SwarmNestOpportunityBoard` provides transient, nest-local job
+hints: up to 24 observations, within a 28-block home radius, expiring after
+360 ticks. A worker can reserve a single task for 100 ticks, and at most
+six workers may concurrently hold reports per nest. Repeated sightings
+refresh the same report; stale, missing, changed or completed targets
+are invalidated. The board stores only primitive positions and UUIDs,
+never chunk tickets, entity references, inventories or phantom loot.
+
+**Spider:** regular bounded local surveys still inspect actual loaded
+world regions. Animal and harvestable-block sightings publish into the
+same nest job board regardless of whether pheromone navigation is enabled.
+An optional spatial signal is also emitted for local gradient followers.
+
+**Zombie gatherer:** after a demand-based local block scan fails, a worker
+may reserve a Spider-observed block, verify that its chunk is currently
+loaded and its current block kind remains harvestable, and reserve that
+block through the original exclusive work board. It navigates to the
+physical position, rechecks its state and breaks one real block, releasing
+all claims afterward. No world item is credited to storage until hauled.
+
+**Zombie hunter:** after a local prey scan fails, the worker may reserve
+an adult farm-animal observation, move toward the reported site and scan
+there for the same living UUID. Only if the animal is physically present
+and still adult and suitable can the worker use original melee behavior.
+This does NOT remotely attack or synthesize animal loot.
+
+The existing high-priority Minecraft combat, goal-selector and engineering
+handoff remain intact, and all harvesting still requires operator toggles.
+A shared task record is **not a central omniscient AI**: discovery,
+expiration, reservations and world rechecks are local, independently
+limited, and subject to labor demand.
+
+### Nest plan completion criteria (not yet met)
+
+| Milestone | Current engineering status |
+|---|---|
+| Real nest core, categorized soil/timber/food stocks | Implemented, automated tests |
+| Physical resource collection/hauling + pig/chicken hunting | Implemented for selected vanilla categories, tests |
+| Basic chamber growth and population cap/recruitment | Implemented experimental 200-tick-cycle model |
+| Optional physical shell modules | Implemented as small bounded modules, not a full anthill |
+| Spider report -> worker real-block/prey task dispatch | Implemented experimental; runtime tests cover discrete handoff |
+| Spatial food/log/soil/STOP pheromone gradients | Implemented as sparse per-nest experimental signals |
+| Realistic large-scale multi-chamber excavation and tunnel routing | Not implemented |
+| Farm replanting, tree regeneration, husbandry, full resource renewal | Not implemented |
+| Dynamic long-term nest ecology with food supply/demand equilibrium | Not validated |
+| 10/50/100/200 natural mob load and TPS/MSPT controlled benchmarks | Not validated |
+| Main branch/release version updated with this PR | No; PR remains open |
+
+The goal of the plan is a **credible emergent labor simulator**, not
+only an expanded combat encounter. A green CI demonstrates behavior
+tested so far, not completion of all ecological milestones.
