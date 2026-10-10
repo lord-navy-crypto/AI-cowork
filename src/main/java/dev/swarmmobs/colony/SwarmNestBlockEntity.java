@@ -66,6 +66,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private long foragedBerries;
     // Only a nonpersistent hint board: no virtual cargo or chunk tickets.
     private final SwarmNestScoutBoard scoutBoard = new SwarmNestScoutBoard();
+    private final SwarmNestOpportunityBoard opportunityBoard = new SwarmNestOpportunityBoard();
     private final SwarmColonyWorkBoard workBoard = new SwarmColonyWorkBoard();
     private final SwarmColonyLaborFeedback laborFeedback = new SwarmColonyLaborFeedback();
     // Sparse signals live with the loaded nest; no persisted global pheromone map.
@@ -103,6 +104,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
     }
     public SwarmNestScoutBoard scoutBoard() { return scoutBoard; }
+    public SwarmNestOpportunityBoard opportunityBoard() { return opportunityBoard; }
     public SwarmColonyWorkBoard workBoard() { return workBoard; }
     public SwarmColonyLaborFeedback laborFeedback() { return laborFeedback; }
     public SwarmNestPheromoneField pheromones() { return pheromoneField; }
