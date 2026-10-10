@@ -238,6 +238,9 @@ public final class SwarmControlNetwork {
             case "nest_crop_replant_toggle" ->
                     SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(
                             !SwarmConfig.NEST_CROP_REPLANT_ENABLED.get());
+            case "nest_stock_adapt_toggle" ->
+                    SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(
+                            !SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get());
             case "nest_animal_hunt_toggle" ->
                     SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(
                             !SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get());
@@ -283,6 +286,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
                 SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
                 SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(false);
+                SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(true);
                 SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
                 SwarmConfig.NEST_GATHER_INTERVAL.set(160);
                 SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
@@ -496,6 +500,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
                 SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
                 SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(false);
+                SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(true);
                 SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
                 SwarmConfig.NEST_GATHER_INTERVAL.set(160);
                 SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
@@ -686,6 +691,7 @@ public final class SwarmControlNetwork {
                 pair("nestBerryForagingEnabled", SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get()),
                 pair("nestBlockGatherEnabled", SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()),
                 pair("nestCropReplantEnabled", SwarmConfig.NEST_CROP_REPLANT_ENABLED.get()),
+                pair("nestAdaptiveStockEnabled", SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get()),
                 pair("nestAnimalHuntEnabled", SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()),
                 pair("nestGatherInterval", SwarmConfig.NEST_GATHER_INTERVAL.get()),
                 pair("nestPheromonesEnabled", SwarmConfig.NEST_PHEROMONES_ENABLED.get()),
