@@ -67,6 +67,8 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NEST_CONSTRUCTION_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_LIFECYCLE_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_HAULING_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_BERRY_FORAGING_ENABLED;
+    public static final ModConfigSpec.IntValue NEST_BERRY_FORAGE_INTERVAL;
     public static final ModConfigSpec.IntValue NEST_HAUL_SEARCH_RADIUS;
     public static final ModConfigSpec.IntValue NEST_HAUL_MAX_STACK;
     public static final ModConfigSpec.IntValue NEST_HAUL_ATTEMPT_INTERVAL;
@@ -355,6 +357,14 @@ public final class SwarmConfig {
         NEST_HAULING_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombies assigned to a loaded Nest Core carry actual nearby dropped resources to it. OFF by default.")
                 .define("nestHaulingEnabled", false);
+
+        NEST_BERRY_FORAGING_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle colony Zombies may pick renewable ripe sweet berries near a loaded nest and create real dropped berry items. OFF by default. Can touch player farms; use only in a designated test world. Requires nest lifecycle, hauling and mobGriefing.")
+                .define("nestBerryForagingEnabled", false);
+
+        NEST_BERRY_FORAGE_INTERVAL = BUILDER
+                .comment("Minimum per-worker ticks between bounded nearby ripe-berry foraging surveys.")
+                .defineInRange("nestBerryForageInterval", 200, 120, 800);
 
         NEST_HAUL_SEARCH_RADIUS = BUILDER
                 .comment("Maximum search radius in blocks from idle Zombie to a dropped resource; each worker is throttled and no chunks are loaded.")
