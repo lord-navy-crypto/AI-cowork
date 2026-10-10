@@ -1,6 +1,7 @@
 package dev.swarmmobs.algorithm;
 
 import java.util.UUID;
+import dev.swarmmobs.agent.SwarmAgentArchetype;
 
 /**
  * Optional SOFT tactical rounds for a mixed same-target squad.
@@ -19,6 +20,31 @@ public final class SwarmTacticalRoundPolicy {
         long squadOffset = Math.floorMod(targetId.getLeastSignificantBits(),3L);
         int index = (int) Math.floorMod(gameTick / ROUND_TICKS + squadOffset,3L);
         return Phase.values()[index];
+    }
+
+    /**
+     * Each caste has a small spatial response to a synchronized phase.
+     * These numbers are gameplay assumptions, not insect timing constants.
+     * Close-range actual combat / vanilla AI always supersedes movement.
+     */
+    public static double formationRadiusMultiplier(Phase phase,
+                                                   SwarmAgentArchetype archetype) {
+        if (phase == null || archetype == null) return 1.0;
+        return switch (phase) {
+            case HOLD -> 1.0;
+            case COVER -> switch (archetype) {
+                case ASSAULT -> 1.10; // Zombie opens space for a safe bow lane
+                case BREACHER -> 0.98; // Creeper keeps approach pressure
+                case RANGED_SUPPORT -> 1.05;
+                case FLANKER -> 1.04;
+            };
+            case ROTATE -> switch (archetype) {
+                case ASSAULT -> 1.04;
+                case BREACHER -> 1.0; // Don't shift vanilla fuse envelope
+                case RANGED_SUPPORT -> 1.02;
+                case FLANKER -> 1.06;
+            };
+        };
     }
 
     /**
