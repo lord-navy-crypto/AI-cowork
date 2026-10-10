@@ -58,6 +58,32 @@ class SwarmPackDecongestionPolicyTest {
         assertEquals(1,choose.side()); // one occupant isn't enough to flip
     }
 
+    @Test void blockedPreferredLaneChangesToOnlyOpenLane() {
+        var proposed = new SwarmPackDecongestionPolicy.Choice(1,true,0,2);
+        var feasible = SwarmPackDecongestionPolicy.chooseFeasible(
+                proposed,false,true);
+        assertTrue(feasible.active());
+        assertEquals(-1,feasible.side());
+    }
+
+    @Test void bothBlockedLanesReturnInactiveForOrdinaryFallback() {
+        var proposed = new SwarmPackDecongestionPolicy.Choice(-1,true,0,0);
+        var feasible = SwarmPackDecongestionPolicy.chooseFeasible(
+                proposed,false,false);
+        assertFalse(feasible.active());
+        assertEquals(0,feasible.side());
+    }
+
+    @Test void usablePreferredLaneRemainsStableAndDoesNotInventReroute() {
+        var proposed = new SwarmPackDecongestionPolicy.Choice(1,true,1,1);
+        assertEquals(proposed,SwarmPackDecongestionPolicy.chooseFeasible(
+                proposed,true,true));
+        assertEquals(proposed,SwarmPackDecongestionPolicy.chooseFeasible(
+                proposed,true,false));
+        assertFalse(SwarmPackDecongestionPolicy.chooseFeasible(
+                null,true,true).active());
+    }
+
     @Test void falseOrInvalidInputsDoNotCreateWaypoint() {
         var peers = List.of(new Vec2(1,1),new Vec2(-1,1),new Vec2(0,1.5));
         assertFalse(SwarmPackDecongestionPolicy.choose(
