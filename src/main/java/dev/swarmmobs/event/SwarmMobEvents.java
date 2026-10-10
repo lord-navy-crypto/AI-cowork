@@ -52,6 +52,7 @@ import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
 import dev.swarmmobs.goal.SwarmZombieBreacherSafetyGoal;
+import dev.swarmmobs.goal.SwarmAllyBreacherSafetyGoal;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
@@ -87,6 +88,9 @@ public final class SwarmMobEvents {
         }
 
         if (mob instanceof Skeleton skeleton) {
+            // Emergency same-target Creeper avoidance may interrupt bow
+            // movement only during a genuine nearby fuse episode.
+            mob.goalSelector.addGoal(-1, new SwarmAllyBreacherSafetyGoal(skeleton));
             mob.goalSelector.addGoal(0, new SwarmSkeletonBowGoal(skeleton));
         } else if (mob instanceof Creeper creeper) {
             mob.goalSelector.addGoal(0, new SwarmCreeperSwellGoal(creeper));
@@ -96,6 +100,7 @@ public final class SwarmMobEvents {
             mob.goalSelector.addGoal(0, new SwarmZombieBreacherSafetyGoal(zombie));
             mob.goalSelector.addGoal(0, new SwarmZombieEngineerGoal(zombie));
         } else if (mob instanceof Spider spider) {
+            mob.goalSelector.addGoal(0, new SwarmAllyBreacherSafetyGoal(spider));
             // A sensor-only action with no MOVE/LOOK flags. Vanilla and
             // swarm tactical navigation retain control of the scout.
             mob.goalSelector.addGoal(2, new SwarmSpiderColonyScoutGoal(spider));
