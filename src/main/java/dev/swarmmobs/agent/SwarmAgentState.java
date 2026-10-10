@@ -47,6 +47,10 @@ public final class SwarmAgentState {
     private String tacticalPattern = "STANDARD";
     // Updated by local same-target sightings, consulted by vanilla bow handoff.
     private boolean bowLaneClear = true;
+    // Local crowd-avoidance lane; reset on target switches.
+    private int crowdLaneSide;
+    private long crowdLaneLastSwitchTick = Long.MIN_VALUE;
+    private long crowdLaneUses;
     private boolean roleInitialized;
     private SwarmRole pendingRole;
     private long pendingRoleSinceTick = Long.MIN_VALUE;
@@ -140,6 +144,8 @@ public final class SwarmAgentState {
         resetSupportPositionState();
         tacticalPattern = "STANDARD";
         bowLaneClear = true;
+        crowdLaneSide = 0;
+        crowdLaneLastSwitchTick = Long.MIN_VALUE;
 
         formationSlotInitialized = false;
         pendingFormationSlot = -1;
@@ -304,6 +310,32 @@ public final class SwarmAgentState {
     }
 
     /** Same-target nearby members, excluding self. */
+    public int crowdLaneSide() {
+        return crowdLaneSide;
+    }
+
+    public long crowdLaneUses() {
+        return crowdLaneUses;
+    }
+
+    /** A lane must remain stable for a minimum interval to avoid oscillation. */
+    public int acceptCrowdLane(int proposed, long tick) {
+        if (proposed == 0) {
+            crowdLaneSide = 0;
+            crowdLaneLastSwitchTick = Long.MIN_VALUE;
+            return 0;
+        }
+        int next = Integer.compare(proposed, 0);
+        if (crowdLaneSide == 0
+                || (next != crowdLaneSide && tick >= crowdLaneLastSwitchTick
+                    && tick - crowdLaneLastSwitchTick >= 20)) {
+            crowdLaneSide = next;
+            crowdLaneLastSwitchTick = tick;
+        }
+        crowdLaneUses++;
+        return crowdLaneSide;
+    }
+
     public int tacticalPeerCount() {
         return tacticalPeerCount;
     }
