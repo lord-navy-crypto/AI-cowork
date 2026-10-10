@@ -21,6 +21,7 @@ import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import dev.swarmmobs.algorithm.SwarmRangedSpacingPolicy;
+import dev.swarmmobs.algorithm.SwarmSkeletonSightlinePolicy;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
@@ -720,20 +721,56 @@ public final class SwarmMobEvents {
                 }
             }
 
-            // Skeleton: direct, close game contact may choose an actually
-            // walkable 3-block spacing correction before vanilla bow handoff.
-            // When blocked, ordinary shooting still works.
+            // Skeletons may move to a real playable square when (1) the
+            // visible game player gets too close or (2) a known same-target
+            // Zombie/Creeper blocks their line. Reuse the local squad
+            // snapshot; no additional entity searches or hidden target reads.
             if (mob instanceof Skeleton skeleton) {
+                boolean directVisible = selection.direct()
+                        && selection.player() != null
+                        && skeleton.hasLineOfSight(selection.player());
+                Vec2 shooterPoint = new Vec2(mob.getX(), mob.getZ());
+                Vec2 sightedPoint = new Vec2(observation.x(), observation.z());
+                List<Vec2> frontPlayers = tacticalNeighbors.stream()
+                        .filter(peer -> peer instanceof Zombie || peer instanceof Creeper)
+                        .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                        .toList();
                 var spacing = SwarmRangedSpacingPolicy.consider(
-                        new Vec2(mob.getX(), mob.getZ()),
-                        new Vec2(observation.x(), observation.z()),
-                        selection.direct() && selection.player() != null
-                                && skeleton.hasLineOfSight(selection.player()),
-                        confidence);
+                        shooterPoint, sightedPoint, directVisible, confidence);
                 boolean possible = spacing.active()
                         && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
-                                level, mob.getY(), spacing.candidate());
-                if (possible) plannedDestination = spacing.candidate();
+                                level, mob.getY(), spacing.candidate())
+                        && SwarmFriendlyFireLanePolicy.isClear(
+                                spacing.candidate(), sightedPoint, frontPlayers)
+                        && hasClearSupportShot(level, mob,
+                                selection.player(), spacing.candidate());
+                if (possible) {
+                    plannedDestination = spacing.candidate();
+                } else if (directVisible && !state.bowLaneClear()
+                        && confidence >= 0.7) {
+                    var pair = SwarmSkeletonSightlinePolicy.propose(
+                            shooterPoint, sightedPoint);
+                    boolean leftPossible = pair.valid()
+                            && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                                    level, mob.getY(), pair.left())
+                            && SwarmFriendlyFireLanePolicy.isClear(
+                                    pair.left(), sightedPoint, frontPlayers)
+                            && hasClearSupportShot(level,mob,
+                                    selection.player(), pair.left());
+                    boolean rightPossible = pair.valid()
+                            && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                                    level, mob.getY(), pair.right())
+                            && SwarmFriendlyFireLanePolicy.isClear(
+                                    pair.right(), sightedPoint, frontPlayers)
+                            && hasClearSupportShot(level,mob,
+                                    selection.player(), pair.right());
+                    Vec2 newLane = SwarmSkeletonSightlinePolicy.choose(
+                            pair,leftPossible,rightPossible,assignedSlot);
+                    if (newLane != null) {
+                        possible = true;
+                        plannedDestination = newLane;
+                    }
+                }
                 state.updateRangedSpacing(possible);
             } else {
                 state.updateRangedSpacing(false);
