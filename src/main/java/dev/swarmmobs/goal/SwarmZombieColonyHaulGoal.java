@@ -3,6 +3,9 @@ package dev.swarmmobs.goal;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
+import dev.swarmmobs.colony.SwarmColonyEmergencePolicy;
+import dev.swarmmobs.colony.SwarmNestPheromoneField;
+import dev.swarmmobs.agent.SwarmTaskType;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
 import dev.swarmmobs.colony.SwarmNestHaulPolicy;
@@ -97,6 +100,11 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             return false;
         }
         int radius = SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get();
+        // Reuse a bounded local peer snapshot; no second world scan per item.
+        var nearbyPeers = level.getEntitiesOfClass(Zombie.class,
+                zombie.getBoundingBox().inflate(radius + 2),
+                other -> other != zombie && other.isAlive())
+                .stream().limit(12).toList();
         String workerId = zombie.getUUID().toString();
         ItemEntity best = null;
         double bestScore = Double.POSITIVE_INFINITY;
@@ -132,9 +140,8 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             if (SwarmNestScoutSignal.recentFor(drop, targetHome, tick)) {
                 score *= 0.75;
             }
-            if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
-                score *= nest.pheromoneCost(drop.blockPosition(), kind, tick);
-            }
+            score = emergentCost(nest, kind, score, drop.blockPosition(),
+                    nearbyPeers, tick);
             if (score < bestScore) {
                 bestScore = score;
                 best = drop;
@@ -163,14 +170,13 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 workerPos, tick, SwarmNestScoutBoard.MAX_DISTANCE,
                 lead -> SwarmNestColonyPolicy.acceptAmount(
                         nest.resources(), 1, lead.kind()) > 0,
-                lead -> SwarmNestHaulPolicy.pickupScore(lead.kind(),
-                        workerPos.distanceSquared(lead.position()),
-                        nest.soilPoints(), nest.timberPoints(),
-                        nest.nutrientPoints(), nest.legacyPoints(),
-                        nest.chamberLevel(), SwarmConfig.NEST_MAX_POPULATION.get())
-                        * (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
-                                ? nest.pheromoneCost(scoutPosition(lead), lead.kind(), tick)
-                                : 1.0));
+                lead -> emergentCost(nest, lead.kind(),
+                        SwarmNestHaulPolicy.pickupScore(lead.kind(),
+                                workerPos.distanceSquared(lead.position()),
+                                nest.soilPoints(),nest.timberPoints(),
+                                nest.nutrientPoints(),nest.legacyPoints(),
+                                nest.chamberLevel(),SwarmConfig.NEST_MAX_POPULATION.get()),
+                        scoutPosition(lead), nearbyPeers, tick));
         if (report == null || !level.hasChunkAt(scoutPosition(report))) {
             if (report != null) nest.scoutBoard().release(report.itemId(), zombie.getUUID());
             return false;
@@ -317,8 +323,17 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                     if (accepted > 0) {
                         if (scoutLead != null) nest.scoutBoard().discard(scoutLead.itemId());
                         if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                            // Crowding-sensitive deposition: successful routes
+                            // still signal, but worker traffic limits excess
+                            // positive feedback and prevents path lock-in.
+                            int companions = level.getEntitiesOfClass(
+                                    Zombie.class,zombie.getBoundingBox().inflate(4.0),
+                                    other -> other != zombie && other.isAlive()).size();
+                            double intensity = SwarmColonyEmergencePolicy
+                                    .depositionMultiplier(companions);
                             for (BlockPos sampled : returnTrail) {
-                                nest.reinforcePheromone(sampled, carriedKind, tick);
+                                nest.reinforcePheromone(sampled, carriedKind,
+                                        tick,intensity);
                             }
                         }
                     }
@@ -356,6 +371,33 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 .trySurvey(tick, 2)) return;
         lastMoveTick = tick;
         zombie.getNavigation().moveTo(x, y, z, 1.0);
+    }
+
+    private double emergentCost(SwarmNestBlockEntity nest,
+                                SwarmNestColonyPolicy.Kind kind,
+                                double baseCost, BlockPos at,
+                                java.util.List<Zombie> peers, long tick) {
+        double scent = 0, stop = 0;
+        if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+            var p = new SwarmNestPheromoneField.Position(
+                    at.getX(),at.getY(),at.getZ());
+            scent = nest.pheromones().scent(
+                    p,SwarmNestPheromoneField.signal(kind),tick);
+            stop = nest.pheromones().scent(
+                    p,SwarmNestPheromoneField.Signal.STOP,tick);
+        }
+        int crowd = (int) peers.stream().filter(peer ->
+                peer.distanceToSqr(at.getX()+.5,at.getY(),at.getZ()+.5) < 9.0)
+                .count();
+        double experience = zombie.getData(SwarmAttachments.AGENT_STATE.get())
+                .taskExperience(SwarmTaskType.MATERIAL);
+        return SwarmColonyEmergencePolicy.workCost(
+                baseCost * nest.laborFeedback().costFactor(kind,tick),
+                zombie.getUUID(),kind,
+                nest.soilPoints(),nest.timberPoints(),
+                nest.nutrientPoints()+nest.legacyPoints(),
+                SwarmColonyEmergencePolicy.sensedAttraction(
+                        zombie.getUUID(),scent),stop,crowd,experience);
     }
 
     private void rememberReturnPosition(BlockPos pos) {
