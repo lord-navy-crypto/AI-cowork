@@ -123,7 +123,7 @@ public final class SwarmConfig {
                 .define("enabled", true);
 
         TACTICAL_ROUNDS_ENABLED = BUILDER
-                .comment("EXPERIMENTAL: non-blocking 100-tick tactical phases activate only in actual COMBAT for same-target squads; separate peaceful nest labor and alert/recovery. Modifies bounded formation and safe Skeleton positioning, NEVER vanilla attacks. ON by default; can be disabled in the command center.")
+                .comment("EXPERIMENTAL: in real COMBAT, same-target squads use event-triggered HOLD/COVER/ROTATE positioning with 12-tick signal confirmation and 20-tick minimum phase hold. Congestion/navigation feedback, not a fixed timer, requests a change; never pauses vanilla attacks or work-to-combat lifecycle. ON by default; operator may disable.")
                 .define("tacticalRoundsEnabled", true);
 
         PLAN_INTERVAL_TICKS = BUILDER
