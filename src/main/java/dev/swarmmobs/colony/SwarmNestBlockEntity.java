@@ -68,6 +68,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private final SwarmNestScoutBoard scoutBoard = new SwarmNestScoutBoard();
     private final SwarmColonyWorkBoard workBoard = new SwarmColonyWorkBoard();
     private final SwarmColonyLaborFeedback laborFeedback = new SwarmColonyLaborFeedback();
+    // Sparse signals live with the loaded nest; no persisted global pheromone map.
+    private final SwarmNestPheromoneField pheromoneField = new SwarmNestPheromoneField();
     private int leaderMarks;
 
     public SwarmNestBlockEntity(BlockPos pos, BlockState state) {
@@ -103,6 +105,43 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     public SwarmNestScoutBoard scoutBoard() { return scoutBoard; }
     public SwarmColonyWorkBoard workBoard() { return workBoard; }
     public SwarmColonyLaborFeedback laborFeedback() { return laborFeedback; }
+    public SwarmNestPheromoneField pheromones() { return pheromoneField; }
+
+    public boolean markPheromone(BlockPos where, SwarmNestColonyPolicy.Kind kind, long tick) {
+        if (!(level instanceof ServerLevel server) || where == null
+                || !server.hasChunkAt(where)) return false;
+        return pheromoneField.observe(
+                new SwarmNestPheromoneField.Position(
+                        worldPosition.getX(),worldPosition.getY(),worldPosition.getZ()),
+                new SwarmNestPheromoneField.Position(where.getX(),where.getY(),where.getZ()),
+                kind,tick);
+    }
+
+    public double pheromoneCost(BlockPos at, SwarmNestColonyPolicy.Kind kind, long tick) {
+        if (at == null) return 1.0;
+        return pheromoneField.costFactor(new SwarmNestPheromoneField.Position(
+                at.getX(), at.getY(), at.getZ()), kind, tick);
+    }
+
+    public void reinforcePheromone(BlockPos at, SwarmNestColonyPolicy.Kind kind, long tick) {
+        if (at == null || !(level instanceof ServerLevel server)
+                || !server.hasChunkAt(at)) return;
+        pheromoneField.reinforce(
+                new SwarmNestPheromoneField.Position(
+                        worldPosition.getX(),worldPosition.getY(),worldPosition.getZ()),
+                new SwarmNestPheromoneField.Position(at.getX(),at.getY(),at.getZ()),
+                kind,tick);
+    }
+
+    public void inhibitPheromone(BlockPos at, SwarmNestColonyPolicy.Kind kind, long tick) {
+        if (at == null || !(level instanceof ServerLevel server)
+                || !server.hasChunkAt(at)) return;
+        pheromoneField.inhibit(
+                new SwarmNestPheromoneField.Position(
+                        worldPosition.getX(),worldPosition.getY(),worldPosition.getZ()),
+                new SwarmNestPheromoneField.Position(at.getX(),at.getY(),at.getZ()),
+                kind,tick);
+    }
 
     /** Scouts report only real, currently loaded resource entities. */
     public boolean reportScoutItem(ItemEntity item, long now) {
