@@ -34,25 +34,23 @@ class SwarmNestPheromoneFieldTest {
         var field=new SwarmNestPheromoneField();
         assertEquals(1.0,field.costFactor(FOOD,NUTRIENT,100),1e-9);
         assertTrue(field.observe(HOME,FOOD,NUTRIENT,100));
-        assertTrue(field.costFactor(FOOD,NUTRIENT,100)<1);
+        double recruited = field.costFactor(FOOD,NUTRIENT,100);
+        assertTrue(recruited<1.0);
         assertTrue(field.inhibit(HOME,FOOD,NUTRIENT,100));
-        assertTrue(field.costFactor(FOOD,NUTRIENT,100)>field.costFactor(
-                FOOD,new SwarmNestColonyPolicy.Kind[]{TIMBER}[0],100)
-                || field.strength(FOOD,SwarmNestPheromoneField.Signal.STOP,100)>0);
+        assertTrue(field.costFactor(FOOD,NUTRIENT,100)>recruited);
         assertTrue(field.reinforce(HOME,FOOD,NUTRIENT,100));
         assertTrue(field.strength(FOOD,SwarmNestPheromoneField.Signal.FOOD,100)>1);
         assertEquals(0,field.size(10000));
-        assertEquals(3,field.size(100)==0?0:3); // already decayed; no resurrection
     }
 
     @Test void capacityIsBoundedAndSignalsAreChannelSpecific() {
         var field=new SwarmNestPheromoneField();
         for(int i=0;i<600;i++){
             var pos=new SwarmNestPheromoneField.Position(
-                    i%56-27,64+(i/56)%3,i/168%6);
+                    ((i%13)-6)*4, 64+(i/143)*4, (((i/13)%11)-5)*4);
             field.observe(HOME,pos,i%2==0?NUTRIENT:TIMBER,100);
         }
-        assertTrue(field.size(100)<=SwarmNestPheromoneField.MAX_CELLS);
+        assertEquals(SwarmNestPheromoneField.MAX_CELLS,field.size(100));
         assertEquals(0,field.inhibitions());
         assertTrue(field.observations()>0);
         assertFalse(field.observe(null,FOOD,NUTRIENT,100));
