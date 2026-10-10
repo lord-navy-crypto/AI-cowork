@@ -4359,6 +4359,54 @@ public final class SwarmRuntimeGameTests {
                 helper.fail("Construction gained extra modules without new supplies");
                 return;
             }
+
+            // Damage is NOT repaired for free; the paid capacity remains 8.
+            helper.setBlock(soilPos, Blocks.AIR);
+            nest.runColonyCycle(helper.getLevel());
+            if (!helper.getLevel().getBlockState(helper.absolutePos(soilPos)).isAir()
+                    || nest.repairedShellPieces() != 0 || nest.resources() != 0) {
+                helper.fail("Nest minted a free soil repair without materials");
+                return;
+            }
+
+            // Even with real soil, an operator-disabled mobGriefing gate must win.
+            nest.deposit(SwarmNestColonyPolicy.Kind.SOIL, 1);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(false, helper.getLevel().getServer());
+            nest.runColonyCycle(helper.getLevel());
+            if (!helper.getLevel().getBlockState(helper.absolutePos(soilPos)).isAir()
+                    || nest.soilPoints() != 1 || nest.repairedShellPieces() != 0) {
+                helper.fail("Shell repair violated the mobGriefing safety gate");
+                return;
+            }
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            nest.runColonyCycle(helper.getLevel());
+            if (!helper.getLevel().getBlockState(helper.absolutePos(soilPos)).is(Blocks.DIRT)
+                    || nest.resources() != 0 || nest.soilPoints() != 0
+                    || nest.repairedShellPieces() != 1 || nest.chamberLevel() != 1) {
+                helper.fail("Paid one-point soil shell repair failed or double-charged");
+                return;
+            }
+
+            // A player block must never be replaced, even when a replacement
+            // oak log is affordable. One raw log equals three timber points.
+            helper.setBlock(timberPos, Blocks.STONE);
+            nest.deposit(SwarmNestColonyPolicy.Kind.TIMBER, 1);
+            nest.runColonyCycle(helper.getLevel());
+            if (!helper.getLevel().getBlockState(helper.absolutePos(timberPos)).is(Blocks.STONE)
+                    || nest.timberPoints() != 3 || nest.repairedShellPieces() != 1) {
+                helper.fail("Shell repair overwrote an occupied site or charged it");
+                return;
+            }
+            helper.setBlock(timberPos, Blocks.AIR);
+            nest.runColonyCycle(helper.getLevel());
+            if (!helper.getLevel().getBlockState(helper.absolutePos(timberPos)).is(Blocks.OAK_LOG)
+                    || nest.resources() != 0 || nest.timberPoints() != 0
+                    || nest.repairedShellPieces() != 2 || nest.visibleChamberLevel() != 1) {
+                helper.fail("Real timber repair was not charged exactly three points");
+                return;
+            }
             helper.succeed();
         } finally {
             SwarmConfig.NEST_LIFECYCLE_ENABLED.set(oldLifecycle);

@@ -64,6 +64,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     // Counts physical berry items spawned by a real ripe bush harvest;
     // they remain in-world and are NOT credited to nest inventory yet.
     private long foragedBerries;
+    // Repairs consume actual stored matter, never mint free blocks.
+    private long repairedShellPieces;
     // Only a nonpersistent hint board: no virtual cargo or chunk tickets.
     private final SwarmNestScoutBoard scoutBoard = new SwarmNestScoutBoard();
     private final SwarmNestOpportunityBoard opportunityBoard = new SwarmNestOpportunityBoard();
@@ -145,6 +147,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     public long hauledItems() { return hauledItems; }
     public long haulTrips() { return haulTrips; }
     public long foragedBerries() { return foragedBerries; }
+    public long repairedShellPieces() { return repairedShellPieces; }
     public void recordForagedBerries(int actualSpawnedItems) {
         if (actualSpawnedItems > 0) {
             foragedBerries += actualSpawnedItems;
@@ -241,6 +244,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         hauledItems = Math.max(0L, tag.getLong("HauledItems"));
         haulTrips = Math.max(0L, tag.getLong("HaulTrips"));
         foragedBerries = Math.max(0L, tag.getLong("ForagedBerries"));
+        repairedShellPieces = Math.max(0L, tag.getLong("RepairedShellPieces"));
         leaderMarks = Math.max(0, Math.min(3, tag.getInt("LeaderMarks")));
     }
 
@@ -263,6 +267,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         tag.putLong("HauledItems", hauledItems);
         tag.putLong("HaulTrips", haulTrips);
         tag.putLong("ForagedBerries", foragedBerries);
+        tag.putLong("RepairedShellPieces", repairedShellPieces);
         tag.putInt("LeaderMarks", leaderMarks);
     }
 
@@ -403,7 +408,10 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         // If an old colony has paid-for abstract rooms, visualize at most
         // one such room per 200-tick cycle without charging it twice.
         boolean visible = SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get();
-        if (visible && visibleChamberLevel < chamberLevel) {
+        // Rebuild one missing PAID-FOR shell block before growing again.
+        if (visible && tryRepairVisibleShell(level)) {
+            // This cycle was spent repairing; never expand in the same cycle.
+        } else if (visible && visibleChamberLevel < chamberLevel) {
             tryPlaceShellModule(level, visibleChamberLevel);
         } else if (SwarmNestArchitecturePolicy.canExtend(
                 chamberLevel, SwarmConfig.NEST_MAX_POPULATION.get(),
@@ -535,6 +543,56 @@ public final class SwarmNestBlockEntity extends BlockEntity {
      * One attempt per colony sample. Owned shell at the lower tier is the
      * only valid foundation for upper-tier elements.
      */
+    /**
+     * At most one missing shell piece can be restored each colony cycle.
+     * Charge physical stock only if placement succeeds. Occupied sites
+     * and chunks without a valid supporting structure are left untouched.
+     */
+    private boolean tryRepairVisibleShell(ServerLevel level) {
+        if (visibleChamberLevel <= 0
+                || !SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()
+                || !level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)
+                || playerNearShell(level)) {
+            return false;
+        }
+        int limit = Math.min(visibleChamberLevel, SwarmNestArchitecturePolicy.MAX_CHAMBER_LEVEL);
+        for (int chamber = 0; chamber < limit; chamber++) {
+            for (int slot = 0; slot < 2; slot++) {
+                var piece = SwarmNestVisibleShellPolicy.piece(chamber, slot);
+                BlockPos pos = worldPosition.offset(piece.x(), piece.y(), piece.z());
+                // Only an AIR hole is ours to repair. Never replace an existing
+                // player block or claim arbitrary logs/dirt as our own shell.
+                if (!level.hasChunkAt(pos) || !level.getBlockState(pos).isAir()
+                        || !level.getFluidState(pos).isEmpty()) {
+                    continue;
+                }
+                int cost = piece.soil() ? 1
+                        : SwarmNestColonyPolicy.value(SwarmNestColonyPolicy.Kind.TIMBER);
+                if ((piece.soil() ? soilPoints : timberPoints) < cost
+                        || resources < cost || !canPlaceShellPiece(level, pos, piece.y())) {
+                    continue;
+                }
+                var material = piece.soil() ? Blocks.DIRT.defaultBlockState()
+                        : Blocks.OAK_LOG.defaultBlockState();
+                if (!level.setBlockAndUpdate(pos, material)) continue;
+                if (piece.soil()) soilPoints -= cost;
+                else timberPoints -= cost;
+                resources -= cost;
+                repairedShellPieces++;
+                setChanged();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean playerNearShell(ServerLevel level) {
+        return level.players().stream().anyMatch(player ->
+                player.isAlive() && player.distanceToSqr(
+                        worldPosition.getX() + 0.5, worldPosition.getY() + 0.5,
+                        worldPosition.getZ() + 0.5) <= 12.0 * 12.0);
+    }
+
     private boolean tryPlaceShellModule(ServerLevel level, int module) {
         if (!SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()
                 || !level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)
@@ -543,11 +601,7 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
         // Keep this optional terrain modification away from people, even if
         // an already-paid abstract room is now being visualized.
-        boolean playerNearby = level.players().stream().anyMatch(player ->
-                player.isAlive() && player.distanceToSqr(
-                        worldPosition.getX() + 0.5, worldPosition.getY() + 0.5,
-                        worldPosition.getZ() + 0.5) <= 12.0 * 12.0);
-        if (playerNearby) return false;
+        if (playerNearShell(level)) return false;
 
         var soilPiece = SwarmNestVisibleShellPolicy.piece(module, 0);
         var timberPiece = SwarmNestVisibleShellPolicy.piece(module, 1);
@@ -598,7 +652,10 @@ public final class SwarmNestBlockEntity extends BlockEntity {
                         // as SUPPORTS, but never construct new crafted blocks.
                         || supporting.is(Blocks.MUD_BRICKS)
                         || supporting.is(Blocks.STRIPPED_OAK_LOG);
+        // Higher tiers MUST stand on this nest's own previously built shell,
+        // not on a player's unrelated dirt or oak-log structure.
         if (!validFoundation
+                || (tier > 0 && !ownsShellPiece(pos.below()))
                 || !supporting.isFaceSturdy(level, pos.below(), Direction.UP)) {
             return false;
         }
