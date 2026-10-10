@@ -43,6 +43,8 @@ public final class SwarmAgentState {
     private long pendingFormationSlotSinceTick = Long.MIN_VALUE;
     private long formationSlotSwitchCount;
     private SwarmRole role = SwarmRole.CHASER;
+    // Runtime-only encounter geometry, used for inspection and acceptance.
+    private String tacticalPattern = "STANDARD";
     private boolean roleInitialized;
     private SwarmRole pendingRole;
     private long pendingRoleSinceTick = Long.MIN_VALUE;
@@ -134,6 +136,7 @@ public final class SwarmAgentState {
         }
         tacticalAssignmentTarget = selectedTarget;
         resetSupportPositionState();
+        tacticalPattern = "STANDARD";
 
         formationSlotInitialized = false;
         pendingFormationSlot = -1;
@@ -280,6 +283,14 @@ public final class SwarmAgentState {
     }
     
     /** Same-target nearby members, excluding self. */
+    public String tacticalPattern() {
+        return tacticalPattern;
+    }
+
+    public void setTacticalPattern(String pattern) {
+        tacticalPattern = pattern == null ? "STANDARD" : pattern;
+    }
+
     public int tacticalPeerCount() {
         return tacticalPeerCount;
     }
