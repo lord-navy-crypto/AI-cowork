@@ -56,6 +56,7 @@ public final class SwarmAgentState {
     private long rangedSpacingStartedAt = Long.MIN_VALUE;
     private long rangedSpacingRetryAfter = Long.MIN_VALUE;
     private long rangedSpacingFallbacks;
+    private long rangedNoProgressFallbacks;
     // A failed, already-tested Minecraft destination is not automatically
     // a good destination again on the very next game tick.
     private double rangedFailedWaypointX;
@@ -64,6 +65,8 @@ public final class SwarmAgentState {
     private long zombieFlankStartedAt = Long.MIN_VALUE;
     private long zombieFlankRetryAfter = Long.MIN_VALUE;
     private long zombieFlankFallbacks;
+    private long zombieNoProgressFallbacks;
+    private boolean zombieShortFlankActive;
     private double zombieFailedWaypointX;
     private double zombieFailedWaypointZ;
     private long zombieFailedWaypointUntil = Long.MIN_VALUE;
@@ -177,6 +180,7 @@ public final class SwarmAgentState {
         rangedFailedWaypointUntil = Long.MIN_VALUE;
         zombieFlankStartedAt = Long.MIN_VALUE;
         zombieFlankRetryAfter = Long.MIN_VALUE;
+        zombieShortFlankActive = false;
         zombieFailedWaypointUntil = Long.MIN_VALUE;
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -375,6 +379,10 @@ public final class SwarmAgentState {
         return rangedSpacingFallbacks;
     }
 
+    public long rangedNoProgressFallbacks() {
+        return rangedNoProgressFallbacks;
+    }
+
     /**
      * An alternative Skeleton game square must pass both global retry
      * cooldown and the per-target recently failed waypoint check.
@@ -406,6 +414,19 @@ public final class SwarmAgentState {
                 SwarmGameHandoffTimeoutPolicy.SKELETON_MAX_MOVE_TICKS)) {
             return false;
         }
+        finishFailedRangedSpacing(tick);
+        return true;
+    }
+
+    /** Report a measured in-game waypoint stall, not merely a timer expiry. */
+    public boolean failRangedSpacingForNoProgress(long tick) {
+        if (!rangedSpacingActive || tick < 0) return false;
+        finishFailedRangedSpacing(tick);
+        rangedNoProgressFallbacks++;
+        return true;
+    }
+
+    private void finishFailedRangedSpacing(long tick) {
         rangedSpacingActive = false;
         rangedSpacingStartedAt = Long.MIN_VALUE;
         rangedSpacingRetryAfter = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
@@ -418,7 +439,6 @@ public final class SwarmAgentState {
                     tick, 180);
         }
         rangedSpacingFallbacks++;
-        return true;
     }
 
     /**
@@ -443,11 +463,38 @@ public final class SwarmAgentState {
 
     /** Called only when a visible game Zombie flank waypoint is worthwhile. */
     public boolean allowShortZombieFlank(long tick) {
-        if (tick < 0 || tick < zombieFlankRetryAfter) return false;
+        if (tick < 0 || tick < zombieFlankRetryAfter) {
+            zombieShortFlankActive = false;
+            return false;
+        }
         if (zombieFlankStartedAt == Long.MIN_VALUE) zombieFlankStartedAt = tick;
         if (SwarmGameHandoffTimeoutPolicy.timedOut(tick,
                 zombieFlankStartedAt,
                 SwarmGameHandoffTimeoutPolicy.ZOMBIE_MAX_FLANK_TICKS)) {
+            finishFailedShortZombieFlank(tick);
+            return false;
+        }
+        zombieShortFlankActive = true;
+        return true;
+    }
+
+    public boolean shortZombieFlankActive() {
+        return zombieShortFlankActive;
+    }
+
+    public long zombieNoProgressFallbacks() {
+        return zombieNoProgressFallbacks;
+    }
+
+    public boolean failShortZombieFlankForNoProgress(long tick) {
+        if (!zombieShortFlankActive || tick < 0) return false;
+        finishFailedShortZombieFlank(tick);
+        zombieNoProgressFallbacks++;
+        return true;
+    }
+
+    private void finishFailedShortZombieFlank(long tick) {
+            zombieShortFlankActive = false;
             zombieFlankStartedAt = Long.MIN_VALUE;
             zombieFlankRetryAfter = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
                     tick, SwarmGameHandoffTimeoutPolicy.ZOMBIE_RETRY_COOLDOWN_TICKS);
@@ -459,12 +506,10 @@ public final class SwarmAgentState {
                         tick, 150);
             }
             zombieFlankFallbacks++;
-            return false;
-        }
-        return true;
     }
 
     public void clearShortZombieFlank() {
+        zombieShortFlankActive = false;
         zombieFlankStartedAt = Long.MIN_VALUE;
     }
 
