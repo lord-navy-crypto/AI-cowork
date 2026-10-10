@@ -677,6 +677,9 @@ public final class SwarmCommands {
                                 + " zombieNoProgress=" + state.zombieNoProgressFallbacks()
                                 + " zombieBowLanePlanned=" + state.zombieBowLaneYieldPlanned()
                                 + " zombieBowLaneAccepted=" + state.zombieBowLaneYieldAcceptedCommands()
+                                + " speciesSpacingPlanned=" + state.routeSpacingPlanned()
+                                + " speciesSpacingSide=" + state.routeSpacingSide()
+                                + " speciesSpacingAccepted=" + state.routeSpacingAcceptedCommands()
                                 + " knownFailedSkeletonSites=" + state.recentRangedFailureLocations(source.getLevel().getGameTime())
                                 + " knownFailedZombieSites=" + state.recentZombieFailureLocations(source.getLevel().getGameTime())
                                 + " zombieFlankFallbacks=" + state.zombieFlankFallbacks()
@@ -821,6 +824,8 @@ public final class SwarmCommands {
         long zombieNoProgress = 0L;
         int zombieBowLanePlanned = 0;
         long zombieBowLaneAccepted = 0L;
+        int speciesSpacingPlanned = 0;
+        long[] speciesSpacingAccepted = new long[4];
         long gamePathRejects = 0L;
         long skeletonPathRejects = 0L;
         long zombiePathRejects = 0L;
@@ -886,6 +891,9 @@ public final class SwarmCommands {
             zombieNoProgress += state.zombieNoProgressFallbacks();
             if (state.zombieBowLaneYieldPlanned()) zombieBowLanePlanned++;
             zombieBowLaneAccepted += state.zombieBowLaneYieldAcceptedCommands();
+            if (state.routeSpacingPlanned()) speciesSpacingPlanned++;
+            speciesSpacingAccepted[SwarmAgentProfiles.profile(agent).archetype().ordinal()]
+                    += state.routeSpacingAcceptedCommands();
             gamePathRejects += state.navigationCommandRejections();
             skeletonPathRejects += state.skeletonPathRejectFallbacks();
             zombiePathRejects += state.zombiePathRejectFallbacks();
@@ -1029,7 +1037,7 @@ public final class SwarmCommands {
 
         // Aggregate of actual per-agent game tactic states, not claimed wins.
         String patternsText = patterns.toString();
-        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", skeletonWaypointHolds=" + skeletonWaypointHolds + ", skeletonMoveFallbacks=" + spacingTimeouts + ", zombieFlankFallbacks=" + zombieFlankFallbacks + ", skeletonNoProgress=" + skeletonNoProgress + ", zombieNoProgress=" + zombieNoProgress + ", zombieBowLanePlanned=" + zombieBowLanePlanned + ", zombieBowLaneAccepted=" + zombieBowLaneAccepted + ", gamePathRejects=" + gamePathRejects + ", skeletonPathRejects=" + skeletonPathRejects + ", zombiePathRejects=" + zombiePathRejects + ", skeletonFailedSites=" + skeletonFailedSites + ", zombieFailedSites=" + zombieFailedSites + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
+        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", skeletonWaypointHolds=" + skeletonWaypointHolds + ", skeletonMoveFallbacks=" + spacingTimeouts + ", zombieFlankFallbacks=" + zombieFlankFallbacks + ", skeletonNoProgress=" + skeletonNoProgress + ", zombieNoProgress=" + zombieNoProgress + ", zombieBowLanePlanned=" + zombieBowLanePlanned + ", zombieBowLaneAccepted=" + zombieBowLaneAccepted + ", activeSpeciesSpacing=" + speciesSpacingPlanned + ", zombieSpacingAccepted=" + speciesSpacingAccepted[0] + ", skeletonSpacingAccepted=" + speciesSpacingAccepted[1] + ", spiderSpacingAccepted=" + speciesSpacingAccepted[2] + ", creeperSpacingAccepted=" + speciesSpacingAccepted[3] + ", gamePathRejects=" + gamePathRejects + ", skeletonPathRejects=" + skeletonPathRejects + ", zombiePathRejects=" + zombiePathRejects + ", skeletonFailedSites=" + skeletonFailedSites + ", zombieFailedSites=" + zombieFailedSites + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
         source.sendSuccess(() -> Component.literal(summary + ", patterns=" + patternsText + mobility), false);
         return total;
     }
