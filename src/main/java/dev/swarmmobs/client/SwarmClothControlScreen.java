@@ -112,6 +112,15 @@ public final class SwarmClothControlScreen {
                         + "Previous world gamerules are not reset.");
 
         status(category, entries,
+                "Live tactics: SWEEP " + integer(values, "tacticSweep")
+                        + "  SURROUND " + integer(values, "tacticSurround")
+                        + "  STANDARD " + integer(values, "tacticStandard")
+                        + "  SEARCH " + integer(values, "tacticSearch"));
+        status(category, entries,
+                "These are live server measurements. Move in Survival to test SWEEP; "
+                        + "stand still near a same-target group to test SURROUND.");
+
+        status(category, entries,
                 "Tasks: ENG " + integer(values, "taskEngineering")
                         + "  MAT " + integer(values, "taskMaterial")
                         + "  FLANK " + integer(values, "taskFlank")
