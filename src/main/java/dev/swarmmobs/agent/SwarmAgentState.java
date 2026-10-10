@@ -3,7 +3,7 @@ package dev.swarmmobs.agent;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
-import dev.swarmmobs.algorithm.SwarmTacticalRoundPolicy;
+import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -30,9 +30,10 @@ public final class SwarmAgentState {
     private long lastLostTargetTick = Long.MIN_VALUE;
     // Hysteresis and temporary work leases must not cross target boundaries.
     private UUID tacticalAssignmentTarget;
-    private SwarmTacticalRoundPolicy.Phase tacticalPhase = SwarmTacticalRoundPolicy.Phase.HOLD;
-    private int tacticalSupportSide;
-    private long tacticalSwitchCount;
+    private int supportPositionSide;
+    private long supportPositionSwitches;
+    private long supportPositionFeasibleSamples;
+    private long supportPositionUnavailableSamples;
     private int tacticalPeerCount;
     private int tacticalBreacherCount;
     private int neighborCount;
@@ -132,7 +133,7 @@ public final class SwarmAgentState {
             return false;
         }
         tacticalAssignmentTarget = selectedTarget;
-        resetTacticalRound();
+        resetSupportPositionState();
 
         formationSlotInitialized = false;
         pendingFormationSlot = -1;
@@ -178,43 +179,51 @@ public final class SwarmAgentState {
         return engagementMode;
     }
 
-    public SwarmTacticalRoundPolicy.Phase tacticalRoundPhase() {
-        return tacticalPhase;
+    public int supportPositionSide() {
+        return supportPositionSide;
     }
 
-    public int tacticalSupportSide() {
-        return tacticalSupportSide;
+    public long supportPositionSwitches() {
+        return supportPositionSwitches;
     }
 
-    public long tacticalRoundSwitchCount() {
-        return tacticalSwitchCount;
+    public long supportPositionFeasibleSamples() {
+        return supportPositionFeasibleSamples;
     }
 
-    /** Store only the last feasible side for the same live target. */
-    public void acceptTacticalSupportDecision(
-            SwarmTacticalRoundPolicy.SupportDecision decision) {
+    public long supportPositionUnavailableSamples() {
+        return supportPositionUnavailableSamples;
+    }
+
+    /**
+     * Store the selected side for a real same-target support-position
+     * decision. Existing vanilla AI and navigator remain authoritative.
+     */
+    public void acceptSupportPositionDecision(
+            SwarmSupportPositionPolicy.SupportDecision decision) {
         if (decision == null || decision.side() == 0) {
-            tacticalPhase = SwarmTacticalRoundPolicy.Phase.HOLD;
-            tacticalSupportSide = 0;
+            supportPositionSide = 0;
+            supportPositionUnavailableSamples++;
             return;
         }
-        if (tacticalSupportSide != 0 && tacticalSupportSide != decision.side()) {
-            tacticalSwitchCount++;
+        if (supportPositionSide != 0 && supportPositionSide != decision.side()) {
+            supportPositionSwitches++;
         }
-        tacticalSupportSide = decision.side();
-        tacticalPhase = decision.phase();
+        supportPositionSide = decision.side();
+        supportPositionFeasibleSamples++;
     }
 
-    public void classifyTacticalRound(SwarmTacticalRoundPolicy.Phase phase) {
-        tacticalPhase = phase == null ? SwarmTacticalRoundPolicy.Phase.HOLD : phase;
-        // Do not erase the lane memory BEFORE the next optimization sample.
-        // A verified previous lane supplies the relocation-cost hysteresis.
+    /** Clear temporary lane memory when the optimizer is not applicable. */
+    public void clearSupportPositionSide() {
+        supportPositionSide = 0;
     }
 
-    public void resetTacticalRound() {
-        tacticalPhase = SwarmTacticalRoundPolicy.Phase.HOLD;
-        tacticalSupportSide = 0;
-        tacticalSwitchCount = 0;
+    /** A new target must not inherit the previous target's lane/counters. */
+    public void resetSupportPositionState() {
+        supportPositionSide = 0;
+        supportPositionSwitches = 0;
+        supportPositionFeasibleSamples = 0;
+        supportPositionUnavailableSamples = 0;
     }
 
     /**
