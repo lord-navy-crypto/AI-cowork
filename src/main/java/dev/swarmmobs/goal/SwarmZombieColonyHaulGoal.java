@@ -397,7 +397,8 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 nest.soilPoints(),nest.timberPoints(),
                 nest.nutrientPoints()+nest.legacyPoints(),
                 SwarmColonyEmergencePolicy.sensedAttraction(
-                        zombie.getUUID(),scent),stop,crowd,experience);
+                        zombie.getUUID(),scent),stop,crowd,experience,
+                nest.resourceDeficit(kind));
     }
 
     private void rememberReturnPosition(BlockPos pos) {
