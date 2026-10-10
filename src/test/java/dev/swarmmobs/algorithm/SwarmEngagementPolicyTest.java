@@ -12,12 +12,12 @@ class SwarmEngagementPolicyTest {
         worker.updateEngagement(true,false,10); // message without line of sight
         assertEquals(SwarmEngagementPolicy.Mode.ALERT,worker.engagementMode());
         assertFalse(SwarmEngagementPolicy.canDoNestWork(worker.engagementMode()));
-        assertFalse(SwarmEngagementPolicy.enableBattleRounds(worker.engagementMode(),5));
+        assertFalse(SwarmEngagementPolicy.canCoordinateActiveSquad(worker.engagementMode(),5));
 
         worker.updateEngagement(true,true,12); // actual sighting / fresh ally
         assertEquals(SwarmEngagementPolicy.Mode.COMBAT,worker.engagementMode());
-        assertTrue(SwarmEngagementPolicy.enableBattleRounds(worker.engagementMode(),1));
-        assertFalse(SwarmEngagementPolicy.enableBattleRounds(worker.engagementMode(),0));
+        assertTrue(SwarmEngagementPolicy.canCoordinateActiveSquad(worker.engagementMode(),1));
+        assertFalse(SwarmEngagementPolicy.canCoordinateActiveSquad(worker.engagementMode(),0));
         worker.updateEngagement(true,false,25); // brief drop in direct vision
         assertEquals(SwarmEngagementPolicy.Mode.COMBAT,worker.engagementMode());
         worker.updateEngagement(true,false,37); // beyond 20 tick grace
@@ -43,13 +43,13 @@ class SwarmEngagementPolicyTest {
     }
 
     @Test void combatOnlyCoordinationDoesNotReplaceOrdinaryWorkMode() {
-        assertFalse(SwarmEngagementPolicy.enableBattleRounds(
+        assertFalse(SwarmEngagementPolicy.canCoordinateActiveSquad(
                 SwarmEngagementPolicy.Mode.WORK,4));
-        assertFalse(SwarmEngagementPolicy.enableBattleRounds(
+        assertFalse(SwarmEngagementPolicy.canCoordinateActiveSquad(
                 SwarmEngagementPolicy.Mode.RECOVERY,4));
-        assertFalse(SwarmEngagementPolicy.enableBattleRounds(
+        assertFalse(SwarmEngagementPolicy.canCoordinateActiveSquad(
                 SwarmEngagementPolicy.Mode.ALERT,4));
-        assertTrue(SwarmEngagementPolicy.enableBattleRounds(
+        assertTrue(SwarmEngagementPolicy.canCoordinateActiveSquad(
                 SwarmEngagementPolicy.Mode.COMBAT,1));
     }
 
