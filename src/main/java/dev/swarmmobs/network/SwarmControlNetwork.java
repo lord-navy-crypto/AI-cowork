@@ -746,6 +746,8 @@ public final class SwarmControlNetwork {
         int agentsWithTacticalBreacher = 0;
         int workAgents = 0, alertAgents = 0, combatAgents = 0, recoveringAgents = 0;
         int tacticSweep = 0, tacticSurround = 0, tacticStandard = 0, tacticSearch = 0;
+        int searchRallying = 0;
+        long searchRallyEpisodes = 0;
         int laneDiverted = 0;
         long laneDiversionSamples = 0;
         long laneBlockedFallbacks = 0;
@@ -781,6 +783,8 @@ public final class SwarmControlNetwork {
                 SwarmAgentState tacticalState =
                         mob.getData(SwarmAttachments.AGENT_STATE.get());
                 if (tacticalState.targetId() != null) {
+                    if (tacticalState.searchRallyActive()) searchRallying++;
+                    searchRallyEpisodes += tacticalState.searchRallyEpisodes();
                     if (tacticalState.crowdLaneSide() != 0) laneDiverted++;
                     laneDiversionSamples += tacticalState.crowdLaneUses();
                     laneBlockedFallbacks += tacticalState.crowdLaneRejected();
@@ -854,6 +858,8 @@ public final class SwarmControlNetwork {
                 pair("tacticSurround", tacticSurround),
                 pair("tacticStandard", tacticStandard),
                 pair("tacticSearch", tacticSearch),
+                pair("searchRallying", searchRallying),
+                pair("searchRallyEpisodes", Math.min(Integer.MAX_VALUE, searchRallyEpisodes)),
                 pair("optimizedSupportAgents", optimizedSupportAgents),
                 pair("supportLaneSwitches", Math.min(Integer.MAX_VALUE,supportLaneSwitches)),
                 pair("supportFeasibleSamples", Math.min(Integer.MAX_VALUE,supportFeasibleSamples)),
