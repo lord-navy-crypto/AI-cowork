@@ -3998,6 +3998,71 @@ public final class SwarmRuntimeGameTests {
     }
 
     @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_adjacent_ownership",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void nearbyHivesDoNotCountOrRecruitEachOthersMembers(
+            GameTestHelper helper) {
+        BlockPos coreA = new BlockPos(0,1,2);
+        BlockPos coreB = new BlockPos(4,1,2);
+        helper.setBlock(coreA,SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(coreB,SwarmNestBlocks.NEST_CORE.get());
+        var one=helper.getLevel().getBlockEntity(helper.absolutePos(coreA));
+        var two=helper.getLevel().getBlockEntity(helper.absolutePos(coreB));
+        if (!(one instanceof SwarmNestBlockEntity first)
+                || !(two instanceof SwarmNestBlockEntity second)) {
+            helper.fail("Adjacent Nest Core block entities were not created");
+            return;
+        }
+        Zombie worker=helper.spawn(EntityType.ZOMBIE,new BlockPos(1,1,2));
+        Skeleton guard=helper.spawn(EntityType.SKELETON,new BlockPos(3,1,2));
+        worker.setNoAi(true);
+        worker.setNoGravity(true);
+        guard.setNoAi(true);
+        guard.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(coreA).asLong());
+        guard.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(coreB).asLong());
+
+        TestPlayerHandle observer=createTickingTestPlayer(helper,GameType.SURVIVAL);
+        boolean oldLifecycle=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        try {
+            var player=observer.player();
+            player.setNoGravity(true);
+            Vec3 watch=helper.absoluteVec(new Vec3(20,1,2));
+            player.setPos(watch.x,watch.y,watch.z);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            first.runColonyCycle(helper.getLevel());
+            second.runColonyCycle(helper.getLevel());
+            if (first.lastPopulation()!=1 || second.lastPopulation()!=1
+                    || worker.getPersistentData().getLong("SwarmColonyNest")
+                            != helper.absolutePos(coreA).asLong()
+                    || guard.getPersistentData().getLong("SwarmColonyNest")
+                            != helper.absolutePos(coreB).asLong()) {
+                helper.fail("Foreign hive member counted or rehomed by adjacent active core");
+                return;
+            }
+
+            // The previous home is LOADED and demonstrably gone: B may
+            // adopt the now-orphaned idle worker without loading chunks.
+            helper.setBlock(coreA,Blocks.AIR);
+            second.runColonyCycle(helper.getLevel());
+            if (second.lastPopulation()!=2
+                    || worker.getPersistentData().getLong("SwarmColonyNest")
+                            != helper.absolutePos(coreB).asLong()
+                    || !helper.getLevel().dimension().location().toString().equals(
+                            worker.getPersistentData().getString("SwarmColonyDimension"))) {
+                helper.fail("Known destroyed home did not recover membership safely");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            observer.close();
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(oldLifecycle);
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
     @GameTest(batch = "swarm_runtime_colony_resource_accounting",
             templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 80)
     public static void colonyNestResourceStorageIsFiniteAndRequiresRealMaterial(GameTestHelper helper) {
