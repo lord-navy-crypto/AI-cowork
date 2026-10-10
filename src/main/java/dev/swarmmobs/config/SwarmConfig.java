@@ -69,6 +69,7 @@ public final class SwarmConfig {
     public static final ModConfigSpec.BooleanValue NEST_HAULING_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_BERRY_FORAGING_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_BLOCK_GATHER_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_CROP_REPLANT_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_ANIMAL_HUNT_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_PHEROMONES_ENABLED;
     public static final ModConfigSpec.BooleanValue NEST_PHEROMONE_EXPLORATION_ENABLED;
@@ -370,6 +371,10 @@ public final class SwarmConfig {
         NEST_BLOCK_GATHER_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombie workers may mine actual soil/log blocks and harvest ripe crops for colony resources; affects player builds and farms intentionally when enabled. Requires lifecycle, hauling and mobGriefing.")
                 .define("nestBlockGatherEnabled", false);
+
+        NEST_CROP_REPLANT_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: after harvesting ripe vanilla field crops, use ONE newly physically dropped planting item to replant. WHEAT/CARROTS/POTATOES/BEETROOTS/NETHER_WART only. No free items. Requires block gathering. OFF by default.")
+                .define("nestCropReplantEnabled", false);
 
         NEST_ANIMAL_HUNT_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombie workers may hunt adult farm animals to create vanilla physical food drops. Requires lifecycle, hauling and mobGriefing.")
