@@ -279,6 +279,11 @@ public final class SwarmClothControlScreen {
                 "nestBlockGatherEnabled", "nest_block_gather_toggle", false,
                 "Workers may break actual world dirt/log blocks including player-built structures, and pick fully grown wheat/carrots/potatoes/beetroots/nether wart/cocoa/melons/pumpkins/mushrooms/sugar cane. All items remain in the world until hauled.");
 
+        toggle(category, entries, values,
+                "Renewable crop replanting (consumes ONE physical seed)",
+                "nestCropReplantEnabled", "nest_crop_replant_toggle", false,
+                "OFF by default: after harvesting a mature wheat/carrot/potato/beetroot/nether-wart crop, consume one newly dropped actual planting item and replant a juvenile plant on suitable farm soil. Requires enabled block harvesting; no synthetic seeds or loot.");
+
         intField(category, entries, values,
                 "Animal and block survey interval (ticks)",
                 "nestGatherInterval", "nest_gather_interval_delta", 160,
