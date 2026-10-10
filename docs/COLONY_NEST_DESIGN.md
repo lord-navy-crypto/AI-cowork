@@ -594,3 +594,82 @@ These are discrete deterministic checks. **Not yet established:** multi-hour
 optimality; robust path-following over large natural obstacles; a true
 comparison against biological trail data; swarm crowding-dependent trail
 deposition rates.
+
+## Joining combat-swarm AI and pheromone ecology: one local choice equation
+
+**Architecture:** existing tactical `SwarmTaskBidPolicy` remains solely
+responsible for the high-priority target/combat/engineering state, and
+`SwarmZombieColonyGatherGoal`, `SwarmZombieColonyHaulGoal`, and
+`SwarmZombiePheromoneExploreGoal` retain their low-priority idle and
+operator-permission checks. Rather than inventing a second global AI, all
+three now **reuse** existing swarm building blocks while idle:
+
+- `SwarmTaskBidPolicy.responseThreshold(worker UUID, MATERIAL/ENGINEERING)`
+  provides reproducible *individual differences*, as in original task
+  threshold-based swarm allocation.
+- `SwarmColonySciencePolicy.response(s, theta)` provides the original
+  mathematical stimulus-response curve, `p = s²/(s² + theta²)`.
+- `SwarmAgentState.taskExperience(MATERIAL/ENGINEERING)` gives existing
+  experience a small, bounded effect on corresponding resource bids.
+- Existing `SwarmCongestionPolicy.countWithin` now penalizes locally
+  crowded directions of pheromone-only exploration. Mining/hauling also
+  snapshot a bounded number of real nearby Zombie positions during their
+  already-budgeted survey to discourage resource-site congestion.
+- Local physical `SwarmNestPheromoneField` FOOD/TIMBER/SOIL/STOP and
+  existing `SwarmColonyLaborFeedback` adjust the SAME worker task scores.
+  They do not reassign Skeleton archery, Creeper combat, or Spider movement.
+
+For a physically valid resource candidate, the model computes
+
+```
+shortage = clamp((target_stock - available_stock) / target_stock, 0, 1)
+s        = 0.12 + 0.80*shortage + 0.09*local_attraction
+p        = s*s / (s*s + worker_threshold*worker_threshold)
+
+cost = base_distance_and_shortage_cost
+     * clamp(
+         (1 + 0.28*nearby_workers) * (1 + 0.30*STOP_scent)
+         / ((0.55 + 0.65*p) * (1 + 0.16*local_attraction)
+            * (1 + 0.10*existing_task_experience)),
+         0.50, 3.50)
+     * existing_colony_feedback_factor
+```
+
+Lowest cost wins. **Stock-room, real-resource validation, combat state,
+operator switches, claim ownership and unloaded-chunk checks still have
+precedence over this heuristic.** Attraction and STOP are local signals
+queried at the real source coordinate. No information is fabricated.
+Within an active scent field, roughly 1/8 of UUIDs have an independent
+explorer phenotype and read only 35% of resource attraction (but retain
+full STOP sensitivity). This preserves a modest exploration/exploitation
+split without a global leader or cross-tick random thrashing.
+
+At the actual *delivery* event, a bounded near-dock count of other Zombies
+reduces the intensity deposited along the sampled physical return route:
+
+```
+deposit_multiplier = 1 / (1 + 0.55*min(nearby_workers,8))
+```
+
+This implements a **negative feedback on positive recruitment** distinct
+from STOP cues for failed routes. These coefficients are game-model
+assumptions, not measured ant pheromone deposition probabilities.
+The motivation is grounded in:
+- Theraulaz, Bonabeau & Deneubourg (1998), *Response threshold reinforcements
+  and division of labour in insect societies*, Proceedings of the Royal
+  Society B, DOI 10.1098/rspb.1998.0299
+- Czaczkes et al. (2013), *Negative feedback in ants: crowding results in
+  less trail pheromone deposition*, Biology Letters, DOI
+  10.1098/rsbl.2012.1009
+- Grüter et al. (2012), *Negative Feedback Enables Fast and Flexible
+  Collective Decision-Making in Ants*, PLOS ONE 7:e44501, DOI
+  10.1371/journal.pone.0044501
+
+**Verification scope:** pure JUnit tests cover increased need response,
+small stable explorer minorities, no infinite feedback, congestion inhibition
+and scaled physical pheromone return. One Minecraft runtime test gives a
+Zombie two equally distant raw logs: a local real-source pheromone mark
+should break the tie, while exactly one physical log gets mined. This does
+not yet establish whole-colony self-organized route optimality in varying
+natural terrain; that requires a separate multi-agent benchmark with
+experimental controls.
