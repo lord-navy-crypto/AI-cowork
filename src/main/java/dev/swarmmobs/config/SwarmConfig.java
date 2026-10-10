@@ -123,7 +123,7 @@ public final class SwarmConfig {
                 .define("enabled", true);
 
         TACTICAL_ROUNDS_ENABLED = BUILDER
-                .comment("EXPERIMENTAL: in real COMBAT, same-target squads use event-triggered HOLD/COVER/ROTATE positioning with 12-tick signal confirmation and 20-tick minimum phase hold. Congestion/navigation feedback, not a fixed timer, requests a change; never pauses vanilla attacks or work-to-combat lifecycle. ON by default; operator may disable.")
+                .comment("EXPERIMENTAL: sampled geometry-based coordination for same-target COMBAT squads. Verified candidate positions are compared by travel distance plus separation violations (in blocks); prior viable lane is kept unless changing saves at least one mob width. No fixed round clock, timed phase holds, or combat damage multipliers. Vanilla movement/combat and WORK/ALERT/RECOVERY remain independent. ON by default; operator may disable.")
                 .define("tacticalRoundsEnabled", true);
 
         PLAN_INTERVAL_TICKS = BUILDER
