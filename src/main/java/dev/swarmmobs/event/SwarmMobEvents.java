@@ -207,12 +207,6 @@ public final class SwarmMobEvents {
                             && gameTick-observedAt <= SwarmEngagementPolicy.DIRECT_GRACE_TICKS;
                 });
         state.updateEngagement(true,squadCombat,gameTick);
-        final boolean battleRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
-                && SwarmEngagementPolicy.enableBattleRounds(
-                        state.engagementMode(),tacticalNeighbors.size());
-        final SwarmTacticalRoundPolicy.Phase combatRound = battleRounds
-                ? SwarmTacticalRoundPolicy.phase(observation.targetId(),gameTick)
-                : SwarmTacticalRoundPolicy.Phase.HOLD;
         if (selection.direct()) {
             state.recordDirectReacquisition(gameTick, observation.targetId());
         }
@@ -295,6 +289,46 @@ public final class SwarmMobEvents {
                 gameTick,
                 SwarmConfig.TARGET_MEMORY_TICKS.get()
         );
+
+        final boolean battleRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
+                && SwarmEngagementPolicy.enableBattleRounds(
+                        state.engagementMode(), tacticalNeighbors.size());
+        final SwarmTacticalRoundPolicy.Phase combatRound;
+        if (battleRounds) {
+            // Reactive, per-target local coordination. Reuse peers gathered
+            // by the existing planner; do not add world queries or new Goals.
+            boolean supportPresent = profile.archetype()
+                    == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
+                    || tacticalNeighbors.stream().anyMatch(peer ->
+                            SwarmAgentProfiles.profile(peer).archetype()
+                                    == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT);
+            boolean frontlinePresent =
+                    profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
+                    || profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER
+                    || tacticalNeighbors.stream().anyMatch(peer -> {
+                        var kind = SwarmAgentProfiles.profile(peer).archetype();
+                        return kind == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
+                                || kind == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER;
+                    });
+            double clearance = SwarmConfig.SEPARATION_RADIUS.get();
+            long crowdedPeers = tacticalNeighbors.stream()
+                    .filter(peer -> mob.distanceToSqr(peer) < clearance * clearance)
+                    .limit(2)
+                    .count();
+            boolean blockedNavigation = state.plannerCandidateCount() > 0
+                    && state.plannerBlockedCount() > 0
+                    && state.plannerFeasibleCount() == 0;
+            // No interval-expiration switch: without crowding or navigation
+            // trouble, a mixed squad remains steadily in COVER.
+            combatRound = state.updateTacticalRound(
+                    new SwarmTacticalRoundPolicy.Signals(
+                            squadCombat, supportPresent, frontlinePresent,
+                            crowdedPeers >= 2, blockedNavigation),
+                    gameTick);
+        } else {
+            state.resetTacticalRound();
+            combatRound = SwarmTacticalRoundPolicy.Phase.HOLD;
+        }
 
         double aiFormationMultiplier = activeStrategy == null
                 ? 1.0
