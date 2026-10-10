@@ -17,6 +17,8 @@ public final class SwarmNestScienceTelemetry {
             double averagePopulation, int chamberLevel, int visibleChamberLevel,
             int colonyCapacity, int soilPoints, int timberPoints,
             int nutrientPoints, int legacyPoints, int resourceTotal,
+            int targetSoil, int targetTimber, int targetFood,
+            int ownedShellPieces,
             long births, long hauledItems, long haulTrips, long foragedBerries,
             int activeWorkSites, int scoutItemLeads,
             int activeOpportunities, int opportunityWorkers,
@@ -36,7 +38,8 @@ public final class SwarmNestScienceTelemetry {
             SwarmColonySciencePolicy.evaluate(0, 0, 0, 0, 1, 0, 0.4, 0.25, 0.55);
     private static final Snapshot EMPTY = new Snapshot(
             -1L, 0, 0, 0, 0, 0, 0, 0, 0.0,
-            0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 4, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0L, 0L,
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             0, 0, 0, 0, EMPTY_MODEL);
@@ -50,7 +53,10 @@ public final class SwarmNestScienceTelemetry {
                 nest.populationSamples(), nest.meanPopulation(),
                 nest.chamberLevel(), nest.visibleChamberLevel(), nest.effectiveCapacity(),
                 nest.soilPoints(), nest.timberPoints(), nest.nutrientPoints(),
-                nest.legacyPoints(), nest.resources(), nest.births(),
+                nest.legacyPoints(), nest.resources(),
+                nest.stockTargets().soil(),nest.stockTargets().timber(),
+                nest.stockTargets().food(),nest.visibleChamberLevel()*2,
+                nest.births(),
                 nest.hauledItems(), nest.haulTrips(), nest.foragedBerries(),
                 nest.workBoard().size(level.getGameTime()),
                 nest.scoutBoard().size(level.getGameTime()),
