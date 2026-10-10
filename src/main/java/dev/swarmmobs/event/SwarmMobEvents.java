@@ -10,6 +10,7 @@ import dev.swarmmobs.agent.SwarmSpecialization;
 import dev.swarmmobs.agent.SwarmTaskType;
 import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
+import dev.swarmmobs.algorithm.SwarmAdaptiveTacticsPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
@@ -421,6 +422,7 @@ public final class SwarmMobEvents {
         );
 
         if (searchMode) {
+            state.setTacticalPattern("SEARCH");
             state.beginSearchEpisode(gameTick, observation.targetId());
             state.clearPredictionTelemetry();
 
@@ -505,13 +507,25 @@ public final class SwarmMobEvents {
                         .formationRadiusMultiplier(state.specialization());
             }
 
+            // Distinct Minecraft squad geometries use only a recent, shared
+            // target observation plus physical same-target peers, never a
+            // hidden live player location or invented turn-based "round".
+            var tacticalFrame = SwarmAdaptiveTacticsPolicy.choose(
+                    observation, gameTick, confidence,
+                    tacticalNeighbors.stream()
+                            .map(peer -> new Vec2(peer.getX(),peer.getZ()))
+                            .toList(),
+                    SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
+            );
+            state.setTacticalPattern(tacticalFrame.pattern().name());
+
             SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
                     tacticalRole,
                     assignedSlot,
                     new Vec2(mob.getX(), mob.getZ()),
                     selfVelocity,
                     new Vec2(prediction.x(), prediction.z()),
-                    new Vec2(observation.forwardX(), observation.forwardZ()),
+                    tacticalFrame.forward(),
                     neighborPositions,
                     neighborVelocities,
                     slots,
@@ -523,7 +537,8 @@ public final class SwarmMobEvents {
                     SwarmConfig.MAX_STEERING_CORRECTION.get()
             );
 
-            Vec2 plannedDestination = plan.destination();
+            Vec2 plannedDestination = SwarmAdaptiveTacticsPolicy.refineDestination(
+                    tacticalFrame, plan.destination(), tacticalRole, profile.archetype());
 
             if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT) {
                 // Only allies on the same active target count. Do not let
