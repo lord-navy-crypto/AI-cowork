@@ -95,6 +95,28 @@ class SwarmTacticalHandoffStateTest {
         assertEquals(2,state.navigationEpisodeResets());
     }
 
+    @Test void missingFlankCoverageCountsRealReplacementEpisodes() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(0, 7));
+        state.updateVacantFlankCoverage(true);
+        state.updateVacantFlankCoverage(true);
+        assertTrue(state.coveringVacantFlank());
+        assertEquals(1, state.vacantFlankCoverageEpisodes());
+        state.updateVacantFlankCoverage(false);
+        assertFalse(state.coveringVacantFlank());
+        state.updateVacantFlankCoverage(true);
+        assertEquals(2, state.vacantFlankCoverageEpisodes());
+    }
+
+    @Test void targetChangeStopsOldFlankFillButKeepsHistoricalCount() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(0, 7));
+        state.updateVacantFlankCoverage(true);
+        state.bindTacticalTarget(new UUID(0, 8));
+        assertFalse(state.coveringVacantFlank());
+        assertEquals(1, state.vacantFlankCoverageEpisodes());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));

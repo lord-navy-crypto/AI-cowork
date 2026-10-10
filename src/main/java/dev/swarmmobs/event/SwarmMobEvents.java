@@ -9,6 +9,7 @@ import dev.swarmmobs.agent.SwarmRole;
 import dev.swarmmobs.agent.SwarmSpecialization;
 import dev.swarmmobs.agent.SwarmTaskType;
 import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
+import dev.swarmmobs.algorithm.SwarmLocalRoleCoveragePolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmAdaptiveTacticsPolicy;
 import dev.swarmmobs.algorithm.SwarmPackDecongestionPolicy;
@@ -436,11 +437,32 @@ public final class SwarmMobEvents {
             state.resetActiveSpecialization();
         }
 
-        SwarmRole tacticalRole = state.stabilizeRole(
+        // Actual observed Spider coverage determines which flank is vacant.
+        // Keep existing engineering/material workers and one assault front
+        // anchor; deterministically offer spare same-target Zombies the
+        // missing flank assignment without a centralized squad commander.
+        var coverage = SwarmLocalRoleCoveragePolicy.choose(
+                mob.getUUID(), profile.archetype(), state.currentTask(),
                 candidateRole,
+                tacticalNeighbors.stream().map(peer -> {
+                    SwarmAgentState peerState = peer.getData(
+                            SwarmAttachments.AGENT_STATE.get());
+                    return new SwarmLocalRoleCoveragePolicy.Member(
+                            peer.getUUID(), SwarmAgentProfiles.profile(peer).archetype(),
+                            peerState.role(), peerState.currentTask());
+                }).toList(),
+                SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
+                        && !searchMode && squadCombat && confidence >= 0.65);
+        boolean urgentVacancy = coverage.fillingMissingFlank() || coverage.frontAnchor();
+        SwarmRole tacticalRole = state.stabilizeRole(
+                coverage.role(),
                 gameTick,
-                SwarmConfig.ROLE_HYSTERESIS_TICKS.get()
+                urgentVacancy
+                        ? Math.min(8, SwarmConfig.ROLE_HYSTERESIS_TICKS.get())
+                        : SwarmConfig.ROLE_HYSTERESIS_TICKS.get()
         );
+        state.updateVacantFlankCoverage(
+                coverage.fillingMissingFlank() && tacticalRole == coverage.role());
 
         if (searchMode) {
             state.setTacticalPattern("SEARCH");
