@@ -3,6 +3,10 @@ package dev.swarmmobs.goal;
 import dev.swarmmobs.agent.SwarmAgentState;
 import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
+import dev.swarmmobs.colony.SwarmColonyEmergencePolicy;
+import dev.swarmmobs.colony.SwarmNestPheromoneField;
+import dev.swarmmobs.agent.SwarmTaskType;
+import java.util.List;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.config.SwarmConfig;
@@ -73,6 +77,12 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                         > 24.0 * 24.0) return false;
         if (!BUDGETS.computeIfAbsent(level, unused -> new SwarmNestSurveyBudget())
                 .trySurvey(tick, 12)) return false;
+        // Use one bounded peer snapshot per permitted survey. Real neighbors,
+        // not an obsolete combat task estimate, determine local crowding.
+        List<Zombie> peers = level.getEntitiesOfClass(
+                Zombie.class, zombie.getBoundingBox().inflate(8.0),
+                other -> other != zombie && other.isAlive())
+                .stream().limit(12).toList();
         double best = Double.POSITIVE_INFINITY;
         BlockPos chosen = null;
         BlockState stateChosen = null;
@@ -95,13 +105,33 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                     double dx2 = zombie.getX() - (test.getX() + .5);
                     double dz2 = zombie.getZ() - (test.getZ() + .5);
                     double dy2 = zombie.getY() - test.getY();
-                    double score = SwarmColonyGatherPolicy.score(kind,
+                    double base = SwarmColonyGatherPolicy.score(kind,
                             dx2 * dx2 + dy2 * dy2 + dz2 * dz2,
                             nest.soilPoints(), nest.timberPoints(),
                             nest.nutrientPoints() + nest.legacyPoints())
-                            * nest.laborFeedback().costFactor(kind, tick)
-                            * (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
-                                    ? nest.pheromoneCost(test, kind, tick) : 1.0);
+                            * nest.laborFeedback().costFactor(kind, tick);
+                    int localPeers = (int) peers.stream().filter(peer ->
+                            peer.distanceToSqr(test.getX() + .5,
+                                    test.getY(), test.getZ() + .5) < 9.0).count();
+                    double scent = 0, stop = 0;
+                    if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                        var p = new SwarmNestPheromoneField.Position(
+                                test.getX(),test.getY(),test.getZ());
+                        scent = nest.pheromones().scent(p,
+                                SwarmNestPheromoneField.signal(kind),tick);
+                        stop = nest.pheromones().scent(p,
+                                SwarmNestPheromoneField.Signal.STOP,tick);
+                    }
+                    SwarmTaskType task = kind == SwarmNestColonyPolicy.Kind.NUTRIENT
+                            ? SwarmTaskType.MATERIAL : SwarmTaskType.ENGINEERING;
+                    double score = SwarmColonyEmergencePolicy.workCost(
+                            base,zombie.getUUID(),kind,
+                            nest.soilPoints(),nest.timberPoints(),
+                            nest.nutrientPoints()+nest.legacyPoints(),
+                            SwarmColonyEmergencePolicy.sensedAttraction(
+                                    zombie.getUUID(),scent),stop,
+                            localPeers,zombie.getData(
+                                    SwarmAttachments.AGENT_STATE.get()).taskExperience(task));
                     if (score < best) {
                         best = score;
                         chosen = test;
