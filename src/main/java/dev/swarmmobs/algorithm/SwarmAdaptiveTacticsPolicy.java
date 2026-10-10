@@ -89,6 +89,30 @@ public final class SwarmAdaptiveTacticsPolicy {
                 Math.min(2.0, frame.leadBlocks()) * factor));
     }
 
+    /**
+     * An otherwise rearward ASSAULT game slot can take a small waypoint on
+     * the far side of a stationary target during SURROUND. This yields an
+     * actual different approach corridor, not merely a new tactical label.
+     * Vanilla block/path validation and normal melee handoff still apply.
+     */
+    public static Vec2 farSideWaypoint(Frame frame, Vec2 original,
+            Vec2 observedTarget, double formationRadius,
+            SwarmRole role, SwarmAgentArchetype archetype) {
+        if (frame == null || frame.pattern() != Pattern.SURROUND
+                || role != SwarmRole.REAR_PRESSURE
+                || archetype != SwarmAgentArchetype.ASSAULT
+                || !finite(original) || !finite(observedTarget)
+                || !finite(frame.forward())
+                || !Double.isFinite(formationRadius)
+                || formationRadius <= 0.0) {
+            return original;
+        }
+        // Half the ordinary formation radius, capped at three game blocks
+        // so the route cannot demand a deep arbitrary detour.
+        double offset = Math.min(3.0, 0.5 * formationRadius);
+        return observedTarget.add(frame.forward().scale(offset));
+    }
+
     private static Vec2 facing(TargetObservation observation) {
         if (observation != null
                 && Double.isFinite(observation.forwardX())
