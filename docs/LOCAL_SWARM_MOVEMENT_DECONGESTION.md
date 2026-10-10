@@ -24,9 +24,16 @@ formation-slot parity. A previously chosen side gets a small stability margin
 and can only be switched after 20 ticks to avoid thrashing.
 
 The selected waypoint deviates at most 2.5 blocks from the existing
-destination. Minecraft pathfinding, obstacle avoidance, terrain checks,
-vanilla movement/attack handoff, bounded search and existing ally behavior
-remain authoritative.
+destination. Before applying a diversion, the server checks the two proposed
+game-block positions for loaded chunks, ground support, free headroom and
+absence of obstructing fluid. If the preferred lane is blocked, the alternate
+is attempted; if both are blocked, the **original destination remains**.
+No additional world chunks are loaded and no extra entity scans are needed.
+A real blocked location immediately overrides the 20-tick lane hold so that
+an NPC does not persist with an obviously unusable diversion.
+Minecraft's regular pathfinding and obstacle avoidance still determine whether
+the rest of each route is reachable; this local check is not a guarantee of a
+valid full path.
 
 No effect when alone, with only one nearby peer, without a valid observation,
 when division-of-labor/planner state isn't active, or for Spiders/Skeletons/
@@ -45,8 +52,10 @@ the results with the same number of non-swarm vanilla Zombies.
 ```
 
 Inspect now reports `crowdLane` (0 / +1 / -1) and `crowdLaneSamples`.
-The group command adds `localLaneDiverted` and `laneSamples`. The Cloth
-Command Center Overview displays the same server-sourced counters.
+The group command adds `localLaneDiverted`, `laneSamples` and
+`blockedLaneFallbacks`. The Cloth Command Center Overview displays the same
+server-sourced counters. A nonzero fallback count means a proposed
+local diversion was rejected after the real game block checks.
 
 These are actual movement **decisions**, not a claim that every chosen route
 is reachable. Test obstacles, narrow corridors, mixed mob groups, solo mobs,
