@@ -195,6 +195,24 @@ public final class SwarmMobEvents {
                 movementNeighbors,
                 peer -> peer.getData(SwarmAttachments.AGENT_STATE.get()).targetId()
         );
+        // Reuse the already acquired same-target neighbors. This is the
+        // actual CURRENT Skeleton -> player game shot corridor, separate
+        // from the two proposed support positions checked below.
+        // RangedBowAttackGoal yields its MOVE handoff when a known allied
+        // Zombie/Creeper stands directly in the firing lane.
+        if (mob instanceof Skeleton && selection.direct()
+                && selection.player() != null) {
+            List<Vec2> blockingAllies = tacticalNeighbors.stream()
+                    .filter(peer -> peer instanceof Zombie || peer instanceof Creeper)
+                    .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                    .toList();
+            state.setBowLaneClear(SwarmFriendlyFireLanePolicy.isClear(
+                    new Vec2(mob.getX(), mob.getZ()),
+                    new Vec2(selection.player().getX(), selection.player().getZ()),
+                    blockingAllies));
+        } else {
+            state.setBowLaneClear(true);
+        }
         // A relayed sighting is ALERT, not permission to override combat.
         // A genuinely fighting same-target neighbor can locally recruit
         // a defender even before its own line-of-sight opens.
