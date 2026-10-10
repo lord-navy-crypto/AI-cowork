@@ -51,6 +51,10 @@ public final class SwarmAgentState {
     private long searchRallyEpisodes;
     // Updated by local same-target sightings, consulted by vanilla bow handoff.
     private boolean bowLaneClear = true;
+    // Planned local Zombie corridor yield is not a successful Minecraft
+    // movement until PathNavigation accepts the actual PLAN destination.
+    private boolean zombieBowLaneYieldPlanned;
+    private long zombieBowLaneYieldAcceptedCommands;
     // Minecraft Skeleton has a locally checked open square to regain distance.
     private boolean rangedSpacingActive;
     private long rangedSpacingEpisodes;
@@ -177,6 +181,7 @@ public final class SwarmAgentState {
         searchRallyActive = false;
         coveringVacantFlank = false;
         bowLaneClear = true;
+        zombieBowLaneYieldPlanned = false;
         rangedSpacingActive = false;
         rangedSpacingStartedAt = Long.MIN_VALUE;
         rangedSpacingRetryAfter = Long.MIN_VALUE;
@@ -344,6 +349,23 @@ public final class SwarmAgentState {
     /** Snapshot from the last local combat plan; not a raycast every tick. */
     public boolean bowLaneClear() {
         return bowLaneClear;
+    }
+
+    public boolean zombieBowLaneYieldPlanned() {
+        return zombieBowLaneYieldPlanned;
+    }
+
+    public void updateZombieBowLaneYieldPlan(boolean planned) {
+        zombieBowLaneYieldPlanned = planned;
+    }
+
+    /** Count accepted game movement commands, not unexecuted UI plans. */
+    public long zombieBowLaneYieldAcceptedCommands() {
+        return zombieBowLaneYieldAcceptedCommands;
+    }
+
+    public void recordZombieBowLaneYieldAccepted() {
+        zombieBowLaneYieldAcceptedCommands++;
     }
 
     public void setBowLaneClear(boolean clear) {
