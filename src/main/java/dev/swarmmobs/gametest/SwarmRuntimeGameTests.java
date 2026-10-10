@@ -4948,6 +4948,24 @@ public final class SwarmRuntimeGameTests {
                     || nest.nutrientPoints() != 0) {
                 helper.fail("Real pig must die from normal melee, dropping actual meat"); return;
             }
+            ItemEntity actualMeat = meat.getFirst();
+            int realMeatCount = actualMeat.getItem().getCount();
+            var haul = new SwarmZombieColonyHaulGoal(worker);
+            if (!haul.canUse()) {
+                helper.fail("Pig food could not enter normal hauling workflow"); return;
+            }
+            haul.start();
+            haul.tick();
+            Vec3 dock = helper.absoluteVec(new Vec3(1.1, 1.0, 2.5));
+            worker.setPos(dock.x, dock.y, dock.z);
+            haul.tick();
+            haul.stop();
+            if (actualMeat.isAlive() || nest.haulTrips() != 1
+                    || nest.hauledItems() != realMeatCount
+                    || nest.nutrientPoints() != realMeatCount * 4) {
+                helper.fail("Real pig meat was lost or duplicated between hunt and nest");
+                return;
+            }
             helper.succeed();
         } finally {
             SwarmConfig.ENABLED.set(master);
