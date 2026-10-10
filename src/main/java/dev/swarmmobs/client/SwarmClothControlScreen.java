@@ -124,6 +124,9 @@ public final class SwarmClothControlScreen {
                 "AI movement fallback (real): Skeleton " + integer(values, "skeletonMoveFallbacks")
                         + " / Zombie flank " + integer(values, "zombieFlankFallbacks"));
         status(category, entries,
+                "Measured stalled waypoints: Skeleton " + integer(values, "skeletonNoProgress")
+                        + " / Zombie " + integer(values, "zombieNoProgress"));
+        status(category, entries,
                 "Vacant flank coverage: " + integer(values, "activeFlankFillers")
                         + " active Zombies / " + integer(values, "flankFillEpisodes")
                         + " replacement episodes (server observed)");

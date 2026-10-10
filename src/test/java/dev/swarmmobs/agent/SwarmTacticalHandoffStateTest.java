@@ -234,6 +234,49 @@ class SwarmTacticalHandoffStateTest {
         assertTrue(state.canUseZombieFlankWaypoint(4, 8, 149));
     }
 
+    @Test void SkeletonMeasuredStallReusesFailedPositionCooldownAndCountsSeparately() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(30,1));
+        state.updateLocalPlan(0,0,SwarmRole.REAR_PRESSURE,6,9,0,0);
+        state.updateRangedSpacing(true,100);
+        assertTrue(state.failRangedSpacingForNoProgress(112));
+        assertEquals(1,state.rangedSpacingFallbacks());
+        assertEquals(1,state.rangedNoProgressFallbacks());
+        assertFalse(state.rangedSpacingActive());
+        assertFalse(state.canUseRangedWaypoint(6,9,162));
+        assertTrue(state.canUseRangedWaypoint(9,9,162));
+        assertFalse(state.failRangedSpacingForNoProgress(113));
+        assertEquals(1,state.rangedNoProgressFallbacks());
+    }
+
+    @Test void ZombieMeasuredStallResumesNativeMeleeAndNoRepeatedFallback() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(31,1));
+        state.updateLocalPlan(0,0,SwarmRole.FLANK_LEFT,4,8,0,0);
+        assertTrue(state.allowShortZombieFlank(100));
+        assertTrue(state.shortZombieFlankActive());
+        assertTrue(state.failShortZombieFlankForNoProgress(112));
+        assertEquals(1,state.zombieFlankFallbacks());
+        assertEquals(1,state.zombieNoProgressFallbacks());
+        assertFalse(state.shortZombieFlankActive());
+        assertFalse(state.allowShortZombieFlank(113));
+        assertFalse(state.canUseZombieFlankWaypoint(4,8,142));
+        assertTrue(state.canUseZombieFlankWaypoint(6,8,142));
+        assertFalse(state.failShortZombieFlankForNoProgress(113));
+        state.bindTacticalTarget(new UUID(31,2));
+        assertTrue(state.allowShortZombieFlank(114));
+        assertEquals(1,state.zombieNoProgressFallbacks());
+    }
+
+    @Test void NormalZombieFlankCompletionClearsInProgressStateWithoutFailing() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(32,1));
+        assertTrue(state.allowShortZombieFlank(100));
+        state.clearShortZombieFlank();
+        assertFalse(state.shortZombieFlankActive());
+        assertEquals(0,state.zombieNoProgressFallbacks());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
