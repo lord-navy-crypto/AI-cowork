@@ -5531,6 +5531,8 @@ public final class SwarmRuntimeGameTests {
         var creeperSpeed=creeper.getAttribute(Attributes.MOVEMENT_SPEED);
         if(zombieSpeed!=null) zombieSpeed.setBaseValue(0.0);
         if(creeperSpeed!=null) creeperSpeed.setBaseValue(0.0);
+        boolean oldRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get();
+        SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(true);
         TestPlayerHandle handle=createTickingTestPlayer(helper,GameType.SURVIVAL);
         ServerPlayer player=handle.player();
         player.setNoGravity(true);
@@ -5595,6 +5597,13 @@ public final class SwarmRuntimeGameTests {
                     return;
                 }
                 safety.stop();
+                // Bonus-round positioning must keep the original
+                // vanilla bow equipment and role intact.
+                if(!SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
+                        || !s.hasDestination() || !c.hasDestination()) {
+                    helper.fail("Bonus tactical rounds removed mixed squad coordination");
+                    return;
+                }
                 if(!skeleton.getItemBySlot(EquipmentSlot.MAINHAND).is(Items.BOW)) {
                     helper.fail("Skeleton lost its vanilla bow during cross-species teamwork");
                     return;
@@ -5602,6 +5611,7 @@ public final class SwarmRuntimeGameTests {
                 helper.succeed();
             } finally {
                 creeper.discard();
+                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
                 handle.close();
             }
         });
