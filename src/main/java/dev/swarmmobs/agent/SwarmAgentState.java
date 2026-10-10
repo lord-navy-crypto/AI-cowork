@@ -3,6 +3,7 @@ package dev.swarmmobs.agent;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
+import dev.swarmmobs.algorithm.SwarmTacticalRoundPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -29,6 +30,7 @@ public final class SwarmAgentState {
     private long lastLostTargetTick = Long.MIN_VALUE;
     // Hysteresis and temporary work leases must not cross target boundaries.
     private UUID tacticalAssignmentTarget;
+    private SwarmTacticalRoundPolicy.Decision tacticalRound = SwarmTacticalRoundPolicy.initial();
     private int tacticalPeerCount;
     private int tacticalBreacherCount;
     private int neighborCount;
@@ -128,6 +130,7 @@ public final class SwarmAgentState {
             return false;
         }
         tacticalAssignmentTarget = selectedTarget;
+        resetTacticalRound();
 
         formationSlotInitialized = false;
         pendingFormationSlot = -1;
@@ -171,6 +174,26 @@ public final class SwarmAgentState {
 
     public SwarmEngagementPolicy.Mode engagementMode() {
         return engagementMode;
+    }
+
+    public SwarmTacticalRoundPolicy.Phase tacticalRoundPhase() {
+        return tacticalRound.phase();
+    }
+
+    public long tacticalRoundSwitchCount() {
+        return tacticalRound.switchCount();
+    }
+
+    /** Keep decisions per mob and target, never on one global timed cycle. */
+    public SwarmTacticalRoundPolicy.Phase updateTacticalRound(
+            SwarmTacticalRoundPolicy.Signals signals, long gameTick) {
+        tacticalRound = SwarmTacticalRoundPolicy.advance(tacticalRound,
+                SwarmTacticalRoundPolicy.recommend(signals),gameTick);
+        return tacticalRound.phase();
+    }
+
+    public void resetTacticalRound() {
+        tacticalRound = SwarmTacticalRoundPolicy.initial();
     }
 
     /**
