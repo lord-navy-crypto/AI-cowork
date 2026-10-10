@@ -293,41 +293,28 @@ public final class SwarmMobEvents {
         final boolean battleRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
                 && SwarmEngagementPolicy.enableBattleRounds(
                         state.engagementMode(), tacticalNeighbors.size());
-        final SwarmTacticalRoundPolicy.Phase combatRound;
+        // Actual sensed composition, not a globally shared clock.
+        boolean supportPresent = profile.archetype()
+                == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
+                || tacticalNeighbors.stream().anyMatch(peer ->
+                        SwarmAgentProfiles.profile(peer).archetype()
+                                == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT);
+        boolean frontlinePresent =
+                profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
+                || profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER
+                || tacticalNeighbors.stream().anyMatch(peer -> {
+                    var kind = SwarmAgentProfiles.profile(peer).archetype();
+                    return kind == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
+                            || kind == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER;
+                });
+        boolean complementaryRoles = supportPresent && frontlinePresent;
         if (battleRounds) {
-            // Reactive, per-target local coordination. Reuse peers gathered
-            // by the existing planner; do not add world queries or new Goals.
-            boolean supportPresent = profile.archetype()
-                    == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
-                    || tacticalNeighbors.stream().anyMatch(peer ->
-                            SwarmAgentProfiles.profile(peer).archetype()
-                                    == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT);
-            boolean frontlinePresent =
-                    profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
-                    || profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER
-                    || tacticalNeighbors.stream().anyMatch(peer -> {
-                        var kind = SwarmAgentProfiles.profile(peer).archetype();
-                        return kind == dev.swarmmobs.agent.SwarmAgentArchetype.ASSAULT
-                                || kind == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER;
-                    });
-            double clearance = SwarmConfig.SEPARATION_RADIUS.get();
-            long crowdedPeers = tacticalNeighbors.stream()
-                    .filter(peer -> mob.distanceToSqr(peer) < clearance * clearance)
-                    .limit(2)
-                    .count();
-            boolean blockedNavigation = state.plannerCandidateCount() > 0
-                    && state.plannerBlockedCount() > 0
-                    && state.plannerFeasibleCount() == 0;
-            // No interval-expiration switch: without crowding or navigation
-            // trouble, a mixed squad remains steadily in COVER.
-            combatRound = state.updateTacticalRound(
-                    new SwarmTacticalRoundPolicy.Signals(
-                            squadCombat, supportPresent, frontlinePresent,
-                            crowdedPeers >= 2, blockedNavigation),
-                    gameTick);
+            // Non-ranged members use the already-tested planner and separation
+            // force. Reclassifying a mode NEVER invents a movement command.
+            state.classifyTacticalRound(SwarmTacticalRoundPolicy.classification(
+                    squadCombat, complementaryRoles));
         } else {
             state.resetTacticalRound();
-            combatRound = SwarmTacticalRoundPolicy.Phase.HOLD;
         }
 
         double aiFormationMultiplier = activeStrategy == null
@@ -535,13 +522,6 @@ public final class SwarmMobEvents {
                 effectiveFormationRadius *= SwarmSpecializationRolePolicy
                         .formationRadiusMultiplier(state.specialization());
             }
-            if (battleRounds) {
-                // All three combat castes respond to the SAME combat phase.
-                // Only formation-space geometry changes; no vanilla attack
-                // Goal, Creeper fuse, or engineering execution is paused.
-                effectiveFormationRadius *= SwarmTacticalRoundPolicy
-                        .formationRadiusMultiplier(combatRound,profile.archetype());
-            }
 
             SwarmCombatPlanner.Plan plan = SwarmCombatPlanner.planForRoleWithMotion(
                     tacticalRole,
@@ -611,15 +591,21 @@ public final class SwarmMobEvents {
                 boolean negativeFriendlyClear = SwarmFriendlyFireLanePolicy.isClear(
                         negativeLane,targetPointForSafety,alliedPositions);
                 if (battleRounds && selection.direct() && selection.player()!=null) {
-                    // The round system is positioning ONLY. No combat Goal
-                    // or vanilla bow cooldown is ever stopped or gated.
-                    int side = SwarmTacticalRoundPolicy.supportSide(
-                            combatRound,
-                            assignedSlot,positiveClear,negativeClear,
+                    // Verify real candidate shooting corridors first. Choose
+                    // the minimum distance + peer-clearance debt in BLOCKS.
+                    // A switch must repay its one-body-width relocation cost
+                    // unless the previous corridor is no longer safe.
+                    var decision = SwarmTacticalRoundPolicy.chooseSupport(
+                            new Vec2(mob.getX(),mob.getZ()),
+                            positiveLane,negativeLane,alliedPositions,
+                            SwarmConfig.SEPARATION_RADIUS.get(),mob.getBbWidth(),
+                            state.tacticalSupportSide(),assignedSlot,
+                            positiveClear,negativeClear,
                             positiveFriendlyClear,negativeFriendlyClear);
-                    if (side > 0) plannedDestination = positiveLane;
-                    else if (side < 0) plannedDestination = negativeLane;
-                    // No verified safe corridor: retain the original plan.
+                    state.acceptTacticalSupportDecision(decision);
+                    if (decision.side() > 0) plannedDestination = positiveLane;
+                    else if (decision.side() < 0) plannedDestination = negativeLane;
+                    // No verified corridor: leave the normal planner alone.
                 } else {
                     // Disabled: preserve the exact tested pre-round behavior.
                     double preferredSign = SwarmFriendlyFireLanePolicy.chooseSide(
