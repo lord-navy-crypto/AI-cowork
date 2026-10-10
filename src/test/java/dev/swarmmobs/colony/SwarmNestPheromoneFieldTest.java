@@ -56,4 +56,17 @@ class SwarmNestPheromoneFieldTest {
         assertFalse(field.observe(null,FOOD,NUTRIENT,100));
         assertFalse(field.observe(HOME,FOOD,SwarmNestColonyPolicy.Kind.NONE,100));
     }
+
+    @Test void crowdingLimitedPhysicalReturnsActuallyDepositLessScent() {
+        var sparse=new SwarmNestPheromoneField();
+        var crowded=new SwarmNestPheromoneField();
+        assertTrue(sparse.reinforce(HOME,FOOD,NUTRIENT,10,
+                SwarmColonyEmergencePolicy.depositionMultiplier(0)));
+        assertTrue(crowded.reinforce(HOME,FOOD,NUTRIENT,10,
+                SwarmColonyEmergencePolicy.depositionMultiplier(5)));
+        assertTrue(sparse.strength(FOOD,SwarmNestPheromoneField.Signal.FOOD,10)
+                > crowded.strength(FOOD,SwarmNestPheromoneField.Signal.FOOD,10));
+        assertFalse(crowded.reinforce(HOME,FOOD,NUTRIENT,10,Double.NaN));
+        assertFalse(crowded.reinforce(HOME,FOOD,NUTRIENT,10,0));
+    }
 }
