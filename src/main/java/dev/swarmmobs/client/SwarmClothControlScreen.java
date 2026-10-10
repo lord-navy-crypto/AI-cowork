@@ -117,6 +117,10 @@ public final class SwarmClothControlScreen {
                         + "  STANDARD " + integer(values, "tacticStandard")
                         + "  SEARCH " + integer(values, "tacticSearch"));
         status(category, entries,
+                "Skeleton game spacing: " + integer(values, "skeletonSpacing")
+                        + " actively repositioning / " + integer(values, "skeletonSpacingEpisodes")
+                        + " spacing episodes");
+        status(category, entries,
                 "Vacant flank coverage: " + integer(values, "activeFlankFillers")
                         + " active Zombies / " + integer(values, "flankFillEpisodes")
                         + " replacement episodes (server observed)");
