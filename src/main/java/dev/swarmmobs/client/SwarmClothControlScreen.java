@@ -489,7 +489,7 @@ public final class SwarmClothControlScreen {
                 "tacticalRoundsEnabled",
                 "tactical_rounds_toggle",
                 true,
-                "ON by default for active same-target COMBAT squads only: synchronized formation/cross-species coordination. WORK uses nest resources and pheromones; ALERT and RECOVERY pause labor but do not impose attack turns. Vanilla combat and engineering remain real-time. Turn OFF to restore previous formation behavior.");
+                "Event-triggered, real COMBAT only: HOLD (stable), COVER (mixed team), ROTATE (persistent crowding or blocked navigation). 12-tick evidence confirmation; minimum 20-tick phase hold. WORK uses nest resources and pheromones. Vanilla attacks and engineering remain real-time. Switch OFF for original formations.");
 
         intField(category, entries, values,
                 "Formation lane hysteresis (ticks)",
@@ -534,6 +534,12 @@ public final class SwarmClothControlScreen {
                         + ", overwatch " + integer(values, "specOverwatch")
                         + ", lead breacher " + integer(values, "specLeadBreacher"));
 
+        status(category, entries,
+                "Combat positioning phases [HOLD / COVER / ROTATE]: "
+                        + integer(values, "roundHoldAgents") + " / "
+                        + integer(values, "roundCoverAgents") + " / "
+                        + integer(values, "roundRotateAgents")
+                        + "  | phase switches " + integer(values, "roundPhaseSwitches"));
         status(category, entries,
                 "Live activity modes [WORK / ALERT / COMBAT / RECOVERY]: "
                         + integer(values, "modeWorkAgents") + " / "
