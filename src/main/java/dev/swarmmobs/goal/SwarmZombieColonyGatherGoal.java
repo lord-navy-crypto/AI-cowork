@@ -45,6 +45,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
     private long lastNavigate = Long.MIN_VALUE;
     private double bestDistance;
     private boolean done;
+    private boolean failedRoute;
 
     public SwarmZombieColonyGatherGoal(Zombie zombie) {
         this.zombie = zombie;
@@ -82,7 +83,9 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
             for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                 for (int dy = -1; dy <= 2; dy++) {
                     BlockPos test = center.offset(dx, dy, dz);
-                    if (!level.hasChunkAt(test)) continue;
+                    if (!level.hasChunkAt(test)
+                            || nest.workBoard().claimedByAnother(
+                                    test.asLong(), zombie.getUUID(), tick)) continue;
                     BlockState state = level.getBlockState(test);
                     var kind = category(level, test, state);
                     if (!SwarmColonyGatherPolicy.needs(kind,
@@ -95,7 +98,8 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                     double score = SwarmColonyGatherPolicy.score(kind,
                             dx2 * dx2 + dy2 * dy2 + dz2 * dz2,
                             nest.soilPoints(), nest.timberPoints(),
-                            nest.nutrientPoints() + nest.legacyPoints());
+                            nest.nutrientPoints() + nest.legacyPoints())
+                            * nest.laborFeedback().costFactor(kind, tick);
                     if (score < best) {
                         best = score;
                         chosen = test;
@@ -105,7 +109,8 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                 }
             }
         }
-        if (chosen == null) return false;
+        if (chosen == null || !nest.workBoard().claim(
+                chosen.asLong(), zombie.getUUID(), tick)) return false;
         home = candidateHome;
         site = chosen;
         original = stateChosen;
@@ -120,17 +125,23 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                 || !level.hasChunkAt(home) || !level.hasChunkAt(site)
                 || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
                 || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())
-                || !level.getBlockState(site).equals(original)) return false;
+                || !level.getBlockState(site).equals(original)
+                || !nest.workBoard().owned(site.asLong(), zombie.getUUID(),
+                        level.getGameTime())) return false;
+        if (SwarmColonyGatherPolicy.expired(level.getGameTime(), started, lastProgress)) {
+            failedRoute = true;
+            return false;
+        }
         return validBlock(level, site, original)
                 && SwarmColonyGatherPolicy.needs(selectedKind,
                         nest.soilPoints(), nest.timberPoints(),
-                        nest.nutrientPoints() + nest.legacyPoints(), nest.resources())
-                && !SwarmColonyGatherPolicy.expired(level.getGameTime(), started, lastProgress);
+                        nest.nutrientPoints() + nest.legacyPoints(), nest.resources());
     }
 
     @Override
     public void start() {
         done = false;
+        failedRoute = false;
         started = zombie.level().getGameTime();
         lastProgress = started;
         lastNavigate = Long.MIN_VALUE;
@@ -149,6 +160,12 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
         double dz = zombie.getZ() - (site.getZ() + .5);
         double d2 = dx * dx + dy * dy + dz * dz;
         long now = level.getGameTime();
+        if (!level.hasChunkAt(home)
+                || !(level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest)
+                || !nest.workBoard().claim(site.asLong(), zombie.getUUID(), now)) {
+            done = true;
+            return;
+        }
         if (d2 > 5.0) {
             if (d2 + .5 < bestDistance) {
                 bestDistance = d2;
@@ -172,6 +189,13 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
     @Override
     public void stop() {
         zombie.getNavigation().stop();
+        if (home != null && site != null
+                && zombie.level() instanceof ServerLevel level && level.hasChunkAt(home)
+                && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
+            nest.workBoard().release(site.asLong(), zombie.getUUID());
+            if (failedRoute) nest.laborFeedback().failed(
+                    selectedKind, level.getGameTime());
+        }
         site = null;
         original = null;
         home = null;
