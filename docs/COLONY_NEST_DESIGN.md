@@ -402,3 +402,52 @@ after picking, physical berry items exist without immediate nest inventory,
 and the regular physical Zombie hauler can carry the *same* item entity into
 the core for exact resource-point accounting. Long-running natural navigation
 and load testing remain separate acceptance gates.
+
+## Colony ecology expansion: hunt animals, gather dirt/logs, harvest ripe crops
+
+The swarm colony is meant to be an **active environmental consumer**,
+not just a passive collector of already-dropped items. Two new switches in
+Command Center -> Coordination & Labor allow the operator to enable:
+
+- **Animal hunting**: idle Zombie workers select real adult pigs and chickens
+  first (with cows, sheep and rabbits as alternatives), claim the living
+  animal against other workers, walk toward it, and attack with the real
+  Zombie melee mechanic. Food arrives via **vanilla animal loot**, and the
+  existing hauling Goal must separately transport the real ItemEntity. No
+  virtual nutrition credit is granted for hitting or killing an animal.
+- **Block and crop gathering**: idle Zombie workers may deliberately break
+  soil (dirt, grass block, coarse dirt, mud, rooted dirt, podzol), raw logs,
+  ripe standard crop blocks, ripe cocoa and nether wart, melons, pumpkins,
+  mushrooms and grown upper sugar cane. The standard Minecraft destroy/drop
+  path emits physical loot, consumed only by a later real-item delivery.
+  Immature crop blocks, protected inventory-bearing blocks, liquids and
+  unbreakable material are excluded from the selector.
+
+There is **no special player-building exemption** in the new gathering
+Goals. A log used in a player wall or dirt in a player's construction can
+be selected as a harvest target when the operator explicitly enables the
+mechanic. Animal farms and crop fields can be harvested as part of this
+fictional colony ecology. Both features default OFF for existing worlds,
+require lifecycle + hauling + mobGriefing and can be disabled independently.
+Finite work windows, bounded local surveys, one-block work actions and
+dimension-level query budgets protect server performance, not buildings.
+
+Nutrient storage accepts any edible item with Minecraft's FOOD component,
+including food from other mods that use that component, plus non-edible
+agricultural resources such as wheat, seeds, mushrooms, cocoa, nether wart,
+eggs and sugar cane. Food and building stock are accounted as separate
+soil/timber/nutrient point categories. The colony prioritizes nutritional
+shortages, then timber and soil shortages needed for nest expansion.
+Workers never craft planks or create phantom materials.
+
+Spider still searches for existing dropped resources while Zombie is the
+current producer/hauler. Direct animal-scout relay, sapling planting,
+tree-regrowth cycles, pathfinding over long distance, seasonal ecology and
+true job auctions are future increments; they are not claims of complete
+ant/bee simulation. This is a game-scale experimental model.
+
+Integration tests cover the intended conservation gates: log block -> real
+log drop, soil block -> real dirt drop, mature crop -> real edible drop,
+animal melee -> real vanilla meat -> separate worker hauling -> nest points.
+The full automated CI checks are authoritative for whether these increments
+work on the current development head.
