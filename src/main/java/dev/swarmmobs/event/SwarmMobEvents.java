@@ -15,6 +15,7 @@ import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
 import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
+import dev.swarmmobs.algorithm.SwarmTacticalRoundPolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
@@ -542,17 +543,29 @@ public final class SwarmMobEvents {
                 }
 
                 Vec2 targetPointForSafety = new Vec2(prediction.x(), prediction.z());
-                double preferredSign = SwarmFriendlyFireLanePolicy.chooseSide(
-                        assignedSlot,
-                        positiveClear,
-                        negativeClear,
-                        SwarmFriendlyFireLanePolicy.isClear(
-                                positiveLane,targetPointForSafety,alliedPositions),
-                        SwarmFriendlyFireLanePolicy.isClear(
-                                negativeLane,targetPointForSafety,alliedPositions)
-                );
-
-                plannedDestination = preferredSign > 0.0 ? positiveLane : negativeLane;
+                boolean positiveFriendlyClear = SwarmFriendlyFireLanePolicy.isClear(
+                        positiveLane,targetPointForSafety,alliedPositions);
+                boolean negativeFriendlyClear = SwarmFriendlyFireLanePolicy.isClear(
+                        negativeLane,targetPointForSafety,alliedPositions);
+                if (SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
+                        && selection.direct() && selection.player()!=null) {
+                    // The round system is positioning ONLY. No combat Goal
+                    // or vanilla bow cooldown is ever stopped or gated.
+                    int side = SwarmTacticalRoundPolicy.supportSide(
+                            SwarmTacticalRoundPolicy.phase(observation.targetId(),gameTick),
+                            assignedSlot,positiveClear,negativeClear,
+                            positiveFriendlyClear,negativeFriendlyClear);
+                    if (side > 0) plannedDestination = positiveLane;
+                    else if (side < 0) plannedDestination = negativeLane;
+                    // No verified safe corridor: retain the original plan.
+                } else {
+                    // Disabled: preserve the exact tested pre-round behavior.
+                    double preferredSign = SwarmFriendlyFireLanePolicy.chooseSide(
+                            assignedSlot,positiveClear,negativeClear,
+                            positiveFriendlyClear,negativeFriendlyClear);
+                    plannedDestination = preferredSign > 0.0
+                            ? positiveLane : negativeLane;
+                }
                 }
             }
 
