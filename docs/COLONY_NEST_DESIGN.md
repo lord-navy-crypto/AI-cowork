@@ -451,3 +451,70 @@ log drop, soil block -> real dirt drop, mature crop -> real edible drop,
 animal melee -> real vanilla meat -> separate worker hauling -> nest points.
 The full automated CI checks are authoritative for whether these increments
 work on the current development head.
+
+## Research-backed colony labor: site exclusivity + indirect feedback (v0 experimental)
+
+This increment implements **local, distributed** labor responses, rather
+than a centrally-scripted hive queen. The implementations are inspired by
+published biological mechanisms; their numeric values are deliberately
+chosen GAME model parameters and must NOT be interpreted as measured insect
+physiology.
+
+### Scientific grounding
+
+1. **Response-threshold task allocation:** Beshers & Fewell (2001), *Models
+   of Division of Labor in Social Insects*, Annual Review of Entomology
+   46:413–440. DOI https://doi.org/10.1146/annurev.ento.46.1.413
+   Internal task thresholds and external colony needs interact, and a fixed
+   permanent profession is not necessary for emergent labor division.
+2. **Rate of successfully returning foragers:** Prabhakar, Dektar & Gordon
+   (2012), *The Regulation of Ant Colony Foraging Activity without Spatial
+   Information*, PLOS Computational Biology 8:e1002670.
+   DOI https://doi.org/10.1371/journal.pcbi.1002670
+   Red harvester ants use the local encounter rate with returning foragers
+   to regulate new foraging departures, even without global spatial maps.
+3. **Stigmergy:** Theraulaz & Bonabeau (1999), *A Brief History of Stigmergy*,
+   Artificial Life 5:97–116.
+   DOI https://doi.org/10.1162/106454699568700
+   An animal can affect later actions through local, ephemeral changes
+   to the environment. Existing Spider->Nest item leads already implement
+   one bounded environmental-information analogue.
+4. **Honey-bee negative feedback:** Nieh (2010), *A Negative Feedback Signal
+   That Is Triggered by Peril Curbs Honey Bee Recruitment*, Current Biology
+   20:310–315. DOI https://doi.org/10.1016/j.cub.2009.12.060
+   We borrow only the abstract concept of recruitment inhibition, not a
+   claim that bees respond to Minecraft pathfinding failures.
+
+### Implemented mechanisms
+
+- **Exclusive work-site leases:** `SwarmColonyWorkBoard` keeps at most 24
+  nonpersistent block-position+worker-UUID leases per loaded nest, expiring
+  after 60 ticks unless refreshed. Miners check the board before selecting
+  soil, logs or mature crops, and refresh while working. Aborted tasks
+  release their site. Two miners may not both commit to the same site at
+  the same moment.
+- **Return reinforcement:** only `acceptHaulDelivery` of an actual living
+  dropped ItemEntity reinforces its nutrient/timber/soil signal. An empty,
+  invalid or merely observed item gives no reinforcement.
+- **Stop/inhibition cue:** a timed-out worker gathering route or animal
+  hunt raises a short-lived negative cue for the relevant material.
+  Both positive and negative signals decay exponentially, with a model
+  half-life of 600 game ticks (30 seconds at nominal 20 TPS).
+  Positive signals reduce selection cost; negative signals increase it.
+  The score is bounded so a feedback loop cannot create infinite demand.
+  **Stock need and whole-item capacity checks always override cues.**
+- **Local metrics:** Command Center displays claimed sites, item leads,
+  successful return reinforcements, failed routes, and independent
+  recruitment and inhibition cues for food/timber/soil. The data come
+  from the most recently sampled loaded Nest Core, not a global census.
+
+### Calibration and open work
+
+Game test fixtures exercise duplicate site claims, expiration/release,
+signal half-life, boundedness and true physical deliveries. There is
+no assertion that 600 ticks is a biologically observed half-life.
+The next empirical evaluation should track total food/log/soil collected,
+failed-path fractions, trips per worker, colony births, average task queue
+length, and TPS/MSPT across 10/50/100/200 loaded agents.
+Natural multi-minute movement, actual preference switching under high
+competition, and Spider sightings of *living prey* remain future work.
