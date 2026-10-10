@@ -20,6 +20,8 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -43,6 +45,9 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
 
     private final Zombie zombie;
     private ItemEntity item;
+    // Physical route samples are transient and remain private to one trip.
+    private final List<BlockPos> returnTrail = new ArrayList<>();
+    private SwarmNestColonyPolicy.Kind carriedKind = SwarmNestColonyPolicy.Kind.NONE;
     private SwarmNestScoutBoard.Lead scoutLead;
     private BlockPos home;
     private Phase phase = Phase.NONE;
@@ -127,6 +132,9 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             if (SwarmNestScoutSignal.recentFor(drop, targetHome, tick)) {
                 score *= 0.75;
             }
+            if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                score *= nest.pheromoneCost(drop.blockPosition(), kind, tick);
+            }
             if (score < bestScore) {
                 bestScore = score;
                 best = drop;
@@ -139,6 +147,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             // navigation budget chasing cargo that is already claimed.
             nest.scoutBoard().discard(best.getUUID());
             item = best;
+            carriedKind = SwarmNestBlockEntity.classify(best.getItem());
             scoutLead = null;
             home = targetHome;
             phase = Phase.TO_ITEM;
@@ -158,12 +167,16 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                         workerPos.distanceSquared(lead.position()),
                         nest.soilPoints(), nest.timberPoints(),
                         nest.nutrientPoints(), nest.legacyPoints(),
-                        nest.chamberLevel(), SwarmConfig.NEST_MAX_POPULATION.get()));
+                        nest.chamberLevel(), SwarmConfig.NEST_MAX_POPULATION.get())
+                        * (SwarmConfig.NEST_PHEROMONES_ENABLED.get()
+                                ? nest.pheromoneCost(scoutPosition(lead), lead.kind(), tick)
+                                : 1.0));
         if (report == null || !level.hasChunkAt(scoutPosition(report))) {
             if (report != null) nest.scoutBoard().release(report.itemId(), zombie.getUUID());
             return false;
         }
         scoutLead = report;
+        carriedKind = report.kind();
         item = null;
         home = targetHome;
         phase = Phase.TO_SCOUT;
@@ -194,6 +207,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
     @Override
     public void start() {
         startTick = zombie.level().getGameTime();
+        returnTrail.clear();
         lastMoveTick = Long.MIN_VALUE;
         lastProgressTick = startTick;
         bestRemainingDistanceSq = Double.POSITIVE_INFINITY;
@@ -231,6 +245,9 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
             if (physical == null) {
                 // The observed item was despawned or moved. Never fabricate it.
                 nest.scoutBoard().discard(scoutLead.itemId());
+                if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                    nest.inhibitPheromone(where, scoutLead.kind(), tick);
+                }
                 phase = Phase.NONE;
                 return;
             }
@@ -250,6 +267,7 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 return;
             }
             item = physical;
+            carriedKind = kind;
             phase = Phase.TO_ITEM;
             lastProgressTick = tick;
             bestRemainingDistanceSq = Double.POSITIVE_INFINITY;
@@ -266,12 +284,14 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                 lastProgressTick = tick;
                 bestRemainingDistanceSq = Double.POSITIVE_INFINITY;
                 zombie.getNavigation().stop();
+                rememberReturnPosition(item.blockPosition());
             } else {
                 follow(level, item.getX(), item.getY(), item.getZ(), tick);
                 return;
             }
         }
         if (phase == Phase.TO_NEST) {
+            rememberReturnPosition(zombie.blockPosition());
             // Reject abnormal external relocation: the same item MUST still
             // be physically near the worker. It may not be deposited from
             // an unrelated location simply because the worker reached home.
@@ -294,8 +314,13 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
                         && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
                     int accepted = nest.acceptHaulDelivery(
                             item, SwarmConfig.NEST_HAUL_MAX_STACK.get());
-                    if (accepted > 0 && scoutLead != null) {
-                        nest.scoutBoard().discard(scoutLead.itemId());
+                    if (accepted > 0) {
+                        if (scoutLead != null) nest.scoutBoard().discard(scoutLead.itemId());
+                        if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
+                            for (BlockPos sampled : returnTrail) {
+                                nest.reinforcePheromone(sampled, carriedKind, tick);
+                            }
+                        }
                     }
                 }
                 phase = Phase.NONE;
@@ -333,6 +358,14 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         zombie.getNavigation().moveTo(x, y, z, 1.0);
     }
 
+    private void rememberReturnPosition(BlockPos pos) {
+        if (pos == null || returnTrail.size() >= 16) return;
+        if (returnTrail.isEmpty()
+                || returnTrail.getLast().distSqr(pos) >= 9.0) {
+            returnTrail.add(pos.immutable());
+        }
+    }
+
     @Override
     public void stop() {
         if (item != null) {
@@ -348,6 +381,8 @@ public final class SwarmZombieColonyHaulGoal extends Goal {
         }
         if (phase != Phase.NONE) zombie.getNavigation().stop();
         item = null;
+        returnTrail.clear();
+        carriedKind = SwarmNestColonyPolicy.Kind.NONE;
         scoutLead = null;
         home = null;
         phase = Phase.NONE;
