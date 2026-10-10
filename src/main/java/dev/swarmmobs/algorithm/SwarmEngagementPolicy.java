@@ -37,8 +37,8 @@ public final class SwarmEngagementPolicy {
         return mode == Mode.WORK;
     }
 
-    /** A round can influence positioning only for a real active fight. */
-    public static boolean enableBattleRounds(Mode mode, int sameTargetPeers) {
+    /** Extra local positioning may run only for a real active same-target squad. */
+    public static boolean canCoordinateActiveSquad(Mode mode, int sameTargetPeers) {
         return mode == Mode.COMBAT && sameTargetPeers > 0;
     }
 
