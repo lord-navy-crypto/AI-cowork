@@ -352,3 +352,53 @@ must also pass their subsequent CI run before being called verified.
 still pending.** Block harvesting, woodcutting and animal hunting remain
 unimplemented; adding them must be explicit opt-in and avoid damaging
 player structures or bypassing claim protections.
+
+## First autonomous resource production: renewable sweet berries (prototype)
+
+This deliberately small first foraging increment is **OFF by default** and
+separate from the already opt-in nest lifecycle and real-item hauling switches.
+Command Center -> Coordination & Labor has a `Renewable sweet-berry foraging`
+toggle and a bounded per-worker survey interval (200 ticks by default).
+
+When enabled alongside `mobGriefing`, idle, targetless colony Zombies whose
+loaded Nest Core is below its twelve-point nutritional readiness threshold
+inspect a *fixed, small neighborhood* for a ripe (age 2 or 3) sweet berry bush.
+The dimension shares a one-survey-per-12-ticks allowance. Only a worker in a
+loaded area with enough whole-item storage capacity can start work. The worker
+can navigate a few blocks toward the plant, stopping after a bounded time or
+if it does not make sufficient progress. Combat and existing item hauling
+retain higher priority.
+
+At the bush, the worker re-checks the actual block state, all operator
+switches, the loaded core, player exclusion radius (16 blocks), and item
+capacity. Successful harvesting changes the existing bush to age 1 and spawns
+an **actual ItemEntity** of 1 berry (age 2) or 2 berries (age 3). No hidden
+materials are credited to the Nest Core. The normal existing-item hauling
+subsystem must separately pick up and deliver those berries before they become
+nutritional resource points. The core persists `ForagedBerries` as a count
+of physically spawned berry items, distinct from `HauledItems` and
+`HaulTrips`.
+
+Important boundaries:
+
+- This is *not* an unrestricted terrain miner. Dirt and trees are untouched.
+- A player-grown sweet berry farm can still be harvested if the operator
+  explicitly enables this in a nearby loaded area. There is no dependable
+  third-party land-claim authorization integration yet. **Use a dedicated test
+  world** and keep the feature disabled on public/multiplayer servers.
+- Harvest happens only with `nestBerryForagingEnabled`,
+  `nestHaulingEnabled`, `nestLifecycleEnabled`, the master switch and
+  `mobGriefing` all enabled; both individual colony and global baselines
+  disable the harvesting switch.
+- This mechanic is a small test of renewable-world-resource supply, not an
+  implementation of natural tree recognition, authorized digging, or
+  complete long-distance autonomous worker navigation.
+- The server checks whether new item creation succeeded before incrementing
+  the foraging counter; if item addition fails and the picked state is
+  unchanged, it restores the plant's old state.
+
+An end-to-end runtime fixture verifies a fully ripe bush remains planted
+after picking, physical berry items exist without immediate nest inventory,
+and the regular physical Zombie hauler can carry the *same* item entity into
+the core for exact resource-point accounting. Long-running natural navigation
+and load testing remain separate acceptance gates.
