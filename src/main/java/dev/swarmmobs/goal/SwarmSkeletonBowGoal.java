@@ -47,6 +47,11 @@ public final class SwarmSkeletonBowGoal extends RangedBowAttackGoal<Skeleton> {
             return false;
         }
 
+        // Expire an optional positioning lease before evaluating the
+        // high-priority bow Goal, so a failed sidestep cannot lock out
+        // vanilla shooting between staggered swarm planner updates.
+        state.expireRangedSpacing(skeleton.level().getGameTime());
+
         // A checked short-distance spacing waypoint temporarily keeps
         // MOVE before the ordinary bow; if no route is open, it can still shoot.
         boolean spacingUnfinished = state.rangedSpacingActive()
