@@ -232,6 +232,16 @@ public final class SwarmControlNetwork {
             case "nest_berry_forage_toggle" ->
                     SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(
                             !SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get());
+            case "nest_block_gather_toggle" ->
+                    SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(
+                            !SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get());
+            case "nest_animal_hunt_toggle" ->
+                    SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(
+                            !SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get());
+            case "nest_gather_interval_delta" ->
+                    SwarmConfig.NEST_GATHER_INTERVAL.set((int) clamp(
+                            SwarmConfig.NEST_GATHER_INTERVAL.get() + value,
+                            60.0, 800.0));
             case "nest_berry_forage_interval_delta" ->
                     SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set((int) clamp(
                             SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.get() + value, 120.0, 800.0));
@@ -262,6 +272,9 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_HAULING_ENABLED.set(false);
                 SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(false);
                 SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
+                SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
+                SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
+                SwarmConfig.NEST_GATHER_INTERVAL.set(160);
                 SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
                 SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
                 SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
@@ -469,6 +482,9 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NEST_HAULING_ENABLED.set(false);
                 SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(false);
                 SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
+                SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
+                SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
+                SwarmConfig.NEST_GATHER_INTERVAL.set(160);
                 SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
                 SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
                 SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
@@ -653,6 +669,9 @@ public final class SwarmControlNetwork {
                 pair("nestLifecycleEnabled", SwarmConfig.NEST_LIFECYCLE_ENABLED.get()),
                 pair("nestHaulingEnabled", SwarmConfig.NEST_HAULING_ENABLED.get()),
                 pair("nestBerryForagingEnabled", SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get()),
+                pair("nestBlockGatherEnabled", SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()),
+                pair("nestAnimalHuntEnabled", SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()),
+                pair("nestGatherInterval", SwarmConfig.NEST_GATHER_INTERVAL.get()),
                 pair("nestBerryForageInterval", SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.get()),
                 pair("nestHaulSearchRadius", SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get()),
                 pair("nestHaulMaxStack", SwarmConfig.NEST_HAUL_MAX_STACK.get()),
