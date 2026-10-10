@@ -38,6 +38,7 @@ import dev.swarmmobs.debug.SwarmDebugParticles;
 import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
+import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
@@ -94,6 +95,9 @@ public final class SwarmMobEvents {
             // Voluntary local-worker foraging yields to vanilla combat and
             // high-priority engineering, and is OFF until explicitly enabled.
             mob.goalSelector.addGoal(2, new SwarmZombieColonyHaulGoal(builder));
+            // Renewable food harvest happens only when idle logistics has
+            // no existing cargo to move; no attack or engineering override.
+            mob.goalSelector.addGoal(3, new SwarmZombieBerryForageGoal(builder));
         }
     }
 
