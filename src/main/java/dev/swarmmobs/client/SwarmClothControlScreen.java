@@ -128,6 +128,10 @@ public final class SwarmClothControlScreen {
                 "Measured stalled waypoints: Skeleton " + integer(values, "skeletonNoProgress")
                         + " / Zombie " + integer(values, "zombieNoProgress"));
         status(category, entries,
+                "Rejected Minecraft paths: " + integer(values, "gamePathRejects")
+                        + " total / Skeleton optional " + integer(values, "skeletonPathRejects")
+                        + " / Zombie optional " + integer(values, "zombiePathRejects"));
+        status(category, entries,
                 "Recent blocked route memories: Skeleton " + integer(values, "skeletonFailedSites")
                         + " / Zombie " + integer(values, "zombieFailedSites")
                         + " (up to 3 per NPC)");

@@ -11,6 +11,7 @@ import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
 import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
 import dev.swarmmobs.algorithm.SwarmPathProbePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandPolicy;
+import dev.swarmmobs.algorithm.SwarmNavigationAcceptancePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationEpisodePolicy;
 import dev.swarmmobs.algorithm.SwarmOptionalWaypointProgressPolicy;
 import dev.swarmmobs.algorithm.SwarmOptionalGameWaypointCommitmentPolicy;
@@ -81,6 +82,13 @@ public final class SwarmApproachGoal extends Goal {
     private double lastCommandY;
     private double lastCommandZ;
     private double lastCommandSpeed;
+    // Navigation.moveTo can reject a proposed command. An attempted route is
+    // never progress evidence; remember the last rejected destination
+    // across Goal stop/start to avoid per-tick pathfinding thrash.
+    private long lastRejectedTick = Long.MIN_VALUE;
+    private double lastRejectedX;
+    private double lastRejectedY;
+    private double lastRejectedZ;
     private boolean obstacleDetourActive;
     private double obstacleDetourX;
     private double obstacleDetourZ;
@@ -133,10 +141,9 @@ public final class SwarmApproachGoal extends Goal {
                     && mob.level() instanceof ServerLevel gameLevel) {
                 state.expireRangedSpacing(gameLevel.getGameTime());
             }
-            if (state.rangedSpacingActive()) {
-                return mob.distanceToSqr(state.destinationX(), mob.getY(),
-                        state.destinationZ()) > 0.75 * 0.75;
-            }
+            // A verified clear shot inside the normal bow envelope wins
+            // over optional spacing. Never let decorative repositioning
+            // starve the real Minecraft Skeleton bow attack.
             if (mob.getTarget() instanceof Player target
                     && validTarget(target)
                     && state.bowLaneClear()
@@ -147,7 +154,14 @@ public final class SwarmApproachGoal extends Goal {
                             mob.distanceToSqr(target),
                             SwarmSkeletonBowGoal.HANDOFF_DISTANCE
                     )) {
+                if (state.rangedSpacingActive()) {
+                    state.updateRangedSpacing(false, mob.level().getGameTime());
+                }
                 return false;
+            }
+            if (state.rangedSpacingActive()) {
+                return mob.distanceToSqr(state.destinationX(), mob.getY(),
+                        state.destinationZ()) > 0.75 * 0.75;
             }
 
             double tolerance = Math.max(0.5, profile.arrivalTolerance());
@@ -285,6 +299,7 @@ public final class SwarmApproachGoal extends Goal {
         obstacleDetourUntilTick = Long.MIN_VALUE;
         commandIssued = false;
         lastCommandTick = Long.MIN_VALUE;
+        lastRejectedTick = Long.MIN_VALUE;
         mob.getNavigation().stop();
         if (mob.level() instanceof ServerLevel level) {
             SwarmPathBudgetRegistry.cancel(level, mob);
@@ -491,43 +506,78 @@ public final class SwarmApproachGoal extends Goal {
                 false
         );
 
-        if (mob.level() instanceof ServerLevel level) {
-            long now = level.getGameTime();
-            SwarmNavigationCommandPolicy.Decision decision =
-                    SwarmNavigationCommandPolicy.evaluate(
-                            commandIssued,
-                            mob.getNavigation().isDone(),
-                            now,
-                            lastCommandTick,
-                            navigationX,
-                            targetY,
-                            navigationZ,
-                            speed,
-                            lastCommandX,
-                            lastCommandY,
-                            lastCommandZ,
-                            lastCommandSpeed
-                    );
-            SwarmNavigationCommandTelemetry.record(level, decision);
-            if (decision == SwarmNavigationCommandPolicy.Decision.SKIP) {
-                return;
-            }
-            lastCommandTick = now;
+        long now = mob.level().getGameTime();
+        if (!SwarmNavigationAcceptancePolicy.mayRetry(
+                now, lastRejectedTick,
+                lastRejectedX, lastRejectedY, lastRejectedZ,
+                navigationX, targetY, navigationZ)) {
+            return;
         }
 
-        // Only meaningful changes and bounded retries create a new path.
-        // Active combat goals still retain their original MOVE handoff.
+        SwarmNavigationCommandPolicy.Decision decision =
+                SwarmNavigationCommandPolicy.Decision.INITIAL;
+        if (mob.level() instanceof ServerLevel level) {
+            decision = SwarmNavigationCommandPolicy.evaluate(
+                    commandIssued,
+                    mob.getNavigation().isDone(),
+                    now,
+                    lastCommandTick,
+                    navigationX,
+                    targetY,
+                    navigationZ,
+                    speed,
+                    lastCommandX,
+                    lastCommandY,
+                    lastCommandZ,
+                    lastCommandSpeed
+            );
+            if (decision == SwarmNavigationCommandPolicy.Decision.SKIP) {
+                SwarmNavigationCommandTelemetry.record(level, decision);
+                return;
+            }
+        }
+
+        // PathNavigation may reject a locally walkable endpoint if there is
+        // no complete game path. Only a successful moveTo is an ISSUED
+        // command and valid evidence for the movement progress watchdog.
+        boolean accepted = mob.getNavigation().moveTo(
+                navigationX, targetY, navigationZ, speed);
+        if (!accepted) {
+            commandIssued = false;
+            lastRejectedTick = now;
+            lastRejectedX = navigationX;
+            lastRejectedY = targetY;
+            lastRejectedZ = navigationZ;
+            state.recordNavigationCommandRejection();
+            if (state.rangedSpacingActive()) {
+                state.failRangedSpacingForRejectedPath(now);
+            } else if (mob instanceof Zombie && state.shortZombieFlankActive()) {
+                state.failShortZombieFlankForRejectedPath(now);
+            }
+            mob.getNavigation().stop();
+            // NavigationMode describes the planner's chosen lane (PLAN,
+            // OBSTACLE_DETOUR, RECOVERY), not guaranteed PathNavigation
+            // acceptance. Keep that real planned mode visible so the
+            // detour-toggle GameTest can verify that OFF clears the plan.
+            // The failed execution is separately recorded by the rejection
+            // counters and commandIssued=false.
+            resetProgressSample();
+            resetOptionalProgressSample();
+            return;
+        }
+        lastRejectedTick = Long.MIN_VALUE;
         commandIssued = true;
+        lastCommandTick = now;
         lastCommandX = navigationX;
         lastCommandY = targetY;
         lastCommandZ = navigationZ;
         lastCommandSpeed = speed;
-        mob.getNavigation().moveTo(
-                navigationX,
-                targetY,
-                navigationZ,
-                speed
-        );
+        // The legacy per-level issued counter must count only moves the
+        // Minecraft navigator actually accepted; failed requests have
+        // their own explicit real server telemetry.
+        if (mob.level() instanceof ServerLevel level) {
+            SwarmNavigationCommandTelemetry.record(level, decision);
+        }
     }
 
     private SwarmObstacleAvoidancePolicy.Avoidance localObstacleAvoidance(
