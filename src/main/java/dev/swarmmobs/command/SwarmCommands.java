@@ -668,6 +668,8 @@ public final class SwarmCommands {
                                 + " tacticalPattern=" + state.tacticalPattern()
                                 + " skeletonSpacing=" + state.rangedSpacingActive()
                                 + " skeletonSpacingEpisodes=" + state.rangedSpacingEpisodes()
+                                + " skeletonMoveFallbacks=" + state.rangedSpacingFallbacks()
+                                + " zombieFlankFallbacks=" + state.zombieFlankFallbacks()
                                 + " fillingMissingFlank=" + state.coveringVacantFlank()
                                 + " flankFillEpisodes=" + state.vacantFlankCoverageEpisodes()
                                 + " searchRallyActive=" + state.searchRallyActive()
@@ -802,6 +804,8 @@ public final class SwarmCommands {
         int withTarget = 0;
         int spacingSkeletons = 0;
         long spacingEpisodes = 0L;
+        long spacingTimeouts = 0L;
+        long zombieFlankFallbacks = 0L;
         int flankFillers = 0;
         long flankFillEpisodes = 0;
         int searchRallying = 0;
@@ -855,6 +859,8 @@ public final class SwarmCommands {
             patterns.merge(state.tacticalPattern(), 1, Integer::sum);
             if (state.rangedSpacingActive()) spacingSkeletons++;
             spacingEpisodes += state.rangedSpacingEpisodes();
+            spacingTimeouts += state.rangedSpacingFallbacks();
+            zombieFlankFallbacks += state.zombieFlankFallbacks();
             if (state.coveringVacantFlank()) flankFillers++;
             flankFillEpisodes += state.vacantFlankCoverageEpisodes();
             if (state.searchRallyActive()) searchRallying++;
@@ -993,7 +999,7 @@ public final class SwarmCommands {
 
         // Aggregate of actual per-agent game tactic states, not claimed wins.
         String patternsText = patterns.toString();
-        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
+        String mobility = ", skeletonSpacing=" + spacingSkeletons + ", spacingEpisodes=" + spacingEpisodes + ", skeletonMoveFallbacks=" + spacingTimeouts + ", zombieFlankFallbacks=" + zombieFlankFallbacks + ", activeFlankFillers=" + flankFillers + ", flankFillEpisodes=" + flankFillEpisodes + ", staleRouteResets=" + staleRouteResets + ", regroupingSearchAgents=" + searchRallying + ", regroupingEpisodes=" + searchRallyEpisodes + ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
         source.sendSuccess(() -> Component.literal(summary + ", patterns=" + patternsText + mobility), false);
         return total;
     }
