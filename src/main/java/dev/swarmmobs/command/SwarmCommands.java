@@ -668,6 +668,7 @@ public final class SwarmCommands {
                                 + " tacticalPattern=" + state.tacticalPattern()
                                 + " crowdLane=" + state.crowdLaneSide()
                                 + " crowdLaneSamples=" + state.crowdLaneUses()
+                                + " crowdLaneRejected=" + state.crowdLaneRejected()
                                 + " pendingRole=" + (state.pendingRole() == null ? "none" : state.pendingRole())
                                 + " roleReassignments=" + state.roleReassignmentCount()
                                 + " mode=" + state.behaviorMode()
@@ -794,6 +795,7 @@ public final class SwarmCommands {
         int withTarget = 0;
         int diverted = 0;
         long diversionSamples = 0;
+        long diversionRejects = 0;
         int direct = 0;
         int engageCount = 0;
         int searchCount = 0;
@@ -839,6 +841,7 @@ public final class SwarmCommands {
             patterns.merge(state.tacticalPattern(), 1, Integer::sum);
             if (state.crowdLaneSide() != 0) diverted++;
             diversionSamples += state.crowdLaneUses();
+            diversionRejects += state.crowdLaneRejected();
             archetypes.merge(SwarmAgentProfiles.profile(agent).archetype(), 1, Integer::sum);
             tasks.merge(state.currentTask(), 1, Integer::sum);
             specializations.merge(state.specialization(), 1, Integer::sum);
@@ -969,7 +972,7 @@ public final class SwarmCommands {
 
         // Aggregate of actual per-agent game tactic states, not claimed wins.
         String patternsText = patterns.toString();
-        String mobility = ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples;
+        String mobility = ", localLaneDiverted=" + diverted + ", laneSamples=" + diversionSamples + ", blockedLaneFallbacks=" + diversionRejects;
         source.sendSuccess(() -> Component.literal(summary + ", patterns=" + patternsText + mobility), false);
         return total;
     }
