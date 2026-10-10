@@ -66,6 +66,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     private long foragedBerries;
     // Only a nonpersistent hint board: no virtual cargo or chunk tickets.
     private final SwarmNestScoutBoard scoutBoard = new SwarmNestScoutBoard();
+    private final SwarmColonyWorkBoard workBoard = new SwarmColonyWorkBoard();
+    private final SwarmColonyLaborFeedback laborFeedback = new SwarmColonyLaborFeedback();
     private int leaderMarks;
 
     public SwarmNestBlockEntity(BlockPos pos, BlockState state) {
@@ -99,6 +101,8 @@ public final class SwarmNestBlockEntity extends BlockEntity {
         }
     }
     public SwarmNestScoutBoard scoutBoard() { return scoutBoard; }
+    public SwarmColonyWorkBoard workBoard() { return workBoard; }
+    public SwarmColonyLaborFeedback laborFeedback() { return laborFeedback; }
 
     /** Scouts report only real, currently loaded resource entities. */
     public boolean reportScoutItem(ItemEntity item, long now) {
@@ -213,10 +217,15 @@ public final class SwarmNestBlockEntity extends BlockEntity {
      * successful voluntary worker trips separately for scientific telemetry.
      */
     public int acceptHaulDelivery(ItemEntity item, int maxItems) {
+        var cargoKind = item == null ? SwarmNestColonyPolicy.Kind.NONE
+                : classify(item.getItem());
         int accepted = acceptDroppedItem(item, maxItems);
         if (accepted > 0) {
             haulTrips++;
             hauledItems += accepted;
+            if (level instanceof ServerLevel server) {
+                laborFeedback.succeeded(cargoKind, accepted, server.getGameTime());
+            }
             setChanged();
         }
         return accepted;
