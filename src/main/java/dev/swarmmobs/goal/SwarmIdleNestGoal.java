@@ -6,6 +6,7 @@ import dev.swarmmobs.algorithm.SwarmColonyCastePolicy;
 import dev.swarmmobs.algorithm.SwarmNestSitePolicy;
 import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import net.minecraft.core.BlockPos;
@@ -123,7 +124,8 @@ public final class SwarmIdleNestGoal extends Goal {
         }
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
         if (state.targetId() != null || state.hasDestination()
-                || zombie.getTarget() != null) {
+                || zombie.getTarget() != null
+                || !SwarmEngagementPolicy.canDoNestWork(state.engagementMode())) {
             return false;
         }
         if (SwarmColonyCastePolicy.idleCaste(
