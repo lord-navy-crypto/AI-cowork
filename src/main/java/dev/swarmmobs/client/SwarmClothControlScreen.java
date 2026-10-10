@@ -489,7 +489,7 @@ public final class SwarmClothControlScreen {
                 "tacticalRoundsEnabled",
                 "tactical_rounds_toggle",
                 true,
-                "Event-triggered, real COMBAT only: HOLD (stable), COVER (mixed team), ROTATE (persistent crowding or blocked navigation). 12-tick evidence confirmation; minimum 20-tick phase hold. WORK uses nest resources and pheromones. Vanilla attacks and engineering remain real-time. Switch OFF for original formations.");
+                "Sampled kinematic decision for active same-target teams. HOLD = no verified support lane, COVER = current feasible positioning, ROTATE = measured beneficial/safety-required change. Distances and clearance in blocks; no 100-tick phases or arbitrary per-caste radius multipliers. Separate WORK/ALERT/RECOVERY remains intact. Switch OFF for old formation behavior.");
 
         intField(category, entries, values,
                 "Formation lane hysteresis (ticks)",
