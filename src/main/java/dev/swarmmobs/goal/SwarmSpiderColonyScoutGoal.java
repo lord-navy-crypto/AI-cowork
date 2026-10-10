@@ -128,10 +128,7 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
         // A scout can recognize living food and ripe plants, not just
         // previously dropped cargo. Passive sensors never attack or dig.
         if (SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()
-                && SwarmColonyGatherPolicy.needs(
-                        SwarmNestColonyPolicy.Kind.NUTRIENT,
-                        nest.soilPoints(), nest.timberPoints(),
-                        nest.nutrientPoints() + nest.legacyPoints(), nest.resources())) {
+                && nest.needsResource(SwarmNestColonyPolicy.Kind.NUTRIENT)) {
             for (Animal animal : level.getEntitiesOfClass(
                     Animal.class, spider.getBoundingBox().inflate(8.0),
                     a -> a.isAlive() && !a.isBaby() && !a.hasCustomName()
@@ -166,9 +163,7 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
                         if (!level.hasChunkAt(pos) || nest.ownsShellPiece(pos)) continue;
                         BlockState state = level.getBlockState(pos);
                         var kind = SwarmZombieColonyGatherGoal.category(level, pos, state);
-                        if (!SwarmColonyGatherPolicy.needs(kind,
-                                nest.soilPoints(), nest.timberPoints(),
-                                nest.nutrientPoints() + nest.legacyPoints(), nest.resources()))
+                        if (!nest.needsResource(kind))
                             continue;
                         if (nest.opportunityBoard().publishBlock(
                                 new SwarmNestOpportunityBoard.Position(
