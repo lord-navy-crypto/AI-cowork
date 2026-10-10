@@ -2,10 +2,10 @@
 
 Branch: `test/colony-all-features-playtest-20261010`, based on PR #64 commit `b4a1ccad`.
 
-**Use a disposable creative test world.** This branch enables ALL opt-in physical colony
-features by default for NEW worlds; those features can break logs, soil, crops, farm animals
-and some player-built blocks. Existing worlds may retain old `serverconfig` overrides.
-The game commands below force-enable or disable the actual runtime settings.
+**Use a disposable creative test world.** All destructive features remain OFF by
+default in both new and old worlds to avoid interference with GameTests and existing
+builds. Use the explicit testmode command below to enable everything for testing.
+These features can break logs, soil, crops, farm animals and player-built blocks.
 
 ## 1. Enable all colony experiments
 
@@ -16,7 +16,7 @@ Run as an operator in your disposable test world:
 /swarmmobs debug testmode status
 ```
 
-This enables nest founding, nest lifecycle, physical resource hauling, block/crop
+The runtime toggle enables nest founding, nest lifecycle, physical resource hauling, block/crop
 gathering, crop replanting, renewable berry harvesting, animal hunting, pheromones,
 adaptive stock/recruitment and visible shell expansion, plus baseline swarm coordination,
 engineering, communication, pathfinding and particles. It also enables the
