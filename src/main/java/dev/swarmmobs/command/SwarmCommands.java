@@ -29,6 +29,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.level.GameRules;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 import java.util.Comparator;
@@ -82,6 +83,15 @@ public final class SwarmCommands {
                         .executes(context -> setParticles(context.getSource(), false)));
 
         debug.then(particles);
+
+        // Operator-only activation for existing worlds with persisted OFF server configs.
+        debug.then(Commands.literal("testmode")
+                .then(Commands.literal("on")
+                        .executes(context -> setPlaytestMode(context.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(context -> setPlaytestMode(context.getSource(), false)))
+                .then(Commands.literal("status")
+                        .executes(context -> playtestModeStatus(context.getSource()))));
 
         var communication = Commands.literal("comm")
                 .then(Commands.literal("on")
@@ -1082,6 +1092,75 @@ public final class SwarmCommands {
                 () -> Component.literal("Swarm debug particles: " + (enabled ? "ON" : "OFF")),
                 true
         );
+        return 1;
+    }
+
+    // Opt-in runtime colony test profile; do not activate in a valued world.
+    private static int setPlaytestMode(CommandSourceStack source, boolean enabled) {
+        SwarmConfig.ENABLED.set(true);
+        SwarmConfig.COMMUNICATION_ENABLED.set(true);
+        SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(true);
+        SwarmConfig.TARGET_PREDICTION_ENABLED.set(true);
+        SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(true);
+        SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(true);
+        SwarmConfig.NAV_WALKABILITY_ENABLED.set(true);
+        SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
+        SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+        SwarmConfig.ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED.set(true);
+        SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(enabled);
+        SwarmConfig.NEST_LIFECYCLE_ENABLED.set(enabled);
+        SwarmConfig.NEST_HAULING_ENABLED.set(enabled);
+        SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(enabled);
+        SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(enabled);
+        SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(enabled);
+        SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(enabled);
+        SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(enabled);
+        SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(true);
+        SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
+        SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+        SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
+
+        if (enabled) {
+            // Use bounded shorter surveys for observable test-world activity.
+            SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(100);
+            SwarmConfig.NEST_GATHER_INTERVAL.set(60);
+            SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(40);
+            SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(120);
+            SwarmConfig.NEST_HAUL_MAX_STACK.set(64);
+            source.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, source.getServer());
+            source.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING)
+                    .set(true, source.getServer());
+        }
+        SwarmDebugState.setParticlesEnabled(enabled);
+        source.sendSuccess(
+                () -> Component.literal(enabled
+                        ? "PLAYTEST ON: nest founding, lifecycle, hauling, gathering, hunting, berries, "
+                                + "replanting, reproduction and visible shells. World gamerules enabled. "
+                                + "Use only a DISPOSABLE world! Colony workers need a nearby core and actual resources."
+                        : "PLAYTEST OFF: optional destructive colony jobs and reproduction disabled. "
+                                + "GameRules were NOT reverted; check mobGriefing yourself."),
+                true);
+        return 1;
+    }
+
+    private static int playtestModeStatus(CommandSourceStack source) {
+        boolean grief = source.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        boolean spawning = source.getLevel().getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING);
+        source.sendSuccess(() -> Component.literal(
+                "Playtest: swarm=" + SwarmConfig.ENABLED.get()
+                + ", founding=" + SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()
+                + ", lifecycle=" + SwarmConfig.NEST_LIFECYCLE_ENABLED.get()
+                + ", hauling=" + SwarmConfig.NEST_HAULING_ENABLED.get()
+                + ", blockGather=" + SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()
+                + ", animalHunt=" + SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()
+                + ", berry=" + SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get()
+                + ", replant=" + SwarmConfig.NEST_CROP_REPLANT_ENABLED.get()
+                + ", shell=" + SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()
+                + ", adaptiveStock=" + SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get()
+                + ", mobGriefing=" + grief + ", doMobSpawning=" + spawning
+                + ". Work requires a loaded home core, no combat target, nearby suitable resources."),
+                false);
         return 1;
     }
 
