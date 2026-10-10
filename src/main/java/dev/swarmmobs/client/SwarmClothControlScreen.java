@@ -117,6 +117,8 @@ public final class SwarmClothControlScreen {
                         + "  STANDARD " + integer(values, "tacticStandard")
                         + "  SEARCH " + integer(values, "tacticSearch"));
         status(category, entries,
+                "Navigation stale-route resets: " + integer(values, "staleRouteResets"));
+        status(category, entries,
                 "SEARCH rejoining: " + integer(values, "searchRallying")
                         + " active agents / " + integer(values, "searchRallyEpisodes")
                         + " local regrouping episodes");
