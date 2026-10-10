@@ -163,7 +163,7 @@ public final class SwarmSpiderColonyScoutGoal extends Goal {
                 for (int dz = -2; dz <= 2 && marked < MAX_MARKS_PER_SURVEY; dz++) {
                     for (int dy = -1; dy <= 1 && marked < MAX_MARKS_PER_SURVEY; dy++) {
                         BlockPos pos = center.offset(dx, dy, dz);
-                        if (!level.hasChunkAt(pos)) continue;
+                        if (!level.hasChunkAt(pos) || nest.ownsShellPiece(pos)) continue;
                         BlockState state = level.getBlockState(pos);
                         var kind = SwarmZombieColonyGatherGoal.category(level, pos, state);
                         if (!SwarmColonyGatherPolicy.needs(kind,
