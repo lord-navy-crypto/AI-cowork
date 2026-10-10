@@ -1374,6 +1374,7 @@ public final class SwarmAgentState {
         this.pendingRole = null;
         this.pendingRoleSinceTick = Long.MIN_VALUE;
         this.hasDestination = false;
+        this.zombieBowLaneYieldPlanned = false;
         this.rangedSpacingActive = false;
         this.rangedSpacingStartedAt = Long.MIN_VALUE;
         clearShortZombieFlank();
