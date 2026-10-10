@@ -7,6 +7,7 @@ import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
 import dev.swarmmobs.colony.SwarmNestColonyPolicy;
 import dev.swarmmobs.colony.SwarmNestOpportunityBoard;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.registry.SwarmNestBlocks;
 import net.minecraft.core.BlockPos;
@@ -316,6 +317,7 @@ public final class SwarmZombieColonyHuntGoal extends Goal {
                 || !zombie.isAlive() || zombie.isNoAi()
                 || zombie.getTarget() != null) return false;
         SwarmAgentState state = zombie.getData(SwarmAttachments.AGENT_STATE.get());
-        return state.targetId() == null && !state.hasDestination();
+        return state.targetId() == null && !state.hasDestination()
+                && SwarmEngagementPolicy.canDoNestWork(state.engagementMode());
     }
 }
