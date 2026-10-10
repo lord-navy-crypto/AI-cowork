@@ -24,6 +24,7 @@ import dev.swarmmobs.goal.SwarmZombieColonyHuntGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmZombiePheromoneExploreGoal;
 import dev.swarmmobs.colony.SwarmNestPheromoneField;
+import dev.swarmmobs.colony.SwarmNestOpportunityBoard;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -5292,6 +5293,152 @@ public final class SwarmRuntimeGameTests {
             SwarmConfig.NEST_PHEROMONES_ENABLED.set(wasPheromones);
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(wasGrief,helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_remote_log_job",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void spiderWorkReportDispatchesRealZombieMinerBeyondLocalScan(
+            GameTestHelper helper) {
+        var core = new BlockPos(0,1,2);
+        var remote = new BlockPos(7,1,2);
+        helper.setBlock(core,SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(remote,Blocks.OAK_LOG);
+        var be=helper.getLevel().getBlockEntity(helper.absolutePos(core));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Missing remote mining nest"); return;
+        }
+        Zombie worker=helper.spawn(EntityType.ZOMBIE,new BlockPos(0,1,0));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(core).asLong());
+        boolean master=SwarmConfig.ENABLED.get();
+        boolean lifecycle=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean haul=SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean gather=SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean grief=helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true,helper.getLevel().getServer());
+            var site=helper.absolutePos(remote);
+            var home=helper.absolutePos(core);
+            var pos=new SwarmNestOpportunityBoard.Position(
+                    site.getX(),site.getY(),site.getZ());
+            var homePos=new SwarmNestOpportunityBoard.Position(
+                    home.getX(),home.getY(),home.getZ());
+            if (!nest.opportunityBoard().publishBlock(pos,
+                    SwarmNestColonyPolicy.Kind.TIMBER,helper.getLevel().getGameTime(),homePos)) {
+                helper.fail("Cannot publish verified remote log");return;
+            }
+            var goal=new SwarmZombieColonyGatherGoal(worker);
+            if(!goal.canUse() || nest.opportunityBoard().activeWorkers(
+                    helper.getLevel().getGameTime())!=1) {
+                helper.fail("Miner did not reserve the distant resource report");return;
+            }
+            goal.start();
+            // Keep the destination loaded and move the test actor, not cargo;
+            // this checks source revalidation and whole-item conservation,
+            // not an end-to-end natural pathfinding guarantee.
+            Vec3 there=helper.absoluteVec(new Vec3(6.5,1.0,2.5));
+            worker.setPos(there.x,there.y,there.z);
+            goal.tick();
+            goal.stop();
+            var drops=helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class,new AABB(site).inflate(2),
+                    e -> e.isAlive() && e.getItem().is(Items.OAK_LOG));
+            if (!helper.getLevel().getBlockState(site).isAir()
+                    || drops.size()!=1
+                    || nest.resources()!=0
+                    || nest.opportunityBoard().size(helper.getLevel().getGameTime())!=0) {
+                helper.fail("Remote log scout handoff did not produce exact physical loot");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(lifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(haul);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(gather);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief,helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_remote_prey_job",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void distantSpiderLivestockReportRequiresRealPreyBeforeMelee(
+            GameTestHelper helper) {
+        var core=new BlockPos(0,1,2);
+        var far=new BlockPos(12,1,2);
+        helper.setBlock(core,SwarmNestBlocks.NEST_CORE.get());
+        var be=helper.getLevel().getBlockEntity(helper.absolutePos(core));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("No remote hunt core");return;
+        }
+        Zombie hunter=helper.spawn(EntityType.ZOMBIE,new BlockPos(0,1,0));
+        hunter.setNoGravity(true);
+        hunter.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(core).asLong());
+        Pig pig=helper.spawn(EntityType.PIG,far);
+        pig.setNoGravity(true);
+        pig.setHealth(1.0f);
+        boolean master=SwarmConfig.ENABLED.get();
+        boolean life=SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean haul=SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean hunt=SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get();
+        boolean grief=helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        boolean loot=helper.getLevel().getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true,helper.getLevel().getServer());
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBLOOT)
+                    .set(true,helper.getLevel().getServer());
+            var home=helper.absolutePos(core);
+            var pos=pig.blockPosition();
+            assert pos!=null;
+            if(!nest.opportunityBoard().publishAnimal(pig.getUUID(),
+                    new SwarmNestOpportunityBoard.Position(pos.getX(),pos.getY(),pos.getZ()),
+                    helper.getLevel().getGameTime(),
+                    new SwarmNestOpportunityBoard.Position(home.getX(),home.getY(),home.getZ()))) {
+                helper.fail("Cannot announce real animal from remote scout");return;
+            }
+            var goal=new SwarmZombieColonyHuntGoal(hunter);
+            if(!goal.canUse()) {
+                helper.fail("Hunter could not reserve out-of-range living prey report");return;
+            }
+            goal.start();
+            Vec3 where=helper.absoluteVec(new Vec3(11.5,1.0,2.5));
+            hunter.setPos(where.x,where.y,where.z);
+            goal.tick();
+            goal.stop();
+            var meat=helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class,new AABB(pig.blockPosition()).inflate(3),
+                    e -> e.isAlive() && e.getItem().is(Items.PORKCHOP));
+            if(pig.isAlive() || meat.isEmpty() || nest.resources()!=0
+                    || nest.opportunityBoard().size(helper.getLevel().getGameTime())!=0) {
+                helper.fail("Remote scout pursuit must kill only actual adult prey and drop meat");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(life);
+            SwarmConfig.NEST_HAULING_ENABLED.set(haul);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(hunt);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief,helper.getLevel().getServer());
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBLOOT)
+                    .set(loot,helper.getLevel().getServer());
         }
     }
 }
