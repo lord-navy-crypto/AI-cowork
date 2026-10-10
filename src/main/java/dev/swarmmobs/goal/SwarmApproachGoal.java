@@ -413,6 +413,7 @@ public final class SwarmApproachGoal extends Goal {
         // Skeleton sidestep or Zombie microflank must not inherit a player's
         // different Y elevation (e.g. a raised platform across a wall).
         boolean localReposition = state.rangedSpacingActive()
+                || state.routeSpacingPlanned()
                 || (mob instanceof Zombie
                         && (state.shortZombieFlankActive()
                                 || state.zombieBowLaneYieldPlanned()));
@@ -574,6 +575,12 @@ public final class SwarmApproachGoal extends Goal {
         lastCommandY = targetY;
         lastCommandZ = navigationZ;
         lastCommandSpeed = speed;
+        if (navigationMode == SwarmNavigationMode.PLAN
+                && state.routeSpacingPlanned()
+                && Math.hypot(navigationX - state.destinationX(),
+                        navigationZ - state.destinationZ()) <= 0.35) {
+            state.recordRouteSpacingAcceptedCommand();
+        }
         // Count only an actual game navigator-accepted MOVE directly to the
         // collision-checked Zombie firing-lane waypoint. Detour/recovery
         // commands or a rejected path never masquerade as cooperation.

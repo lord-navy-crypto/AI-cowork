@@ -375,6 +375,25 @@ class SwarmTacticalHandoffStateTest {
         assertFalse(state.zombieBowLaneYieldPlanned());
     }
 
+    @Test void fourSpeciesTrafficRouteRecordsPlansSeparatelyFromAcceptedMove() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(100, 1));
+        state.updateRouteSpacingPlan(true,-1);
+        assertTrue(state.routeSpacingPlanned());
+        assertEquals(-1,state.routeSpacingSide());
+        assertEquals(0,state.routeSpacingAcceptedCommands());
+        // Only the actual accepted PLAN moveTo branch invokes this method.
+        state.recordRouteSpacingAcceptedCommand();
+        assertEquals(1,state.routeSpacingAcceptedCommands());
+        state.updateRouteSpacingPlan(false,0);
+        assertFalse(state.routeSpacingPlanned());
+        assertEquals(-1,state.routeSpacingSide());
+        state.bindTacticalTarget(new UUID(100, 2));
+        assertFalse(state.routeSpacingPlanned());
+        assertEquals(0,state.routeSpacingSide());
+        assertEquals(1,state.routeSpacingAcceptedCommands());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));

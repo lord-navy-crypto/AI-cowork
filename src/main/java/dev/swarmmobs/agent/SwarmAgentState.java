@@ -75,6 +75,10 @@ public final class SwarmAgentState {
     private final SwarmFailedWaypointMemory zombieFailedWaypoints =
             new SwarmFailedWaypointMemory();
     // Local crowd-avoidance lane; reset on target switches.
+    // Terrain-checked species traffic plan. A plan is not an accepted path.
+    private int routeSpacingSide;
+    private boolean routeSpacingPlanned;
+    private long routeSpacingAcceptedCommands;
     private int crowdLaneSide;
     private long crowdLaneLastSwitchTick = Long.MIN_VALUE;
     private long crowdLaneUses;
@@ -190,6 +194,8 @@ public final class SwarmAgentState {
         zombieFlankRetryAfter = Long.MIN_VALUE;
         zombieShortFlankActive = false;
         zombieFailedWaypoints.clear();
+        routeSpacingSide = 0;
+        routeSpacingPlanned = false;
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
 
@@ -561,6 +567,28 @@ public final class SwarmAgentState {
 
     public long zombieFlankFallbacks() {
         return zombieFlankFallbacks;
+    }
+
+    public int routeSpacingSide() {
+        return routeSpacingSide;
+    }
+
+    public boolean routeSpacingPlanned() {
+        return routeSpacingPlanned;
+    }
+
+    public long routeSpacingAcceptedCommands() {
+        return routeSpacingAcceptedCommands;
+    }
+
+    public void updateRouteSpacingPlan(boolean active, int side) {
+        routeSpacingPlanned = active;
+        if (active && side != 0) routeSpacingSide = side > 0 ? 1 : -1;
+    }
+
+    /** Count accepted physical moveTo commands, never just candidate plans. */
+    public void recordRouteSpacingAcceptedCommand() {
+        routeSpacingAcceptedCommands++;
     }
 
     public int crowdLaneSide() {
@@ -1374,6 +1402,7 @@ public final class SwarmAgentState {
         this.pendingRole = null;
         this.pendingRoleSinceTick = Long.MIN_VALUE;
         this.hasDestination = false;
+        this.routeSpacingPlanned = false;
         this.zombieBowLaneYieldPlanned = false;
         this.rangedSpacingActive = false;
         this.rangedSpacingStartedAt = Long.MIN_VALUE;
