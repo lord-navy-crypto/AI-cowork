@@ -4,6 +4,13 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class SwarmConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    // Development/playtest builds start with all standalone colony systems enabled.
+    // Runtime GameTests opt out via a JVM property so unit fixtures remain isolated.
+    // Existing worlds keep their persisted SERVER-config choices.
+    private static boolean defaultColonyExperimentsEnabled() {
+        return !Boolean.getBoolean("swarmmobs.gametest");
+    }
+
 
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.IntValue PLAN_INTERVAL_TICKS;
@@ -348,14 +355,14 @@ public final class SwarmConfig {
 
         BUILDER.pop();
 
-        // Keep destructive colony features OFF by default so independent GameTests
-        // and ordinary saved worlds are not affected. Operators can opt in
-        // to the entire experimental economy using /swarmmobs debug testmode on.
+        // Playtest defaults are enabled for NEW worlds. Existing world configs persist.
+        // GameTest fixtures opt out via -Dswarmmobs.gametest=true. Operators can
+        // opt into all colony experiments in existing worlds via testmode on.
         BUILDER.push("colonies");
 
         NEST_CONSTRUCTION_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: allow idle Zombie workers to place a persistent Nest Core on suitable natural soil; OFF by default to protect player worlds.")
-                .define("nestConstructionEnabled", false);
+                .define("nestConstructionEnabled", defaultColonyExperimentsEnabled());
 
         NEST_BUILD_INTERVAL_TICKS = BUILDER
                 .comment("Minimum interval between idle nest-building site surveys for each worker (game ticks).")
@@ -367,19 +374,19 @@ public final class SwarmConfig {
 
         NEST_LIFECYCLE_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: activate resource-fed nest lifecycle and capped colony spawning; OFF by default.")
-                .define("nestLifecycleEnabled", false);
+                .define("nestLifecycleEnabled", defaultColonyExperimentsEnabled());
 
         NEST_HAULING_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombies assigned to a loaded Nest Core carry actual nearby dropped resources to it. OFF by default.")
-                .define("nestHaulingEnabled", false);
+                .define("nestHaulingEnabled", defaultColonyExperimentsEnabled());
 
         NEST_BERRY_FORAGING_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle colony Zombies may pick renewable ripe sweet berries near a loaded nest and create real dropped berry items. OFF by default. Can touch player farms; use only in a designated test world. Requires nest lifecycle, hauling and mobGriefing.")
-                .define("nestBerryForagingEnabled", false);
+                .define("nestBerryForagingEnabled", defaultColonyExperimentsEnabled());
 
         NEST_BLOCK_GATHER_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombie workers may mine actual soil/log blocks and harvest ripe crops for colony resources; affects player builds and farms intentionally when enabled. Requires lifecycle, hauling and mobGriefing.")
-                .define("nestBlockGatherEnabled", false);
+                .define("nestBlockGatherEnabled", defaultColonyExperimentsEnabled());
 
         NEST_ADAPTIVE_STOCK_ENABLED = BUILDER
                 .comment("When colony lifecycle is enabled, adapt food/soil/log worker demand to population and capacity. Real dropped-item intake is limited to each category's outstanding demand so one large stack cannot starve the others; surplus items stay physical. Explicit manual resource accounting remains bounded by the global store.")
@@ -387,11 +394,11 @@ public final class SwarmConfig {
 
         NEST_CROP_REPLANT_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: after harvesting ripe vanilla field crops, use ONE newly physically dropped planting item to replant. WHEAT/CARROTS/POTATOES/BEETROOTS/NETHER_WART only. No free items. Requires block gathering. OFF by default.")
-                .define("nestCropReplantEnabled", false);
+                .define("nestCropReplantEnabled", defaultColonyExperimentsEnabled());
 
         NEST_ANIMAL_HUNT_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: idle Zombie workers may hunt adult farm animals to create vanilla physical food drops. Requires lifecycle, hauling and mobGriefing.")
-                .define("nestAnimalHuntEnabled", false);
+                .define("nestAnimalHuntEnabled", defaultColonyExperimentsEnabled());
 
         NEST_GATHER_INTERVAL = BUILDER
                 .comment("Ticks between bounded colony block or animal surveys per worker.")
@@ -423,7 +430,7 @@ public final class SwarmConfig {
 
         NEST_VISIBLE_EXPANSION_ENABLED = BUILDER
                 .comment("EXPERIMENTAL: physically place conservative soil/timber nest shell blocks when chambers expand. OFF by default. Requires mobGriefing; blocked sites defer upgrades.")
-                .define("nestVisibleExpansionEnabled", false);
+                .define("nestVisibleExpansionEnabled", defaultColonyExperimentsEnabled());
 
         NEST_MAX_POPULATION = BUILDER
                 .comment("Maximum locally counted colony members before reproduction stops.")
