@@ -737,7 +737,10 @@ public final class SwarmMobEvents {
                         .toList();
                 var spacing = SwarmRangedSpacingPolicy.consider(
                         shooterPoint, sightedPoint, directVisible, confidence);
-                boolean possible = spacing.active()
+                boolean attemptAllowed = state.mayAttemptRangedSpacing(gameTick);
+                boolean possible = attemptAllowed && spacing.active()
+                        && state.canUseRangedWaypoint(
+                                spacing.candidate().x(), spacing.candidate().z(), gameTick)
                         && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
                                 level, mob.getY(), spacing.candidate())
                         && SwarmFriendlyFireLanePolicy.isClear(
@@ -746,11 +749,23 @@ public final class SwarmMobEvents {
                                 selection.player(), spacing.candidate());
                 if (possible) {
                     plannedDestination = spacing.candidate();
-                } else if (directVisible && !state.bowLaneClear()
+                } else if (attemptAllowed && directVisible
+                        // Do not preempt an unobstructed vanilla bow merely
+                        // because the ideal retreat square does not exist.
+                        // Sideways fallback is warranted only by an actual
+                        // ally-blocked lane or recorded failed destination.
+                        && (!state.bowLaneClear()
+                                || (spacing.active()
+                                        && state.hasRecentlyFailedRangedWaypoint(gameTick)))
                         && confidence >= 0.7) {
+                    // A failed or obstructed backward step can select a
+                    // different lateral square, rather than retrying the same
+                    // unreachably planned location after each cooldown.
                     var pair = SwarmSkeletonSightlinePolicy.propose(
                             shooterPoint, sightedPoint);
                     boolean leftPossible = pair.valid()
+                            && state.canUseRangedWaypoint(
+                                    pair.left().x(), pair.left().z(), gameTick)
                             && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
                                     level, mob.getY(), pair.left())
                             && SwarmFriendlyFireLanePolicy.isClear(
@@ -758,6 +773,8 @@ public final class SwarmMobEvents {
                             && hasClearSupportShot(level,mob,
                                     selection.player(), pair.left());
                     boolean rightPossible = pair.valid()
+                            && state.canUseRangedWaypoint(
+                                    pair.right().x(), pair.right().z(), gameTick)
                             && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
                                     level, mob.getY(), pair.right())
                             && SwarmFriendlyFireLanePolicy.isClear(

@@ -152,6 +152,46 @@ class SwarmTacticalHandoffStateTest {
         assertTrue(state.mayAttemptRangedSpacing(1));
     }
 
+    @Test void SkeletonRemembersTimedOutGameSquareButAcceptsAnother() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(10, 1));
+        state.updateLocalPlan(0, 0, SwarmRole.REAR_PRESSURE,
+                6.0, 9.0, 0, 0);
+        state.updateRangedSpacing(true, 100);
+        assertTrue(state.expireRangedSpacing(130));
+        assertTrue(state.hasRecentlyFailedRangedWaypoint(180));
+        // The global 50-tick cooldown still takes precedence.
+        assertFalse(state.canUseRangedWaypoint(9, 9, 179));
+        assertFalse(state.canUseRangedWaypoint(6, 9, 180));
+        assertFalse(state.canUseRangedWaypoint(7, 9, 180));
+        assertTrue(state.canUseRangedWaypoint(9, 9, 180));
+        assertTrue(state.canUseRangedWaypoint(6, 9, 310));
+        assertFalse(state.hasRecentlyFailedRangedWaypoint(310));
+    }
+
+    @Test void SkeletonFailedWaypointNeverLeaksToAnotherMinecraftTarget() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(10, 1));
+        state.updateLocalPlan(0, 0, SwarmRole.REAR_PRESSURE,
+                6.0, 9.0, 0, 0);
+        state.updateRangedSpacing(true, 100);
+        assertTrue(state.expireRangedSpacing(130));
+        assertFalse(state.canUseRangedWaypoint(6, 9, 180));
+        state.bindTacticalTarget(new UUID(10, 2));
+        assertFalse(state.hasRecentlyFailedRangedWaypoint(181));
+        assertTrue(state.canUseRangedWaypoint(6, 9, 181));
+        assertFalse(state.canUseRangedWaypoint(Double.NaN, 9, 181));
+    }
+
+    @Test void SkeletonNoSuccessfulWaypointDoesNotFabricateFailureHistory() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(10, 3));
+        state.updateRangedSpacing(true, 100);
+        assertTrue(state.expireRangedSpacing(130));
+        assertFalse(state.hasRecentlyFailedRangedWaypoint(180));
+        assertTrue(state.canUseRangedWaypoint(6, 9, 180));
+    }
+
     @Test void ZombieShortSideMovementGivesUpAndLetsMeleeResume() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(7,1));
@@ -164,6 +204,34 @@ class SwarmTacticalHandoffStateTest {
         state.clearShortZombieFlank();
         state.bindTacticalTarget(new UUID(7,2));
         assertTrue(state.allowShortZombieFlank(1));
+    }
+
+    @Test void ZombieTimedOutFlankAvoidsSameBlockedSquareButAcceptsAlternative() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(11, 1));
+        state.updateLocalPlan(0, 0, SwarmRole.FLANK_LEFT, 4, 8, 0, 0);
+        assertTrue(state.allowShortZombieFlank(100));
+        assertFalse(state.allowShortZombieFlank(118));
+        assertEquals(1, state.zombieFlankFallbacks());
+        assertTrue(state.hasRecentlyFailedZombieWaypoint(148));
+        assertFalse(state.canUseZombieFlankWaypoint(4, 8, 147));
+        // Retry is permitted after cooldown, but not at the same failed spot.
+        assertFalse(state.canUseZombieFlankWaypoint(4, 8, 148));
+        assertTrue(state.canUseZombieFlankWaypoint(6, 8, 148));
+        assertTrue(state.canUseZombieFlankWaypoint(4, 8, 268));
+        assertFalse(state.hasRecentlyFailedZombieWaypoint(268));
+        assertFalse(state.canUseZombieFlankWaypoint(Double.NaN, 8, 268));
+    }
+
+    @Test void ZombieFailureMemoryClearsForDifferentTarget() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(11, 1));
+        state.updateLocalPlan(0, 0, SwarmRole.FLANK_RIGHT, 4, 8, 0, 0);
+        assertTrue(state.allowShortZombieFlank(100));
+        assertFalse(state.allowShortZombieFlank(118));
+        state.bindTacticalTarget(new UUID(11, 2));
+        assertFalse(state.hasRecentlyFailedZombieWaypoint(149));
+        assertTrue(state.canUseZombieFlankWaypoint(4, 8, 149));
     }
 
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {

@@ -34,6 +34,19 @@ There were two edge cases:
   target clears the old leases. The normal navigation and SEARCH routines
   continue running with their existing budgets; these timers do NOT
   introduce artificial combat rounds.
+- **Avoid the failed square:** A Skeleton timeout remembers the exact
+  failed Minecraft game waypoint for **180 ticks** and rejects newly planned
+  optional positions within **2 blocks** of it, after the original 50-tick
+  general cooldown expires. The next observed, clear side is eligible
+  instead. A flanking Zombie timeout similarly remembers the failed
+  square for **150 ticks** (within **1.5 blocks**) after its 30-tick
+  cooldown. These are temporary, per-target local movement memories, not
+  enemy-location memories; swapping targets clears them immediately.
+- The game planner filters candidate waypoints **before** writing them
+  into the active server-side movement plan. A rejected optional waypoint
+  leaves the ordinary positioning or native attack handoff intact, so the
+  Command Center does not show a fake "inactive" state with a still-active
+  failed optional movement destination.
 - No changes to weapon damage, attack eligibility, arrows, player targets,
   health, Creeper explosions or in-world building rights.
 
@@ -47,7 +60,9 @@ Use a **disposable** Survival-mode Minecraft experiment world.
    ordinary bow once the friendly corridor is clear.
 2. Put a mixed Zombie/Skeleton squad near an irregular wall. Have one Zombie
    obtain the FLANK_LEFT/RIGHT role; if its nearby flank waypoint is blocked,
-   normal melee must still happen when its target is close.
+   normal melee must still happen when its target is close. After a flank
+   timeout, keep the failed waypoint obstructed and verify that it does
+   not trigger the same optional flank immediately again.
 3. Run:
 
 ```mcfunction

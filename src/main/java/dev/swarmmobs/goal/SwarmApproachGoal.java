@@ -173,6 +173,9 @@ public final class SwarmApproachGoal extends Goal {
                                     state.destinationZ()),
                             release)
                         && mob.level() instanceof ServerLevel gameLevel
+                        && state.canUseZombieFlankWaypoint(
+                                state.destinationX(), state.destinationZ(),
+                                gameLevel.getGameTime())
                         && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
                                 gameLevel, mob.getY(),
                                 new Vec2(state.destinationX(), state.destinationZ()))
