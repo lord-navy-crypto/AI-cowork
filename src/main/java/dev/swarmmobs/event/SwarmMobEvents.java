@@ -750,7 +750,13 @@ public final class SwarmMobEvents {
                 if (possible) {
                     plannedDestination = spacing.candidate();
                 } else if (attemptAllowed && directVisible
-                        && (!state.bowLaneClear() || spacing.active())
+                        // Do not preempt an unobstructed vanilla bow merely
+                        // because the ideal retreat square does not exist.
+                        // Sideways fallback is warranted only by an actual
+                        // ally-blocked lane or recorded failed destination.
+                        && (!state.bowLaneClear()
+                                || (spacing.active()
+                                        && state.hasRecentlyFailedRangedWaypoint(gameTick)))
                         && confidence >= 0.7) {
                     // A failed or obstructed backward step can select a
                     // different lateral square, rather than retrying the same
