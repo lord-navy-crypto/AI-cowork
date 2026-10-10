@@ -793,7 +793,11 @@ public final class SwarmMobEvents {
                 // 3-block offset. Keep the previously issued game waypoint
                 // when the fresh proposal is nearby AND the old square and
                 // its actual line remain verified. No new chunk/entity scans.
+                // Keep a lane only while an actual same-target ally
+                // obstructs the current shot. In an unobstructed bow
+                // envelope, do not prolong spacing and starve native firing.
                 if (possible && state.rangedSpacingActive()
+                        && !state.bowLaneClear()
                         && state.hasDestination()) {
                     Vec2 previouslyPlanned = new Vec2(
                             state.destinationX(), state.destinationZ());
