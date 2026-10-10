@@ -59,6 +59,29 @@ class SwarmTacticalHandoffStateTest {
         assertEquals(1,state.acceptCrowdLane(1,301));
     }
 
+    @Test void searchRallyCountsEpisodesNotPlannerTicks() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(5,1));
+        state.updateSearchRally(true);
+        state.updateSearchRally(true);
+        assertEquals(1,state.searchRallyEpisodes());
+        assertTrue(state.searchRallyActive());
+        state.updateSearchRally(false);
+        state.updateSearchRally(true);
+        assertEquals(2,state.searchRallyEpisodes());
+    }
+
+    @Test void targetChangeClearsSearchRally() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(5,1));
+        state.updateSearchRally(true);
+        state.bindTacticalTarget(new UUID(5,2));
+        assertFalse(state.searchRallyActive());
+        assertEquals(1,state.searchRallyEpisodes());
+        state.forgetTarget();
+        assertFalse(state.searchRallyActive());
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
