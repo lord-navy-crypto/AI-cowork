@@ -26,6 +26,7 @@ import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
 import dev.swarmmobs.algorithm.SwarmTaskDemandPolicy;
 import dev.swarmmobs.algorithm.SwarmTaskSaturationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
+import dev.swarmmobs.algorithm.SwarmSearchRallyPolicy;
 import dev.swarmmobs.algorithm.SwarmNeighborSelectionPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
 import dev.swarmmobs.algorithm.SwarmTargetSquadPolicy;
@@ -471,20 +472,35 @@ public final class SwarmMobEvents {
                     SwarmConfig.MAX_STEERING_CORRECTION.get()
             );
 
+            // Same-target local rejoining is a bounded modification of an
+            // existing sector waypoint, not a new sighting of the player.
+            // Uses already collected nearby peers: no global lookup.
+            var rally = SwarmSearchRallyPolicy.adjust(
+                    new Vec2(mob.getX(), mob.getZ()),
+                    searchPlan.destination(),
+                    new Vec2(observation.x(), observation.z()),
+                    tacticalNeighbors.stream()
+                            .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                            .toList(),
+                    SwarmConfig.DIVISION_OF_LABOR_ENABLED.get()
+            );
+            state.updateSearchRally(rally.regrouping());
+
             state.updateLocalPlan(
                     movementNeighbors.size(),
                     assignedSlot,
                     tacticalRole,
                     SwarmBehaviorMode.SEARCH,
                     searchPlan.searchRadius(),
-                    searchPlan.destination().x(),
-                    searchPlan.destination().z(),
+                    rally.destination().x(),
+                    rally.destination().z(),
                     searchPlan.separationMagnitude(),
                     searchPlan.cohesionMagnitude(),
                     searchPlan.alignmentMagnitude(),
                     searchPlan.steeringMagnitude()
             );
         } else {
+            state.updateSearchRally(false);
             TargetPredictionPolicy.Prediction prediction;
             if (SwarmConfig.TARGET_PREDICTION_ENABLED.get()) {
                 prediction = TargetPredictionPolicy.predict(
