@@ -280,6 +280,11 @@ public final class SwarmClothControlScreen {
                 "Workers may break actual world dirt/log blocks including player-built structures, and pick fully grown wheat/carrots/potatoes/beetroots/nether wart/cocoa/melons/pumpkins/mushrooms/sugar cane. All items remain in the world until hauled.");
 
         toggle(category, entries, values,
+                "Adaptive nest resource targets (capacity-aware)",
+                "nestAdaptiveStockEnabled", "nest_stock_adapt_toggle", true,
+                "When lifecycle is enabled, soil/log demand follows upcoming chamber construction, food demand follows remaining population slots. Once the real hard cap is full, workers stop needless harvesting.");
+
+        toggle(category, entries, values,
                 "Renewable crop replanting (consumes ONE physical seed)",
                 "nestCropReplantEnabled", "nest_crop_replant_toggle", false,
                 "OFF by default: after harvesting a mature wheat/carrot/potato/beetroot/nether-wart crop, consume one newly dropped actual planting item and replant a juvenile plant on suitable farm soil. Requires enabled block harvesting; no synthetic seeds or loot.");
@@ -412,6 +417,15 @@ public final class SwarmClothControlScreen {
                             + decimal(values, "colonySoilInhibition"));
             status(category, entries,
                     "Research-inspired feedback values are experimental GAME parameters, not measured ant or bee signal rates.");
+            status(category, entries,
+                    "Population-aware stock targets [soil / timber / food]: "
+                            + integer(values, "colonyTargetSoil") + " / "
+                            + integer(values, "colonyTargetTimber") + " / "
+                            + integer(values, "colonyTargetFood"));
+            status(category, entries,
+                    "Registered visible nest pieces: "
+                            + integer(values, "colonyOwnedShellPieces")
+                            + " (workers cannot mine their own completed modules)");
             status(category, entries,
                     "Sparse pheromone field: " + integer(values, "colonyPheromoneCells")
                             + " / 128 occupied 4-block cells");
