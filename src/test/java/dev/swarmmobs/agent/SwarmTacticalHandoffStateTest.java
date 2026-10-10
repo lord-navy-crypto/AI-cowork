@@ -132,6 +132,40 @@ class SwarmTacticalHandoffStateTest {
         assertEquals(2, state.rangedSpacingEpisodes());
     }
 
+    @Test void SkeletonTimedMoveReturnsBowControlAndHonorsCooldown() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(9, 1));
+        state.updateRangedSpacing(true, 100);
+        assertTrue(state.rangedSpacingActive());
+        assertFalse(state.expireRangedSpacing(129));
+        assertTrue(state.expireRangedSpacing(130));
+        assertFalse(state.rangedSpacingActive());
+        assertEquals(1,state.rangedSpacingFallbacks());
+        state.updateRangedSpacing(true, 131);
+        assertFalse(state.rangedSpacingActive());
+        assertEquals(1,state.rangedSpacingEpisodes());
+        state.updateRangedSpacing(true, 180);
+        assertTrue(state.rangedSpacingActive());
+        assertEquals(2,state.rangedSpacingEpisodes());
+        state.bindTacticalTarget(new UUID(9, 2));
+        assertFalse(state.rangedSpacingActive());
+        assertTrue(state.mayAttemptRangedSpacing(1));
+    }
+
+    @Test void ZombieShortSideMovementGivesUpAndLetsMeleeResume() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(7,1));
+        assertTrue(state.allowShortZombieFlank(100));
+        assertTrue(state.allowShortZombieFlank(117));
+        assertFalse(state.allowShortZombieFlank(118));
+        assertEquals(1,state.zombieFlankFallbacks());
+        assertFalse(state.allowShortZombieFlank(147));
+        assertTrue(state.allowShortZombieFlank(148));
+        state.clearShortZombieFlank();
+        state.bindTacticalTarget(new UUID(7,2));
+        assertTrue(state.allowShortZombieFlank(1));
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
