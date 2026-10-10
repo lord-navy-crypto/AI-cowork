@@ -756,6 +756,8 @@ public final class SwarmControlNetwork {
         long zombieNoProgress = 0;
         int zombieBowLanePlanned = 0;
         long zombieBowLaneAccepted = 0;
+        int speciesSpacingPlanned = 0;
+        long[] speciesSpacingAccepted = new long[4];
         long gamePathRejects = 0;
         long skeletonPathRejects = 0;
         long zombiePathRejects = 0;
@@ -810,6 +812,9 @@ public final class SwarmControlNetwork {
                     zombieNoProgress += tacticalState.zombieNoProgressFallbacks();
                     if (tacticalState.zombieBowLaneYieldPlanned()) zombieBowLanePlanned++;
                     zombieBowLaneAccepted += tacticalState.zombieBowLaneYieldAcceptedCommands();
+                    if (tacticalState.routeSpacingPlanned()) speciesSpacingPlanned++;
+                    speciesSpacingAccepted[SwarmAgentProfiles.profile(mob).archetype().ordinal()]
+                            += tacticalState.routeSpacingAcceptedCommands();
                     gamePathRejects += tacticalState.navigationCommandRejections();
                     skeletonPathRejects += tacticalState.skeletonPathRejectFallbacks();
                     zombiePathRejects += tacticalState.zombiePathRejectFallbacks();
@@ -898,6 +903,11 @@ public final class SwarmControlNetwork {
                 pair("zombieNoProgress", Math.min(Integer.MAX_VALUE, zombieNoProgress)),
                 pair("zombieBowLanePlanned", zombieBowLanePlanned),
                 pair("zombieBowLaneAccepted", Math.min(Integer.MAX_VALUE, zombieBowLaneAccepted)),
+                pair("speciesSpacingPlanned", speciesSpacingPlanned),
+                pair("zombieSpacingAccepted", Math.min(Integer.MAX_VALUE, speciesSpacingAccepted[0])),
+                pair("skeletonSpacingAccepted", Math.min(Integer.MAX_VALUE, speciesSpacingAccepted[1])),
+                pair("spiderSpacingAccepted", Math.min(Integer.MAX_VALUE, speciesSpacingAccepted[2])),
+                pair("creeperSpacingAccepted", Math.min(Integer.MAX_VALUE, speciesSpacingAccepted[3])),
                 pair("gamePathRejects", Math.min(Integer.MAX_VALUE, gamePathRejects)),
                 pair("skeletonPathRejects", Math.min(Integer.MAX_VALUE, skeletonPathRejects)),
                 pair("zombiePathRejects", Math.min(Integer.MAX_VALUE, zombiePathRejects)),
