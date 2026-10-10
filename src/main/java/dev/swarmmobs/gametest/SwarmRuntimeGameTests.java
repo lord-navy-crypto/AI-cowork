@@ -19,6 +19,8 @@ import dev.swarmmobs.goal.SwarmApproachGoal;
 import dev.swarmmobs.goal.SwarmIdleNestGoal;
 import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
 import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyGatherGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyHuntGoal;
 import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.colony.SwarmNestHaulLease;
 import dev.swarmmobs.colony.SwarmNestScoutSignal;
@@ -52,6 +54,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.monster.Spider;
+import net.minecraft.world.entity.animal.Pig;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
@@ -4745,6 +4748,216 @@ public final class SwarmRuntimeGameTests {
             SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(foraging);
             helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
                     .set(grief, helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_tree_mining",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void workerCutsRawLogAndProducesPhysicalTimber(GameTestHelper helper) {
+        var nestPos = new BlockPos(0, 1, 2);
+        var harvestPos = new BlockPos(4, 1, 2);
+        helper.setBlock(nestPos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(harvestPos, Blocks.OAK_LOG);
+        var be = helper.getLevel().getBlockEntity(helper.absolutePos(nestPos));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("No core for log mining"); return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(nestPos).asLong());
+        boolean oldMaster = SwarmConfig.ENABLED.get();
+        boolean oldLife = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean oldHaul = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean oldGather = SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean oldGrief = helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            var goal = new SwarmZombieColonyGatherGoal(worker);
+            if (!goal.canUse()) { helper.fail("Worker cannot choose nearby oak log"); return; }
+            goal.start(); goal.tick(); goal.stop();
+            if (!helper.getLevel().getBlockState(helper.absolutePos(harvestPos)).isAir()
+                    || nest.resources() != 0) {
+                helper.fail("Log not mined or resources added without transport"); return;
+            }
+            var drops = helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class, new AABB(helper.absolutePos(harvestPos)).inflate(2),
+                    e -> e.isAlive() && e.getItem().is(Items.OAK_LOG));
+            if (drops.size() != 1 || drops.getFirst().getItem().getCount() != 1) {
+                helper.fail("Raw log must exist as one physical loot item"); return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(oldMaster);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(oldLife);
+            SwarmConfig.NEST_HAULING_ENABLED.set(oldHaul);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(oldGather);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(oldGrief, helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_soil_mining",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void workerMinesRealDirtWithoutMagicallyCreditingNest(GameTestHelper helper) {
+        var nestPos = new BlockPos(0, 1, 2);
+        var site = new BlockPos(4, 1, 2);
+        helper.setBlock(nestPos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(site, Blocks.DIRT);
+        var be = helper.getLevel().getBlockEntity(helper.absolutePos(nestPos));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("No core for soil mining"); return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(nestPos).asLong());
+        boolean master = SwarmConfig.ENABLED.get(), life = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean gather = SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean grief = helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            var goal = new SwarmZombieColonyGatherGoal(worker);
+            if (!goal.canUse()) { helper.fail("Worker cannot target genuine soil"); return; }
+            goal.start(); goal.tick(); goal.stop();
+            var drops = helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class, new AABB(helper.absolutePos(site)).inflate(2),
+                    e -> e.isAlive() && e.getItem().is(Items.DIRT));
+            if (!helper.getLevel().getBlockState(helper.absolutePos(site)).isAir()
+                    || drops.size() != 1 || nest.soilPoints() != 0) {
+                helper.fail("Dirt must be mined into real loot before any delivery"); return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(life);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(gather);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief, helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_crop_harvest",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void workerHarvestsOnlyMatureCarrotsAsWorldItems(GameTestHelper helper) {
+        var nestPos = new BlockPos(0, 1, 2);
+        var site = new BlockPos(4, 1, 2);
+        helper.setBlock(nestPos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(site.below(), Blocks.FARMLAND);
+        helper.setBlock(site, Blocks.CARROTS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.CarrotBlock.AGE, 7));
+        var be = helper.getLevel().getBlockEntity(helper.absolutePos(nestPos));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Missing core for crop harvest"); return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(nestPos).asLong());
+        boolean master = SwarmConfig.ENABLED.get(), life = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean gather = SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean grief = helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            var goal = new SwarmZombieColonyGatherGoal(worker);
+            if (!goal.canUse()) { helper.fail("Ripe carrots not selected"); return; }
+            goal.start(); goal.tick(); goal.stop();
+            var drops = helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class, new AABB(helper.absolutePos(site)).inflate(2),
+                    e -> e.isAlive() && e.getItem().is(Items.CARROT));
+            int produced = drops.stream().mapToInt(e -> e.getItem().getCount()).sum();
+            if (!helper.getLevel().getBlockState(helper.absolutePos(site)).isAir()
+                    || produced <= 0 || nest.nutrientPoints() != 0
+                    || SwarmNestBlockEntity.classify(drops.getFirst().getItem())
+                            != SwarmNestColonyPolicy.Kind.NUTRIENT) {
+                helper.fail("Mature crop must yield real edible items without free inventory");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(life);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(gather);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief, helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_pig_hunting",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void workerHuntsRealPigAndLeavesVanillaMeatToHaul(GameTestHelper helper) {
+        var nestPos = new BlockPos(0, 1, 2);
+        helper.setBlock(nestPos, SwarmNestBlocks.NEST_CORE.get());
+        var be = helper.getLevel().getBlockEntity(helper.absolutePos(nestPos));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Pig hunting fixture missing core"); return;
+        }
+        Zombie worker = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        worker.setNoGravity(true);
+        worker.getPersistentData().putLong("SwarmColonyNest",
+                helper.absolutePos(nestPos).asLong());
+        Pig pig = helper.spawn(EntityType.PIG, new BlockPos(4, 1, 2));
+        pig.setNoGravity(true);
+        pig.setHealth(1.0f);
+        boolean master = SwarmConfig.ENABLED.get(), life = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean hunt = SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get();
+        boolean grief = helper.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        boolean mobLoot = helper.getLevel().getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBLOOT)
+                    .set(true, helper.getLevel().getServer());
+            var goal = new SwarmZombieColonyHuntGoal(worker);
+            if (!goal.canUse()) { helper.fail("Worker could not claim adult pig"); return; }
+            goal.start(); goal.tick(); goal.stop();
+            var meat = helper.getLevel().getEntitiesOfClass(
+                    ItemEntity.class, new AABB(pig.blockPosition()).inflate(3),
+                    e -> e.isAlive() && e.getItem().is(Items.PORKCHOP));
+            if (pig.isAlive() || meat.isEmpty()
+                    || SwarmNestBlockEntity.classify(meat.getFirst().getItem())
+                            != SwarmNestColonyPolicy.Kind.NUTRIENT
+                    || nest.nutrientPoints() != 0) {
+                helper.fail("Real pig must die from normal melee, dropping actual meat"); return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(life);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(hunt);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief, helper.getLevel().getServer());
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_DOMOBLOOT)
+                    .set(mobLoot, helper.getLevel().getServer());
         }
     }
 }
