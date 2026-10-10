@@ -12,6 +12,7 @@ import dev.swarmmobs.algorithm.CapabilitySlotAllocator;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner;
 import dev.swarmmobs.algorithm.SwarmAdaptiveTacticsPolicy;
 import dev.swarmmobs.algorithm.SwarmPackDecongestionPolicy;
+import dev.swarmmobs.algorithm.SwarmCrowdWaypointWorldPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
@@ -53,8 +54,6 @@ import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
 import dev.swarmmobs.goal.SwarmZombieBreacherSafetyGoal;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Skeleton;
@@ -585,8 +584,8 @@ public final class SwarmMobEvents {
                         plannedDestination, tacticalFrame.forward(), 1);
                 Vec2 left = SwarmPackDecongestionPolicy.waypoint(
                         plannedDestination, tacticalFrame.forward(), -1);
-                boolean rightUsable = safeCrowdWaypoint(level, mob, right);
-                boolean leftUsable = safeCrowdWaypoint(level, mob, left);
+                boolean rightUsable = SwarmCrowdWaypointWorldPolicy.locallyTraversable(level, mob.getY(), right);
+                boolean leftUsable = SwarmCrowdWaypointWorldPolicy.locallyTraversable(level, mob.getY(), left);
                 var feasible = SwarmPackDecongestionPolicy.chooseFeasible(
                         crowdChoice, rightUsable, leftUsable);
                 boolean priorLaneBlocked = (state.crowdLaneSide() > 0 && !rightUsable)
@@ -707,32 +706,6 @@ public final class SwarmMobEvents {
         if (gameTick % 10L == 0L) {
             SwarmDebugParticles.render(level, mob, communicationNeighbors);
         }
-    }
-
-    /**
-     * Lightweight conservative Minecraft waypoint check. Never loads chunks.
-     * This is not a full path guarantee: the ordinary navigation/recovery
-     * controller still decides whether a viable route reaches the waypoint.
-     */
-    private static boolean safeCrowdWaypoint(
-            ServerLevel level, PathfinderMob mob, Vec2 point
-    ) {
-        if (point == null || !Double.isFinite(point.x())
-                || !Double.isFinite(point.z())) {
-            return false;
-        }
-        BlockPos feet = BlockPos.containing(point.x(), mob.getY(), point.z());
-        if (!level.isInWorldBounds(feet)
-                || !level.isInWorldBounds(feet.above())
-                || !level.hasChunkAt(feet)) {
-            return false;
-        }
-        BlockPos head = feet.above();
-        BlockPos ground = feet.below();
-        return level.getBlockState(feet).getCollisionShape(level, feet).isEmpty()
-                && level.getBlockState(head).getCollisionShape(level, head).isEmpty()
-                && level.getFluidState(feet).isEmpty()
-                && level.getBlockState(ground).isFaceSturdy(level, ground, Direction.UP);
     }
 
     private static boolean hasClearSupportShot(
