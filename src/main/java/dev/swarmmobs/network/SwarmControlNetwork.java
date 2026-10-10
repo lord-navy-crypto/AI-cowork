@@ -617,6 +617,8 @@ public final class SwarmControlNetwork {
         int tacticalPeerLinks = 0;
         int agentsWithTacticalBreacher = 0;
         int workAgents = 0, alertAgents = 0, combatAgents = 0, recoveringAgents = 0;
+        int roundHoldAgents = 0, roundCoverAgents = 0, roundRotateAgents = 0;
+        long roundPhaseSwitches = 0;
         long nestsFoundedByLoadedAgents = 0L;
         EnumMap<SwarmTaskType, Integer> taskCounts = new EnumMap<>(SwarmTaskType.class);
         EnumMap<SwarmSpecialization, Integer> specializationCounts =
@@ -645,6 +647,17 @@ public final class SwarmControlNetwork {
             if (masterEnabled) {
                 SwarmAgentState tacticalState =
                         mob.getData(SwarmAttachments.AGENT_STATE.get());
+                if (SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
+                        && tacticalState.engagementMode()
+                                == dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
+                        && tacticalState.tacticalPeerCount() > 0) {
+                    switch (tacticalState.tacticalRoundPhase()) {
+                        case HOLD -> roundHoldAgents++;
+                        case COVER -> roundCoverAgents++;
+                        case ROTATE -> roundRotateAgents++;
+                    }
+                    roundPhaseSwitches += tacticalState.tacticalRoundSwitchCount();
+                }
                 switch (tacticalState.engagementMode()) {
                     case WORK -> workAgents++;
                     case ALERT -> alertAgents++;
@@ -692,6 +705,10 @@ public final class SwarmControlNetwork {
                 pair("aiLastError", ai.lastError()),
                 pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
+                pair("roundHoldAgents", roundHoldAgents),
+                pair("roundCoverAgents", roundCoverAgents),
+                pair("roundRotateAgents", roundRotateAgents),
+                pair("roundPhaseSwitches", Math.min(Integer.MAX_VALUE,roundPhaseSwitches)),
                 pair("modeWorkAgents", workAgents),
                 pair("modeAlertAgents", alertAgents),
                 pair("modeCombatAgents", combatAgents),
