@@ -5,6 +5,7 @@ import dev.swarmmobs.algorithm.SwarmNestSurveyBudget;
 import dev.swarmmobs.colony.SwarmColonyGatherPolicy;
 import dev.swarmmobs.colony.SwarmColonyEmergencePolicy;
 import dev.swarmmobs.colony.SwarmNestPheromoneField;
+import dev.swarmmobs.colony.SwarmNestOpportunityBoard;
 import dev.swarmmobs.agent.SwarmTaskType;
 import java.util.List;
 import dev.swarmmobs.colony.SwarmNestBlockEntity;
@@ -43,6 +44,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
     private BlockPos site;
     private BlockState original;
     private SwarmNestColonyPolicy.Kind selectedKind;
+    private SwarmNestOpportunityBoard.Opportunity scoutOpportunity;
     private long nextSurvey = Long.MIN_VALUE;
     private long started;
     private long lastProgress;
@@ -141,8 +143,50 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                 }
             }
         }
-        if (chosen == null || !nest.workBoard().claim(
-                chosen.asLong(), zombie.getUUID(), tick)) return false;
+        SwarmNestOpportunityBoard.Opportunity fromScout = null;
+        if (chosen == null) {
+            // A remote site is not a command to mine blindly: a real Spider
+            // sighting suggests a waypoint, then we verify a loaded block
+            // and reserve the SAME block through the shared work board.
+            BlockPos workerPosition = zombie.blockPosition();
+            fromScout = nest.opportunityBoard().reserve(
+                    zombie.getUUID(),
+                    new SwarmNestOpportunityBoard.Position(
+                            workerPosition.getX(),workerPosition.getY(),workerPosition.getZ()),
+                    SwarmNestOpportunityBoard.Type.BLOCK,tick,
+                    SwarmNestOpportunityBoard.MAX_RADIUS,
+                    lead -> SwarmColonyGatherPolicy.needs(lead.kind(),
+                            nest.soilPoints(),nest.timberPoints(),
+                            nest.nutrientPoints()+nest.legacyPoints(),nest.resources())
+                            && !nest.workBoard().claimedByAnother(
+                                    BlockPos.asLong(lead.position().x(),
+                                            lead.position().y(),lead.position().z()),
+                                    zombie.getUUID(),tick),
+                    lead -> SwarmColonyGatherPolicy.score(lead.kind(),
+                            workerPosition.distSqr(new BlockPos(
+                                    lead.position().x(),lead.position().y(),lead.position().z())),
+                            nest.soilPoints(),nest.timberPoints(),
+                            nest.nutrientPoints()+nest.legacyPoints()));
+            if (fromScout == null) return false;
+            var p = fromScout.position();
+            BlockPos observed = new BlockPos(p.x(),p.y(),p.z());
+            if (!level.hasChunkAt(observed)
+                    || !validBlock(level,observed,level.getBlockState(observed))
+                    || category(level,observed,level.getBlockState(observed))
+                            != fromScout.kind()) {
+                nest.opportunityBoard().invalidate(fromScout);
+                return false;
+            }
+            chosen = observed;
+            stateChosen = level.getBlockState(observed);
+            kindChosen = fromScout.kind();
+        }
+        if (!nest.workBoard().claim(chosen.asLong(), zombie.getUUID(), tick)) {
+            if (fromScout != null) nest.opportunityBoard().release(
+                    fromScout,zombie.getUUID());
+            return false;
+        }
+        scoutOpportunity = fromScout;
         home = candidateHome;
         site = chosen;
         original = stateChosen;
@@ -159,7 +203,10 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                 || !level.getBlockState(home).is(SwarmNestBlocks.NEST_CORE.get())
                 || !level.getBlockState(site).equals(original)
                 || !nest.workBoard().owned(site.asLong(), zombie.getUUID(),
-                        level.getGameTime())) return false;
+                        level.getGameTime())
+                || (scoutOpportunity != null
+                    && !nest.opportunityBoard().renew(
+                            scoutOpportunity,zombie.getUUID(),level.getGameTime()))) return false;
         if (SwarmColonyGatherPolicy.expired(level.getGameTime(), started, lastProgress)) {
             failedRoute = true;
             return false;
@@ -219,6 +266,11 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
         if (broken && SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
             nest.markPheromone(site, selectedKind, now);
         }
+        if (scoutOpportunity != null) {
+            // A one-off block is gone after mining. Never preserve a stale
+            // worker waypoint or counterfeit another physical resource.
+            nest.opportunityBoard().invalidate(scoutOpportunity);
+        }
         done = true;
         zombie.getNavigation().stop();
     }
@@ -230,6 +282,9 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
                 && zombie.level() instanceof ServerLevel level && level.hasChunkAt(home)
                 && level.getBlockEntity(home) instanceof SwarmNestBlockEntity nest) {
             nest.workBoard().release(site.asLong(), zombie.getUUID());
+            if (scoutOpportunity != null) {
+                nest.opportunityBoard().release(scoutOpportunity,zombie.getUUID());
+            }
             if (failedRoute) {
                 nest.laborFeedback().failed(selectedKind, level.getGameTime());
                 if (SwarmConfig.NEST_PHEROMONES_ENABLED.get()) {
@@ -238,6 +293,7 @@ public final class SwarmZombieColonyGatherGoal extends Goal {
             }
         }
         site = null;
+        scoutOpportunity = null;
         original = null;
         home = null;
         selectedKind = null;
