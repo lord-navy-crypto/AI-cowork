@@ -7,6 +7,7 @@ public final class SwarmConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.IntValue PLAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.BooleanValue SUPPORT_POSITION_OPTIMIZATION_ENABLED;
     public static final ModConfigSpec.DoubleValue NEIGHBOR_RADIUS;
     public static final ModConfigSpec.IntValue MAX_NEIGHBORS;
     public static final ModConfigSpec.DoubleValue TARGET_RADIUS;
@@ -48,6 +49,7 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue NAV_LOCAL_LATERAL_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_LOCAL_CONGESTION_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_LOCAL_CONGESTION_RADIUS;
+    public static final ModConfigSpec.IntValue NAV_PATH_EVIDENCE_BUDGET_PER_TICK;
     public static final ModConfigSpec.BooleanValue NAV_PATH_EVIDENCE_ENABLED;
     public static final ModConfigSpec.DoubleValue NAV_PATH_NODE_PENALTY;
     public static final ModConfigSpec.DoubleValue NAV_PATH_RESIDUAL_PENALTY;
@@ -62,6 +64,30 @@ public final class SwarmConfig {
     public static final ModConfigSpec.DoubleValue ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS;
     public static final ModConfigSpec.IntValue ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN;
 
+    // New idle colony construction is opt-in to protect existing player worlds.
+    public static final ModConfigSpec.BooleanValue NEST_CONSTRUCTION_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_LIFECYCLE_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_HAULING_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_BERRY_FORAGING_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_BLOCK_GATHER_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_CROP_REPLANT_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_ADAPTIVE_STOCK_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_ANIMAL_HUNT_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_PHEROMONES_ENABLED;
+    public static final ModConfigSpec.BooleanValue NEST_PHEROMONE_EXPLORATION_ENABLED;
+    public static final ModConfigSpec.IntValue NEST_GATHER_INTERVAL;
+    public static final ModConfigSpec.IntValue NEST_BERRY_FORAGE_INTERVAL;
+    public static final ModConfigSpec.IntValue NEST_HAUL_SEARCH_RADIUS;
+    public static final ModConfigSpec.IntValue NEST_HAUL_MAX_STACK;
+    public static final ModConfigSpec.IntValue NEST_HAUL_ATTEMPT_INTERVAL;
+    public static final ModConfigSpec.BooleanValue NEST_VISIBLE_EXPANSION_ENABLED;
+    public static final ModConfigSpec.IntValue NEST_MAX_POPULATION;
+    public static final ModConfigSpec.BooleanValue NEST_ADAPTIVE_RECRUITMENT;
+    public static final ModConfigSpec.DoubleValue NEST_WORKER_TARGET_SHARE;
+    public static final ModConfigSpec.DoubleValue NEST_GUARD_TARGET_SHARE;
+    public static final ModConfigSpec.DoubleValue NEST_RESPONSE_THRESHOLD;
+    public static final ModConfigSpec.IntValue NEST_BUILD_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue NEST_MIN_GROUP_SIZE;
     public static final ModConfigSpec.BooleanValue DIVISION_OF_LABOR_ENABLED;
     public static final ModConfigSpec.IntValue SPECIALIZATION_MIN_HOLD_TICKS;
     public static final ModConfigSpec.DoubleValue SPECIALIZATION_EXPERIENCE_GAIN;
@@ -95,6 +121,10 @@ public final class SwarmConfig {
         ENABLED = BUILDER
                 .comment("Master switch for the algorithmic swarm layer.")
                 .define("enabled", true);
+
+        SUPPORT_POSITION_OPTIMIZATION_ENABLED = BUILDER
+                .comment("Enable local geometric support-position optimization for directly observed same-target squads. Check each candidate against existing world and teammate visibility first, then minimize travel plus separation deficit. Keep feasible prior choice unless another beats it by the mob's physical width. No turn system, attack override, or extra chunk scanning. ON by default; operator can restore legacy side selection.")
+                .define("supportPositionOptimizationEnabled", true);
 
         PLAN_INTERVAL_TICKS = BUILDER
                 .comment("How often each swarm mob replans. 20 ticks = 1 second.")
@@ -264,6 +294,10 @@ public final class SwarmConfig {
                 .comment("Radius, in blocks, used to estimate crowding around local navigation candidates.")
                 .defineInRange("navLocalCongestionRadius", 2.5, 0.5, 8.0);
 
+        NAV_PATH_EVIDENCE_BUDGET_PER_TICK = BUILDER
+                .comment("Maximum path-evidence reservations per server-level tick; complete local episodes defer when budget is exhausted.")
+                .defineInRange("navPathEvidenceBudgetPerTick", 96, 8, 512);
+
         NAV_PATH_EVIDENCE_ENABLED = BUILDER
                 .comment("Use Minecraft PathNavigation reachability and path cost as evidence for local detour candidates.")
                 .define("navPathEvidenceEnabled", true);
@@ -311,6 +345,105 @@ public final class SwarmConfig {
         ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN = BUILDER
                 .comment("Maximum consecutive unsupported blocks a local Zombie team may commit to bridging.")
                 .defineInRange("zombieEngineeringMaxBridgeSpan", 4, 1, 8);
+
+        BUILDER.pop();
+
+        // Keep destructive colony features OFF by default so independent GameTests
+        // and ordinary saved worlds are not affected. Operators can opt in
+        // to the entire experimental economy using /swarmmobs debug testmode on.
+        BUILDER.push("colonies");
+
+        NEST_CONSTRUCTION_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: allow idle Zombie workers to place a persistent Nest Core on suitable natural soil; OFF by default to protect player worlds.")
+                .define("nestConstructionEnabled", false);
+
+        NEST_BUILD_INTERVAL_TICKS = BUILDER
+                .comment("Minimum interval between idle nest-building site surveys for each worker (game ticks).")
+                .defineInRange("nestBuildIntervalTicks", 200, 100, 1200);
+
+        NEST_MIN_GROUP_SIZE = BUILDER
+                .comment("Minimum local supported swarm mobs, including builder, required to found a nest.")
+                .defineInRange("nestMinGroupSize", 3, 2, 16);
+
+        NEST_LIFECYCLE_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: activate resource-fed nest lifecycle and capped colony spawning; OFF by default.")
+                .define("nestLifecycleEnabled", false);
+
+        NEST_HAULING_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle Zombies assigned to a loaded Nest Core carry actual nearby dropped resources to it. OFF by default.")
+                .define("nestHaulingEnabled", false);
+
+        NEST_BERRY_FORAGING_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle colony Zombies may pick renewable ripe sweet berries near a loaded nest and create real dropped berry items. OFF by default. Can touch player farms; use only in a designated test world. Requires nest lifecycle, hauling and mobGriefing.")
+                .define("nestBerryForagingEnabled", false);
+
+        NEST_BLOCK_GATHER_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle Zombie workers may mine actual soil/log blocks and harvest ripe crops for colony resources; affects player builds and farms intentionally when enabled. Requires lifecycle, hauling and mobGriefing.")
+                .define("nestBlockGatherEnabled", false);
+
+        NEST_ADAPTIVE_STOCK_ENABLED = BUILDER
+                .comment("When colony lifecycle is enabled, adapt food/soil/log worker demand to population and capacity. Real dropped-item intake is limited to each category's outstanding demand so one large stack cannot starve the others; surplus items stay physical. Explicit manual resource accounting remains bounded by the global store.")
+                .define("nestAdaptiveStockEnabled", true);
+
+        NEST_CROP_REPLANT_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: after harvesting ripe vanilla field crops, use ONE newly physically dropped planting item to replant. WHEAT/CARROTS/POTATOES/BEETROOTS/NETHER_WART only. No free items. Requires block gathering. OFF by default.")
+                .define("nestCropReplantEnabled", false);
+
+        NEST_ANIMAL_HUNT_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: idle Zombie workers may hunt adult farm animals to create vanilla physical food drops. Requires lifecycle, hauling and mobGriefing.")
+                .define("nestAnimalHuntEnabled", false);
+
+        NEST_GATHER_INTERVAL = BUILDER
+                .comment("Ticks between bounded colony block or animal surveys per worker.")
+                .defineInRange("nestGatherInterval", 160, 60, 800);
+
+        NEST_PHEROMONES_ENABLED = BUILDER
+                .comment("Use sparse decaying food, timber, soil and stop pheromone-like local cues in colony labor decisions. Only active with opt-in colony lifecycle and hauling.")
+                .define("nestPheromonesEnabled", true);
+
+        NEST_PHEROMONE_EXPLORATION_ENABLED = BUILDER
+                .comment("Allow idle workers to make short, loaded-chunk-only exploratory hops toward locally sensed resource pheromones. Needs colony lifecycle, hauling, and pheromones.")
+                .define("nestPheromoneExplorationEnabled", true);
+
+        NEST_BERRY_FORAGE_INTERVAL = BUILDER
+                .comment("Minimum per-worker ticks between bounded nearby ripe-berry foraging surveys.")
+                .defineInRange("nestBerryForageInterval", 200, 120, 800);
+
+        NEST_HAUL_SEARCH_RADIUS = BUILDER
+                .comment("Maximum search radius in blocks from idle Zombie to a dropped resource; each worker is throttled and no chunks are loaded.")
+                .defineInRange("nestHaulSearchRadius", 8, 4, 16);
+
+        NEST_HAUL_MAX_STACK = BUILDER
+                .comment("Maximum number of items in a dropped stack a Zombie may transport as one real entity.")
+                .defineInRange("nestHaulMaxStack", 16, 1, 64);
+
+        NEST_HAUL_ATTEMPT_INTERVAL = BUILDER
+                .comment("Minimum ticks between a Zombie's idle resource-hauling surveys.")
+                .defineInRange("nestHaulAttemptInterval", 100, 40, 400);
+
+        NEST_VISIBLE_EXPANSION_ENABLED = BUILDER
+                .comment("EXPERIMENTAL: physically place conservative soil/timber nest shell blocks when chambers expand. OFF by default. Requires mobGriefing; blocked sites defer upgrades.")
+                .define("nestVisibleExpansionEnabled", false);
+
+        NEST_MAX_POPULATION = BUILDER
+                .comment("Maximum locally counted colony members before reproduction stops.")
+                .defineInRange("nestMaxPopulation", 12, 3, 32);
+
+        NEST_ADAPTIVE_RECRUITMENT = BUILDER
+                .comment("If lifecycle is enabled, recruit based on local response-threshold workforce deficits rather than fixed species rotation.")
+                .define("nestAdaptiveRecruitment", true);
+
+        NEST_WORKER_TARGET_SHARE = BUILDER
+                .comment("Desired fraction of local colony population made of Zombie workers (game model, not biological data).")
+                .defineInRange("nestWorkerTargetShare", 0.40, 0.15, 0.65);
+
+        NEST_GUARD_TARGET_SHARE = BUILDER
+                .comment("Desired fraction of local colony population made of Skeleton guards; remaining slots are scouts/reserves.")
+                .defineInRange("nestGuardTargetShare", 0.25, 0.10, 0.50);
+
+        NEST_RESPONSE_THRESHOLD = BUILDER
+                .comment("Response threshold theta in s^2/(s^2 + theta^2); higher values make recruiting less responsive to small deficits.")
+                .defineInRange("nestResponseThreshold", 0.55, 0.10, 3.0);
 
         BUILDER.pop();
 

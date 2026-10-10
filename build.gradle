@@ -15,6 +15,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 repositories {
     mavenCentral()
+    maven { url = "https://maven.architectury.dev/" }
 }
 
 neoForge {
@@ -51,6 +52,7 @@ neoForge {
 }
 
 dependencies {
+    implementation "me.shedaniel.cloth:cloth-config-neoforge:${cloth_config_version}"
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
     testImplementation 'com.google.code.gson:gson:2.11.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
@@ -81,6 +83,56 @@ def generateGameTestResources = tasks.register("generateGameTestResources") {
     }
 }
 
+// Dedicated 32x32 pixel-art textures are generated reproducibly at build
+// time because GitHub's text-file connector cannot upload binary PNG blobs.
+// The resulting textures are INCLUDED in the built mod JAR.
+def nestArtworkOutput = layout.buildDirectory.dir("generated/nestArtwork")
+def generateNestArtwork = tasks.register("generateNestArtwork") {
+    outputs.dir(nestArtworkOutput)
+    doLast {
+        def directory = nestArtworkOutput.get().file("assets/swarmmobs/textures/block").asFile
+        directory.mkdirs()
+
+        for (def face in ["side", "top"]) {
+            int scale = 32
+            def image = new java.awt.image.BufferedImage(scale, scale,
+                    java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            for (int y = 0; y < scale; y++) {
+                for (int x = 0; x < scale; x++) {
+                    // Slate housing with asymmetric basalt cracks, amber cells
+                    // and a central violet "swarm signal" core.
+                    int jitter = Math.floorMod(x * 31 + y * 23 + x * y * 7, 11)
+                    int r = 32 + jitter, g = 36 + jitter, b = 49 + jitter
+                    boolean seam = Math.floorMod(x + (y / 4).intValue() * 3, 9) == 0
+                            || Math.floorMod(y + (x / 6).intValue(), 9) == 0
+                    if (seam) { r = 79; g = 68; b = 52 }
+                    boolean honeyCell = (Math.floorMod(x + (y / 7).intValue() * 4, 10) >= 3
+                            && Math.floorMod(x + (y / 7).intValue() * 4, 10) <= 5)
+                            && Math.floorMod(y, 7) >= 2 && Math.floorMod(y, 7) <= 4
+                    if (honeyCell) { r = 146; g = 100; b = 55 }
+
+                    if (face == "top") {
+                        double d = Math.hypot(x - 15.5, y - 15.5)
+                        if (d < 13 && d > 10) { r = 167; g = 116; b = 63 }
+                        if (d < 9 && d > 7) { r = 74; g = 129; b = 133 }
+                        if (d < 6) { r = 78; g = 50; b = 123 }
+                        if (d < 3) { r = 169; g = 113; b = 204 }
+                        if (d < 1.7) { r = 224; g = 187; b = 246 }
+                    } else if (x >= 12 && x <= 19 && y >= 11 && y <= 21) {
+                        r = 74 + jitter * 3; g = 47 + jitter; b = 118 + jitter * 4
+                        if (Math.abs(x - 15.5) + Math.abs(y - 16) < 4) {
+                            r = 166; g = 111; b = 212
+                        }
+                    }
+                    image.setRGB(x, y, new java.awt.Color(r, g, b).getRGB())
+                }
+            }
+            javax.imageio.ImageIO.write(image, "png",
+                    new File(directory, "nest_core_" + face + ".png"))
+        }
+    }
+}
+
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
             minecraft_version       : minecraft_version,
@@ -98,12 +150,14 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
     into "build/generated/sources/modMetadata"
 }
 sourceSets.main.resources.srcDir generateModMetadata
+sourceSets.main.resources.srcDir generateNestArtwork
 sourceSets.main.resources.srcDir generateGameTestResources
 neoForge.ideSyncTask generateModMetadata
 neoForge.ideSyncTask generateGameTestResources
 
 tasks.named("processResources").configure {
     dependsOn generateGameTestResources
+    dependsOn generateNestArtwork
 }
 
 tasks.withType(JavaCompile).configureEach {

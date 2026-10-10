@@ -49,7 +49,7 @@ public final class SwarmClientEvents {
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || event.getScreen() instanceof SwarmControlScreen) {
+        if (minecraft.player == null || SwarmControlClient.isControlScreen(event.getScreen())) {
             return;
         }
 

@@ -14,13 +14,19 @@ import dev.swarmmobs.algorithm.SwarmCombatBusyPolicy;
 import dev.swarmmobs.algorithm.SwarmCombatPlanner.Vec2;
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy;
 import dev.swarmmobs.algorithm.SwarmFireSupportLanePolicy;
+import dev.swarmmobs.algorithm.SwarmFriendlyFireLanePolicy;
+import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
+import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmDivisionOfLaborPolicy;
 import dev.swarmmobs.algorithm.SwarmEngineeringEscalationPolicy;
 import dev.swarmmobs.algorithm.SwarmSpecializationRolePolicy;
 import dev.swarmmobs.algorithm.SwarmTaskDemandPolicy;
 import dev.swarmmobs.algorithm.SwarmTaskSaturationPolicy;
 import dev.swarmmobs.algorithm.SwarmSearchPlanner;
+import dev.swarmmobs.algorithm.SwarmNeighborSelectionPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportSpacingPolicy;
+import dev.swarmmobs.algorithm.SwarmTargetSquadPolicy;
+import dev.swarmmobs.algorithm.SwarmVisibleTargetPolicy;
 import dev.swarmmobs.algorithm.SwarmSensingPolicy;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.TargetPredictionPolicy;
@@ -33,13 +39,22 @@ import dev.swarmmobs.config.SwarmConfig;
 import dev.swarmmobs.data.SwarmAttachments;
 import dev.swarmmobs.debug.SwarmDebugParticles;
 import dev.swarmmobs.goal.SwarmApproachGoal;
+import dev.swarmmobs.goal.SwarmIdleNestGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyHaulGoal;
+import dev.swarmmobs.goal.SwarmZombieBerryForageGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyGatherGoal;
+import dev.swarmmobs.goal.SwarmZombiePheromoneExploreGoal;
+import dev.swarmmobs.goal.SwarmZombieColonyHuntGoal;
+import dev.swarmmobs.goal.SwarmSpiderColonyScoutGoal;
 import dev.swarmmobs.goal.SwarmCreeperSwellGoal;
 import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
+import dev.swarmmobs.goal.SwarmZombieBreacherSafetyGoal;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Skeleton;
+import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
@@ -74,10 +89,31 @@ public final class SwarmMobEvents {
         } else if (mob instanceof Creeper creeper) {
             mob.goalSelector.addGoal(0, new SwarmCreeperSwellGoal(creeper));
         } else if (mob instanceof Zombie zombie) {
+            // Active allied fuse is a rare, urgent MOVE handoff; otherwise
+            // this never activates and existing engineering/melee remain intact.
+            mob.goalSelector.addGoal(0, new SwarmZombieBreacherSafetyGoal(zombie));
             mob.goalSelector.addGoal(0, new SwarmZombieEngineerGoal(zombie));
+        } else if (mob instanceof Spider spider) {
+            // A sensor-only action with no MOVE/LOOK flags. Vanilla and
+            // swarm tactical navigation retain control of the scout.
+            mob.goalSelector.addGoal(2, new SwarmSpiderColonyScoutGoal(spider));
         }
 
         mob.goalSelector.addGoal(1, new SwarmApproachGoal(mob));
+        if (mob instanceof Zombie builder) {
+            mob.goalSelector.addGoal(2, new SwarmIdleNestGoal(builder));
+            // Voluntary local-worker foraging yields to vanilla combat and
+            // high-priority engineering, and is OFF until explicitly enabled.
+            mob.goalSelector.addGoal(2, new SwarmZombieColonyHaulGoal(builder));
+            // Renewable food harvest happens only when idle logistics has
+            // no existing cargo to move; no attack or engineering override.
+            mob.goalSelector.addGoal(3, new SwarmZombieColonyHuntGoal(builder));
+            mob.goalSelector.addGoal(4, new SwarmZombieColonyGatherGoal(builder));
+            mob.goalSelector.addGoal(5, new SwarmZombieBerryForageGoal(builder));
+            // Last-resort short exploration along actual locally sensed
+            // pheromone gradients, not an omniscient direct route to prey.
+            mob.goalSelector.addGoal(6, new SwarmZombiePheromoneExploreGoal(builder));
+        }
     }
 
     public static void onEntityTick(EntityTickEvent.Post event) {
@@ -104,10 +140,26 @@ public final class SwarmMobEvents {
             return;
         }
 
+        // If the entire dimension currently has no players, a mob with no
+        // target or queued relay has nothing to coordinate against. Avoid
+        // running neighbor queries, line-of-sight checks and task allocation
+        // for inactive swarms in loaded chunks. Poll once per second so
+        // freshly entering players are detected without chunk tickets.
+        if (level.players().isEmpty()
+                && state.targetId() == null
+                && state.pendingTargetMessageCount() == 0
+                && mob.getTarget() == null) {
+            state.scheduleNextPlan(gameTick, Math.max(interval, 20));
+            state.updateEngagement(false,false,gameTick);
+            state.clearLocalPlan(0);
+            return;
+        }
+
         state.scheduleNextPlan(gameTick, interval);
 
-        List<PathfinderMob> movementNeighbors = findMovementNeighbors(level, mob);
-        List<PathfinderMob> communicationNeighbors = findCommunicationNeighbors(level, mob);
+        var neighbors = findNearbyPeers(level, mob);
+        List<PathfinderMob> movementNeighbors = neighbors.movement();
+        List<PathfinderMob> communicationNeighbors = neighbors.communication();
 
         receiveNeighborMessages(
                 mob,
@@ -119,6 +171,8 @@ public final class SwarmMobEvents {
         TargetSelection selection = findTarget(level, mob, state, gameTick);
 
         if (selection == null) {
+            state.updateEngagement(false,false,gameTick);
+            state.updateTacticalSquadTelemetry(0, 0);
             state.recordSearchFailure();
             state.forgetTarget();
             state.clearLocalPlan(movementNeighbors.size());
@@ -129,6 +183,30 @@ public final class SwarmMobEvents {
         }
 
         TargetObservation observation = selection.observation();
+        state.bindTacticalTarget(observation.targetId());
+
+        // Tactical slots, task saturation and cross-species fire lanes belong
+        // to allies currently pursuing the same target. Keep all physical
+        // movement neighbors for separation/cohesion and all communication
+        // neighbors for observation relay across the wider local swarm.
+        List<PathfinderMob> tacticalNeighbors = SwarmTargetSquadPolicy.sameTarget(
+                observation.targetId(),
+                movementNeighbors,
+                peer -> peer.getData(SwarmAttachments.AGENT_STATE.get()).targetId()
+        );
+        // A relayed sighting is ALERT, not permission to override combat.
+        // A genuinely fighting same-target neighbor can locally recruit
+        // a defender even before its own line-of-sight opens.
+        boolean squadCombat = selection.direct() || tacticalNeighbors.stream()
+                .anyMatch(peer -> {
+                    SwarmAgentState ally = peer.getData(SwarmAttachments.AGENT_STATE.get());
+                    long observedAt = ally.lastTargetObservationTick();
+                    return ally.directObservation()
+                            && observedAt >= 0
+                            && gameTick >= observedAt
+                            && gameTick-observedAt <= SwarmEngagementPolicy.DIRECT_GRACE_TICKS;
+                });
+        state.updateEngagement(true,squadCombat,gameTick);
         if (selection.direct()) {
             state.recordDirectReacquisition(gameTick, observation.targetId());
         }
@@ -150,7 +228,7 @@ public final class SwarmMobEvents {
 
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
 
-        List<CapabilitySlotAllocator.Member> capabilityMembers = movementNeighbors.stream()
+        List<CapabilitySlotAllocator.Member> capabilityMembers = tacticalNeighbors.stream()
                 .map(peer -> new CapabilitySlotAllocator.Member(
                         peer.getUUID(),
                         SwarmAgentProfiles.profile(peer).archetype()
@@ -171,9 +249,16 @@ public final class SwarmMobEvents {
         );
         SwarmLocalComposition composition = SwarmLocalComposition.fromArchetypes(
                 profile.archetype(),
-                movementNeighbors.stream()
+                tacticalNeighbors.stream()
                         .map(peer -> SwarmAgentProfiles.profile(peer).archetype())
                         .toList()
+        );
+        state.updateTacticalSquadTelemetry(
+                tacticalNeighbors.size(),
+                (int) tacticalNeighbors.stream()
+                        .filter(peer -> SwarmAgentProfiles.profile(peer).archetype()
+                                == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER)
+                        .count()
         );
 
         SwarmAiActiveState.Snapshot activeStrategy =
@@ -204,6 +289,15 @@ public final class SwarmMobEvents {
                 gameTick,
                 SwarmConfig.TARGET_MEMORY_TICKS.get()
         );
+
+        // No artificial battle cadence. The optional local optimizer is
+        // considered only for a directly-observing, same-target ranged
+        // support agent with a real frontline. All other agents retain the
+        // existing spatial swarm controller and native Minecraft Goals.
+        final boolean optimizeSupport = SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()
+                && SwarmEngagementPolicy.canCoordinateActiveSquad(
+                        state.engagementMode(), tacticalNeighbors.size());
+        if (!optimizeSupport) state.clearSupportPositionSide();
 
         double aiFormationMultiplier = activeStrategy == null
                 ? 1.0
@@ -252,7 +346,7 @@ public final class SwarmMobEvents {
             EnumMap<SwarmTaskType, Integer> peerTaskOccupancy =
                     new EnumMap<>(SwarmTaskType.class);
             int sameTargetPeerCount = 0;
-            for (PathfinderMob peer : movementNeighbors) {
+            for (PathfinderMob peer : tacticalNeighbors) {
                 SwarmAgentState peerState =
                         peer.getData(SwarmAttachments.AGENT_STATE.get());
                 if (state.targetId() == null
@@ -330,7 +424,7 @@ public final class SwarmMobEvents {
             state.beginSearchEpisode(gameTick, observation.targetId());
             state.clearPredictionTelemetry();
 
-            int sameCapabilityCount = 1 + (int) movementNeighbors.stream()
+            int sameCapabilityCount = 1 + (int) tacticalNeighbors.stream()
                     .filter(peer -> SwarmAgentProfiles.profile(peer).archetype() == profile.archetype())
                     .count();
 
@@ -431,13 +525,23 @@ public final class SwarmMobEvents {
 
             Vec2 plannedDestination = plan.destination();
 
-            if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT
-                    && composition.hasBreacher()) {
-                List<Vec2> breacherPositions = movementNeighbors.stream()
-                        .filter(peer -> SwarmAgentProfiles.profile(peer).archetype()
-                                == dev.swarmmobs.agent.SwarmAgentArchetype.BREACHER)
+            if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT) {
+                // Only allies on the same active target count. Do not let
+                // another independent squad distort this Skeleton's shots.
+                List<PathfinderMob> frontline = tacticalNeighbors.stream()
+                        .filter(peer -> peer instanceof Zombie || peer instanceof Creeper)
+                        .toList();
+                List<Vec2> breacherPositions = frontline.stream()
+                        .filter(peer -> peer instanceof Creeper)
                         .map(peer -> new Vec2(peer.getX(), peer.getZ()))
                         .toList();
+                List<Vec2> alliedPositions = frontline.stream()
+                        .map(peer -> new Vec2(peer.getX(), peer.getZ()))
+                        .toList();
+                // When no Creeper is present, use the Zombie front as the
+                // corridor axis, preserving a separate bow-fire lane.
+                if (breacherPositions.isEmpty()) breacherPositions = alliedPositions;
+                if (!breacherPositions.isEmpty()) {
 
                 Vec2 targetPoint = new Vec2(prediction.x(), prediction.z());
 
@@ -463,13 +567,39 @@ public final class SwarmMobEvents {
                     negativeClear = hasClearSupportShot(level, mob, selection.player(), negativeLane);
                 }
 
-                double preferredSign = SwarmFireSupportLanePolicy.choosePreferredSign(
-                        assignedSlot,
-                        positiveClear,
-                        negativeClear
-                );
-
-                plannedDestination = preferredSign > 0.0 ? positiveLane : negativeLane;
+                Vec2 targetPointForSafety = new Vec2(prediction.x(), prediction.z());
+                boolean positiveFriendlyClear = SwarmFriendlyFireLanePolicy.isClear(
+                        positiveLane,targetPointForSafety,alliedPositions);
+                boolean negativeFriendlyClear = SwarmFriendlyFireLanePolicy.isClear(
+                        negativeLane,targetPointForSafety,alliedPositions);
+                if (optimizeSupport && selection.direct() && selection.player()!=null) {
+                    // Real block visibility and same-target teammate line
+                    // clearance are mandatory before considering either
+                    // position. Compare feasible ones in consistent units.
+                    var decision = SwarmSupportPositionPolicy.chooseSupport(
+                            new Vec2(mob.getX(),mob.getZ()),
+                            positiveLane,negativeLane,alliedPositions,
+                            SwarmConfig.SEPARATION_RADIUS.get(),mob.getBbWidth(),
+                            state.supportPositionSide(),assignedSlot,
+                            positiveClear,negativeClear,
+                            positiveFriendlyClear,negativeFriendlyClear);
+                    state.acceptSupportPositionDecision(decision);
+                    if (decision.side() > 0) plannedDestination = positiveLane;
+                    else if (decision.side() < 0) plannedDestination = negativeLane;
+                    // Neither feasible: preserve ordinary swarm planning.
+                } else if (!SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()) {
+                    // Explicit OFF means the pre-optimizer legacy behavior.
+                    double preferredSign = SwarmFriendlyFireLanePolicy.chooseSide(
+                            assignedSlot,positiveClear,negativeClear,
+                            positiveFriendlyClear,negativeFriendlyClear);
+                    plannedDestination = preferredSign > 0.0
+                            ? positiveLane : negativeLane;
+                } else {
+                    state.clearSupportPositionSide();
+                    // Without a directly verified target there is no
+                    // scientifically justified extra support-position move.
+                }
+                }
             }
 
             state.updateLocalPlan(
@@ -523,54 +653,40 @@ public final class SwarmMobEvents {
         return hit.getType() == HitResult.Type.MISS;
     }
 
-    private static List<PathfinderMob> findMovementNeighbors(
+    /**
+     * One entity query feeds two independently capped channels. In particular a
+     * wide communication radius must not crowd out the nearest movement peers.
+     */
+    private static SwarmNeighborSelectionPolicy.Selection<PathfinderMob> findNearbyPeers(
             ServerLevel level,
             PathfinderMob self
     ) {
-        return findNearbyPeers(
-                level,
-                self,
-                SwarmConfig.NEIGHBOR_RADIUS.get(),
-                SwarmConfig.MAX_NEIGHBORS.get()
-        );
-    }
+        boolean communicationEnabled = SwarmConfig.COMMUNICATION_ENABLED.get();
+        double movementRadius = SwarmConfig.NEIGHBOR_RADIUS.get();
+        double communicationRadius = SwarmConfig.COMMUNICATION_RADIUS.get();
+        double radius = communicationEnabled
+                ? Math.max(movementRadius, communicationRadius)
+                : movementRadius;
+        double radiusSquared = radius * radius;
 
-    private static List<PathfinderMob> findCommunicationNeighbors(
-            ServerLevel level,
-            PathfinderMob self
-    ) {
-        if (!SwarmConfig.COMMUNICATION_ENABLED.get()) {
-            return List.of();
-        }
-
-        return findNearbyPeers(
-                level,
-                self,
-                SwarmConfig.COMMUNICATION_RADIUS.get(),
-                SwarmConfig.MAX_NEIGHBORS.get()
-        );
-    }
-
-    private static List<PathfinderMob> findNearbyPeers(
-            ServerLevel level,
-            PathfinderMob self,
-            double radius,
-            int maxNeighbors
-    ) {
-        double radiusSqr = radius * radius;
-        List<PathfinderMob> nearby = level.getEntitiesOfClass(
+        List<PathfinderMob> candidates = level.getEntitiesOfClass(
                 PathfinderMob.class,
                 self.getBoundingBox().inflate(radius),
                 candidate -> candidate != self
                         && candidate.isAlive()
                         && !candidate.isNoAi()
                         && SwarmAgentProfiles.isSupported(candidate)
-                        && self.distanceToSqr(candidate) <= radiusSqr
+                        && self.distanceToSqr(candidate) <= radiusSquared
         );
 
-        nearby.sort(Comparator.comparingDouble(self::distanceToSqr));
-        int limit = Math.min(Math.max(0, maxNeighbors), nearby.size());
-        return new ArrayList<>(nearby.subList(0, limit));
+        return SwarmNeighborSelectionPolicy.select(
+                candidates,
+                self::distanceToSqr,
+                movementRadius,
+                communicationRadius,
+                SwarmConfig.MAX_NEIGHBORS.get(),
+                communicationEnabled
+        );
     }
 
     private static void receiveNeighborMessages(
@@ -639,7 +755,9 @@ public final class SwarmMobEvents {
             records.add(message.observation());
         }
 
-        Player direct = findDirectObservation(level, self);
+        Player direct = findDirectObservation(
+                level, self, state.directObservation() ? state.targetId() : null
+        );
         if (direct != null) {
             Vec3 look = direct.getLookAngle();
             Vec3 velocity = direct.getDeltaMovement();
@@ -687,6 +805,35 @@ public final class SwarmMobEvents {
             state.recordSensingDrop();
         }
 
+        // Vanilla targeting may already know about a player behind an obstacle.
+        // Treat that as an indirect observation instead of requiring the swarm
+        // layer to have seen the player before the wall existed. Without this
+        // bridge, a Zombie facing a pre-existing base wall can have a valid
+        // vanilla attack target while engineering remains permanently blind
+        // because swarm targetId never becomes initialized.
+        if (state.targetObservation() == null
+                && self.getTarget() instanceof Player vanillaTarget
+                && validTarget(vanillaTarget)
+                && !self.hasLineOfSight(vanillaTarget)
+                && self.distanceToSqr(vanillaTarget)
+                        <= SwarmConfig.TARGET_RADIUS.get() * SwarmConfig.TARGET_RADIUS.get()) {
+            Vec3 look = vanillaTarget.getLookAngle();
+            Vec3 velocity = vanillaTarget.getDeltaMovement();
+            TargetObservation observation = new TargetObservation(
+                    vanillaTarget.getUUID(),
+                    gameTick,
+                    vanillaTarget.getX(),
+                    vanillaTarget.getY(),
+                    vanillaTarget.getZ(),
+                    look.x,
+                    look.z,
+                    velocity.x,
+                    velocity.z
+            );
+            state.rememberTarget(observation, false);
+            return new TargetSelection(observation, vanillaTarget, false);
+        }
+
         if (state.targetObservation() != null) {
             records.add(state.targetObservation());
         }
@@ -706,7 +853,8 @@ public final class SwarmMobEvents {
 
     private static Player findDirectObservation(
             ServerLevel level,
-            PathfinderMob self
+            PathfinderMob self,
+            UUID incumbentId
     ) {
         double radius = SwarmConfig.TARGET_RADIUS.get();
         double radiusSqr = radius * radius;
@@ -717,10 +865,14 @@ public final class SwarmMobEvents {
                         && self.distanceToSqr(player) <= radiusSqr
         );
 
-        return players.stream()
-                .filter(self::hasLineOfSight)
-                .min(Comparator.comparingDouble(self::distanceToSqr))
-                .orElse(null);
+        // Only candidates with current real line of sight are eligible. A
+        // relayed or occluded old player must never receive sticky priority.
+        return SwarmVisibleTargetPolicy.choose(
+                players.stream().filter(self::hasLineOfSight).toList(),
+                incumbentId,
+                Player::getUUID,
+                self::distanceToSqr
+        );
     }
 
     private static Player resolvePlayer(ServerLevel level, UUID id) {

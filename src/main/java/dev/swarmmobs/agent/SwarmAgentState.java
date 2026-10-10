@@ -2,6 +2,8 @@ package dev.swarmmobs.agent;
 
 import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
+import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
+import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -11,6 +13,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class SwarmAgentState {
@@ -20,6 +23,19 @@ public final class SwarmAgentState {
     private long nextPlanTick;
     private boolean planningScheduleInitialized;
     private boolean directObservation;
+    // Runtime-only context: never persisted into a save or used to decide
+    // whether a vanilla Mob may attack. The original target memory persists.
+    private SwarmEngagementPolicy.Mode engagementMode = SwarmEngagementPolicy.Mode.WORK;
+    private long lastCombatEvidenceTick = Long.MIN_VALUE;
+    private long lastLostTargetTick = Long.MIN_VALUE;
+    // Hysteresis and temporary work leases must not cross target boundaries.
+    private UUID tacticalAssignmentTarget;
+    private int supportPositionSide;
+    private long supportPositionSwitches;
+    private long supportPositionFeasibleSamples;
+    private long supportPositionUnavailableSamples;
+    private int tacticalPeerCount;
+    private int tacticalBreacherCount;
     private int neighborCount;
     private int formationSlot;
     private boolean formationSlotInitialized;
@@ -82,6 +98,7 @@ public final class SwarmAgentState {
     private long engineeringTasksCompleted;
     private long engineeringMaterialsGiven;
     private long engineeringMaterialsReceived;
+    private long nestsFounded;
 
     private SwarmTaskType currentTask = SwarmTaskType.RESERVE;
     private SwarmSpecialization specialization = SwarmSpecialization.RESERVE;
@@ -100,6 +117,35 @@ public final class SwarmAgentState {
     public UUID targetId() {
         return targetObservation == null ? null : targetObservation.targetId();
     }
+
+    public UUID tacticalAssignmentTarget() {
+        return tacticalAssignmentTarget;
+    }
+
+    /**
+     * Bind tactical hysteresis to the selected target (not the latest message
+     * source). A new target is a new squad: stale slots/roles/specialization
+     * must not hold for 12-30 ticks before the new squad can coordinate.
+     * Task experience and cumulative counters deliberately survive switches.
+     */
+    public boolean bindTacticalTarget(UUID selectedTarget) {
+        if (Objects.equals(tacticalAssignmentTarget, selectedTarget)) {
+            return false;
+        }
+        tacticalAssignmentTarget = selectedTarget;
+        resetSupportPositionState();
+
+        formationSlotInitialized = false;
+        pendingFormationSlot = -1;
+        pendingFormationSlotSinceTick = Long.MIN_VALUE;
+        roleInitialized = false;
+        pendingRole = null;
+        pendingRoleSinceTick = Long.MIN_VALUE;
+        resetActiveSpecialization();
+        updateTacticalSquadTelemetry(0, 0);
+        return true;
+    }
+
 
     public long lastTargetObservationTick() {
         return targetObservation == null ? Long.MIN_VALUE : targetObservation.observationTick();
@@ -129,6 +175,82 @@ public final class SwarmAgentState {
         return directObservation;
     }
 
+    public SwarmEngagementPolicy.Mode engagementMode() {
+        return engagementMode;
+    }
+
+    public int supportPositionSide() {
+        return supportPositionSide;
+    }
+
+    public long supportPositionSwitches() {
+        return supportPositionSwitches;
+    }
+
+    public long supportPositionFeasibleSamples() {
+        return supportPositionFeasibleSamples;
+    }
+
+    public long supportPositionUnavailableSamples() {
+        return supportPositionUnavailableSamples;
+    }
+
+    /**
+     * Store the selected side for a real same-target support-position
+     * decision. Existing vanilla AI and navigator remain authoritative.
+     */
+    public void acceptSupportPositionDecision(
+            SwarmSupportPositionPolicy.SupportDecision decision) {
+        if (decision == null || decision.side() == 0) {
+            supportPositionSide = 0;
+            supportPositionUnavailableSamples++;
+            return;
+        }
+        if (supportPositionSide != 0 && supportPositionSide != decision.side()) {
+            supportPositionSwitches++;
+        }
+        supportPositionSide = decision.side();
+        supportPositionFeasibleSamples++;
+    }
+
+    /** Clear temporary lane memory when the optimizer is not applicable. */
+    public void clearSupportPositionSide() {
+        supportPositionSide = 0;
+    }
+
+    /** A new target must not inherit the previous target's lane/counters. */
+    public void resetSupportPositionState() {
+        supportPositionSide = 0;
+        supportPositionSwitches = 0;
+        supportPositionFeasibleSamples = 0;
+        supportPositionUnavailableSamples = 0;
+    }
+
+    /**
+     * Called once per staggered planner sample. Direct observation or
+     * fresh same-target squad combat enters COMBAT. Relay alone enters ALERT.
+     * A brief RECOVERY holds off nest work after target evidence disappears.
+     */
+    public void updateEngagement(boolean aware, boolean combatEvidence, long now) {
+        if (now < 0) return;
+        if (aware && combatEvidence) lastCombatEvidenceTick = now;
+        if (!aware && engagementMode != SwarmEngagementPolicy.Mode.RECOVERY
+                && engagementMode != SwarmEngagementPolicy.Mode.WORK) {
+            lastLostTargetTick = now;
+        }
+        long sinceDirect = lastCombatEvidenceTick == Long.MIN_VALUE
+                ? Long.MAX_VALUE : Math.max(0L,now-lastCombatEvidenceTick);
+        long sinceLost = lastLostTargetTick == Long.MIN_VALUE
+                ? Long.MAX_VALUE : Math.max(0L,now-lastLostTargetTick);
+        engagementMode = SwarmEngagementPolicy.next(
+                engagementMode, aware, combatEvidence, sinceDirect, sinceLost);
+        if (aware) lastLostTargetTick = Long.MIN_VALUE;
+        if (engagementMode == SwarmEngagementPolicy.Mode.WORK) {
+            lastCombatEvidenceTick = Long.MIN_VALUE;
+            lastLostTargetTick = Long.MIN_VALUE;
+        }
+    }
+
     public boolean searchEpisodeActive() {
         return searchEpisodeActive;
     }
@@ -156,6 +278,22 @@ public final class SwarmAgentState {
     public int neighborCount() {
         return neighborCount;
     }
+    
+    /** Same-target nearby members, excluding self. */
+    public int tacticalPeerCount() {
+        return tacticalPeerCount;
+    }
+
+    /** Same-target nearby Creeper breachers, excluding self. */
+    public int tacticalBreacherCount() {
+        return tacticalBreacherCount;
+    }
+
+    public void updateTacticalSquadTelemetry(int peers, int breachers) {
+        this.tacticalPeerCount = Math.max(0, peers);
+        this.tacticalBreacherCount = Math.max(0, Math.min(this.tacticalPeerCount, breachers));
+    }
+
 
     public int formationSlot() {
         return formationSlot;
@@ -425,6 +563,14 @@ public final class SwarmAgentState {
 
     public long engineeringMaterialsReceived() {
         return engineeringMaterialsReceived;
+    }
+
+    public long nestsFounded() {
+        return nestsFounded;
+    }
+
+    public void recordNestFounded() {
+        nestsFounded++;
     }
 
     public boolean transferOneEngineeringBlockTo(
@@ -734,6 +880,7 @@ public final class SwarmAgentState {
     }
 
     public void forgetTarget() {
+        bindTacticalTarget(null);
         this.targetObservation = null;
         this.directObservation = false;
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
@@ -855,6 +1002,7 @@ public final class SwarmAgentState {
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
         this.searchRadius = 0.0;
         clearPredictionTelemetry();
+        clearNavigationTelemetry();
         this.separationMagnitude = 0.0;
         this.cohesionMagnitude = 0.0;
         this.alignmentMagnitude = 0.0;

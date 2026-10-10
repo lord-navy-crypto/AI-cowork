@@ -1,4 +1,7 @@
 {
   "key.swarmmobs.open_command_center": "Open Swarm Command Center",
-  "key.categories.swarmmobs": "Swarm Mobs"
+  "key.categories.swarmmobs": "Swarm Mobs",
+  "block.swarmmobs.nest_core": "Swarm Colony Core",
+  "entity.swarmmobs.nest_regent_zombie": "Colony Regent Zombie",
+  "entity.swarmmobs.nest_regent_skeleton": "Colony Regent Skeleton"
 }

@@ -1,5 +1,8 @@
 package dev.swarmmobs.network;
 
+import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
+import dev.swarmmobs.algorithm.SwarmNavigationCommandTelemetry;
+
 import dev.swarmmobs.client.SwarmControlClient;
 import dev.swarmmobs.agent.SwarmAgentProfiles;
 import dev.swarmmobs.agent.SwarmAgentState;
@@ -13,6 +16,7 @@ import java.util.EnumMap;
 import dev.swarmmobs.ai.SwarmAiShadowService;
 import dev.swarmmobs.ai.SwarmAiShadowState;
 import dev.swarmmobs.config.SwarmConfig;
+import dev.swarmmobs.colony.SwarmNestScienceTelemetry;
 import dev.swarmmobs.experiment.SwarmExperimentManager;
 import dev.swarmmobs.experiment.SwarmExperimentMetrics;
 import dev.swarmmobs.experiment.SwarmExperimentPreset;
@@ -44,7 +48,9 @@ public final class SwarmControlNetwork {
     public static void sendSnapshot(ServerPlayer player) {
         PacketDistributor.sendToPlayer(
                 player,
-                new ControlPanelSnapshotPayload(snapshotData(player.serverLevel()))
+                new ControlPanelSnapshotPayload(
+                        snapshotData(player.serverLevel(), player.hasPermissions(2))
+                )
         );
     }
 
@@ -52,7 +58,19 @@ public final class SwarmControlNetwork {
             ControlPanelActionPayload payload,
             IPayloadContext context
     ) {
-        if (!(context.player() instanceof ServerPlayer player) || !player.hasPermissions(2)) {
+        if (!(context.player() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        // Everyone may inspect the server-authoritative panel. Mutations remain
+        // permission-gated on the server.
+        if ("panel_refresh".equals(payload.action())) {
+            sendSnapshot(player);
+            return;
+        }
+
+        if (!player.hasPermissions(2)) {
+            sendSnapshot(player);
             return;
         }
 
@@ -76,6 +94,8 @@ public final class SwarmControlNetwork {
 
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
+            case "support_position_toggle" -> SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(
+                    !SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get());
 
             case "ai_toggle" -> {
                 boolean next = !SwarmConfig.EXTERNAL_AI_ENABLED.get();
@@ -126,6 +146,7 @@ public final class SwarmControlNetwork {
             case "coord_baseline" -> {
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(false);
             }
 
             case "toggle_division" ->
@@ -193,6 +214,97 @@ public final class SwarmControlNetwork {
                 SwarmConfig.ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.ZOMBIE_ENGINEERING_MATERIAL_HANDOFF_RADIUS.set(2.5);
                 SwarmConfig.ZOMBIE_ENGINEERING_MAX_BRIDGE_SPAN.set(4);
+            }
+
+            case "nest_adaptive_toggle" ->
+                    SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(!SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.get());
+            case "nest_worker_share_delta" -> SwarmConfig.NEST_WORKER_TARGET_SHARE.set(clamp(
+                    SwarmConfig.NEST_WORKER_TARGET_SHARE.get() + value, 0.15, 0.65
+            ));
+            case "nest_guard_share_delta" -> SwarmConfig.NEST_GUARD_TARGET_SHARE.set(clamp(
+                    SwarmConfig.NEST_GUARD_TARGET_SHARE.get() + value, 0.10, 0.50
+            ));
+            case "nest_response_threshold_delta" -> SwarmConfig.NEST_RESPONSE_THRESHOLD.set(clamp(
+                    SwarmConfig.NEST_RESPONSE_THRESHOLD.get() + value, 0.10, 3.0
+            ));
+            case "nest_visible_expansion_toggle" ->
+                    SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(
+                            !SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get());
+            case "nest_haul_toggle" ->
+                    SwarmConfig.NEST_HAULING_ENABLED.set(!SwarmConfig.NEST_HAULING_ENABLED.get());
+            case "nest_berry_forage_toggle" ->
+                    SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(
+                            !SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get());
+            case "nest_block_gather_toggle" ->
+                    SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(
+                            !SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get());
+            case "nest_crop_replant_toggle" ->
+                    SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(
+                            !SwarmConfig.NEST_CROP_REPLANT_ENABLED.get());
+            case "nest_stock_adapt_toggle" ->
+                    SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(
+                            !SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get());
+            case "nest_animal_hunt_toggle" ->
+                    SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(
+                            !SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get());
+            case "nest_pheromone_toggle" ->
+                    SwarmConfig.NEST_PHEROMONES_ENABLED.set(
+                            !SwarmConfig.NEST_PHEROMONES_ENABLED.get());
+            case "nest_pheromone_explore_toggle" ->
+                    SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(
+                            !SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.get());
+            case "nest_gather_interval_delta" ->
+                    SwarmConfig.NEST_GATHER_INTERVAL.set((int) clamp(
+                            SwarmConfig.NEST_GATHER_INTERVAL.get() + value,
+                            60.0, 800.0));
+            case "nest_berry_forage_interval_delta" ->
+                    SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set((int) clamp(
+                            SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.get() + value, 120.0, 800.0));
+            case "nest_haul_radius_delta" -> SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set((int) clamp(
+                    SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get() + value, 4.0, 16.0));
+            case "nest_haul_stack_delta" -> SwarmConfig.NEST_HAUL_MAX_STACK.set((int) clamp(
+                    SwarmConfig.NEST_HAUL_MAX_STACK.get() + value, 1.0, 64.0));
+            case "nest_haul_interval_delta" -> SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set((int) clamp(
+                    SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.get() + value, 40.0, 400.0));
+            case "nest_lifecycle_toggle" ->
+                    SwarmConfig.NEST_LIFECYCLE_ENABLED.set(!SwarmConfig.NEST_LIFECYCLE_ENABLED.get());
+            case "nest_max_population_delta" -> SwarmConfig.NEST_MAX_POPULATION.set((int) clamp(
+                    SwarmConfig.NEST_MAX_POPULATION.get() + value, 3.0, 32.0
+            ));
+            case "nest_toggle" ->
+                    SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(!SwarmConfig.NEST_CONSTRUCTION_ENABLED.get());
+            case "nest_interval_delta" -> SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set((int) clamp(
+                    SwarmConfig.NEST_BUILD_INTERVAL_TICKS.get() + value,
+                    100.0, 1200.0
+            ));
+            case "nest_population_delta" -> SwarmConfig.NEST_MIN_GROUP_SIZE.set((int) clamp(
+                    SwarmConfig.NEST_MIN_GROUP_SIZE.get() + value,
+                    2.0, 16.0
+            ));
+            case "nest_baseline" -> {
+                SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
+                SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_HAULING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
+                SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
+                SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(false);
+                SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(true);
+                SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
+                SwarmConfig.NEST_GATHER_INTERVAL.set(160);
+                SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+                SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
+                SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
+                SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
+                SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
+                SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(false);
+                SwarmConfig.NEST_MAX_POPULATION.set(12);
+                SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
+                SwarmConfig.NEST_WORKER_TARGET_SHARE.set(0.40);
+                SwarmConfig.NEST_GUARD_TARGET_SHARE.set(0.25);
+                SwarmConfig.NEST_RESPONSE_THRESHOLD.set(0.55);
+                SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
+                SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
             }
 
             case "ai_active_toggle" -> {
@@ -340,6 +452,11 @@ public final class SwarmControlNetwork {
                     0.5,
                     8.0
             ));
+            case "nav_path_budget_delta" -> SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.set((int) clamp(
+                    SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.get() + value,
+                    8.0,
+                    512.0
+            ));
             case "toggle_path_evidence" ->
                     SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(!SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get());
             case "nav_path_node_penalty_delta" -> SwarmConfig.NAV_PATH_NODE_PENALTY.set(clamp(
@@ -371,6 +488,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
                 SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
+                SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.set(96);
                 SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
@@ -378,6 +496,30 @@ public final class SwarmControlNetwork {
             }
 
             case "baseline_all" -> {
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(false);
+                SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
+                SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
+                SwarmConfig.NEST_HAULING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(false);
+                SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(200);
+                SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(false);
+                SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(false);
+                SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(true);
+                SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(false);
+                SwarmConfig.NEST_GATHER_INTERVAL.set(160);
+                SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+                SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
+                SwarmConfig.NEST_HAUL_SEARCH_RADIUS.set(8);
+                SwarmConfig.NEST_HAUL_MAX_STACK.set(16);
+                SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(100);
+                SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(false);
+                SwarmConfig.NEST_MAX_POPULATION.set(12);
+                SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
+                SwarmConfig.NEST_WORKER_TARGET_SHARE.set(0.40);
+                SwarmConfig.NEST_GUARD_TARGET_SHARE.set(0.25);
+                SwarmConfig.NEST_RESPONSE_THRESHOLD.set(0.55);
+                SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(200);
+                SwarmConfig.NEST_MIN_GROUP_SIZE.set(3);
                 SwarmExperimentManager.apply(SwarmExperimentPreset.BASELINE);
                 SwarmConfig.ENABLED.set(true);
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
@@ -424,6 +566,7 @@ public final class SwarmControlNetwork {
                 SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.set(0.20);
                 SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.set(0.75);
                 SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.set(2.5);
+                SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.set(96);
                 SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
                 SwarmConfig.NAV_PATH_NODE_PENALTY.set(0.05);
                 SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.set(0.25);
@@ -440,8 +583,15 @@ public final class SwarmControlNetwork {
         }
     }
 
-    private static String snapshotData(net.minecraft.server.level.ServerLevel level) {
+    private static String snapshotData(
+            net.minecraft.server.level.ServerLevel level,
+            boolean canEdit
+    ) {
         var metrics = SwarmExperimentMetrics.snapshot(level);
+        var pathBudget = SwarmPathBudgetRegistry.snapshot(level);
+        var navCommands = SwarmNavigationCommandTelemetry.snapshot(level);
+        var colony = SwarmNestScienceTelemetry.snapshot(level);
+        var colonyModel = colony.science();
         var ai = SwarmAiShadowState.snapshot();
         var decision = ai.lastDecision();
         var activeAi = SwarmAiActiveState.snapshot(level.getGameTime());
@@ -463,6 +613,14 @@ public final class SwarmControlNetwork {
         int skeletons = 0;
         int spiders = 0;
         int creepers = 0;
+        int tacticalAgentsWithAllies = 0;
+        int tacticalPeerLinks = 0;
+        int agentsWithTacticalBreacher = 0;
+        int workAgents = 0, alertAgents = 0, combatAgents = 0, recoveringAgents = 0;
+        int optimizedSupportAgents = 0;
+        long supportLaneSwitches = 0, supportFeasibleSamples = 0,
+                supportUnavailableSamples = 0;
+        long nestsFoundedByLoadedAgents = 0L;
         EnumMap<SwarmTaskType, Integer> taskCounts = new EnumMap<>(SwarmTaskType.class);
         EnumMap<SwarmSpecialization, Integer> specializationCounts =
                 new EnumMap<>(SwarmSpecialization.class);
@@ -482,6 +640,38 @@ public final class SwarmControlNetwork {
                 creepers++;
             }
 
+            if (masterEnabled) {
+                nestsFoundedByLoadedAgents +=
+                        mob.getData(SwarmAttachments.AGENT_STATE.get()).nestsFounded();
+            }
+
+            if (masterEnabled) {
+                SwarmAgentState tacticalState =
+                        mob.getData(SwarmAttachments.AGENT_STATE.get());
+                if (SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()
+                        && tacticalState.engagementMode()
+                                == dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
+                        && tacticalState.tacticalPeerCount() > 0) {
+                    if (tacticalState.supportPositionSide() != 0) optimizedSupportAgents++;
+                    supportLaneSwitches += tacticalState.supportPositionSwitches();
+                    supportFeasibleSamples += tacticalState.supportPositionFeasibleSamples();
+                    supportUnavailableSamples += tacticalState.supportPositionUnavailableSamples();
+                }
+                switch (tacticalState.engagementMode()) {
+                    case WORK -> workAgents++;
+                    case ALERT -> alertAgents++;
+                    case COMBAT -> combatAgents++;
+                    case RECOVERY -> recoveringAgents++;
+                }
+                if (tacticalState.tacticalPeerCount() > 0) {
+                    tacticalAgentsWithAllies++;
+                    tacticalPeerLinks += tacticalState.tacticalPeerCount();
+                }
+                if (tacticalState.tacticalBreacherCount() > 0) {
+                    agentsWithTacticalBreacher++;
+                }
+            }
+
             if (exposeDynamicAssignments) {
                 SwarmAgentState state =
                         mob.getData(SwarmAttachments.AGENT_STATE.get());
@@ -495,6 +685,7 @@ public final class SwarmControlNetwork {
         }
 
         return String.join(";",
+                pair("canEdit", canEdit),
                 pair("aiEnabled", SwarmConfig.EXTERNAL_AI_ENABLED.get()),
                 pair("aiModel", SwarmConfig.OLLAMA_MODEL.get()),
                 pair("aiStatus", ai.status().name()),
@@ -513,10 +704,103 @@ public final class SwarmControlNetwork {
                 pair("aiLastError", ai.lastError()),
                 pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
+                pair("optimizedSupportAgents", optimizedSupportAgents),
+                pair("supportLaneSwitches", Math.min(Integer.MAX_VALUE,supportLaneSwitches)),
+                pair("supportFeasibleSamples", Math.min(Integer.MAX_VALUE,supportFeasibleSamples)),
+                pair("supportUnavailableSamples", Math.min(Integer.MAX_VALUE,supportUnavailableSamples)),
+                pair("modeWorkAgents", workAgents),
+                pair("modeAlertAgents", alertAgents),
+                pair("modeCombatAgents", combatAgents),
+                pair("modeRecoveryAgents", recoveringAgents),
                 pair("liveZombies", zombies),
                 pair("liveSkeletons", skeletons),
                 pair("liveSpiders", spiders),
                 pair("liveCreepers", creepers),
+                pair("nestEnabled", SwarmConfig.NEST_CONSTRUCTION_ENABLED.get()),
+                pair("nestLifecycleEnabled", SwarmConfig.NEST_LIFECYCLE_ENABLED.get()),
+                pair("nestHaulingEnabled", SwarmConfig.NEST_HAULING_ENABLED.get()),
+                pair("nestBerryForagingEnabled", SwarmConfig.NEST_BERRY_FORAGING_ENABLED.get()),
+                pair("nestBlockGatherEnabled", SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get()),
+                pair("nestCropReplantEnabled", SwarmConfig.NEST_CROP_REPLANT_ENABLED.get()),
+                pair("nestAdaptiveStockEnabled", SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.get()),
+                pair("nestAnimalHuntEnabled", SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.get()),
+                pair("nestGatherInterval", SwarmConfig.NEST_GATHER_INTERVAL.get()),
+                pair("nestPheromonesEnabled", SwarmConfig.NEST_PHEROMONES_ENABLED.get()),
+                pair("nestPheromoneExplorationEnabled",
+                        SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.get()),
+                pair("nestBerryForageInterval", SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.get()),
+                pair("nestHaulSearchRadius", SwarmConfig.NEST_HAUL_SEARCH_RADIUS.get()),
+                pair("nestHaulMaxStack", SwarmConfig.NEST_HAUL_MAX_STACK.get()),
+                pair("nestHaulAttemptInterval", SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.get()),
+                pair("colonyHaulItems", colony.hauledItems()),
+                pair("colonyHaulTrips", colony.haulTrips()),
+                pair("colonyForagedBerries", colony.foragedBerries()),
+                pair("colonyActiveWorkSites", colony.activeWorkSites()),
+                pair("colonyScoutItemLeads", colony.scoutItemLeads()),
+                pair("colonyOpportunityLeads", colony.activeOpportunities()),
+                pair("colonyOpportunityWorkers", colony.opportunityWorkers()),
+                pair("colonyOpportunityReports", colony.opportunityReports()),
+                pair("colonyOpportunityInvalidations", colony.opportunityInvalidations()),
+                pair("colonyReinforcedTrips", colony.reinforcedTrips()),
+                pair("colonyInhibitedJobs", colony.inhibitedJobs()),
+                pair("colonyFoodRecruitment", colony.foodRecruitment()),
+                pair("colonyTimberRecruitment", colony.timberRecruitment()),
+                pair("colonySoilRecruitment", colony.soilRecruitment()),
+                pair("colonyFoodInhibition", colony.foodInhibition()),
+                pair("colonyTimberInhibition", colony.timberInhibition()),
+                pair("colonySoilInhibition", colony.soilInhibition()),
+                pair("colonyTargetSoil", colony.targetSoil()),
+                pair("colonyTargetTimber", colony.targetTimber()),
+                pair("colonyTargetFood", colony.targetFood()),
+                pair("colonyOwnedShellPieces", colony.ownedShellPieces()),
+                pair("colonyPheromoneCells", colony.pheromoneCells()),
+                pair("colonyPheromoneObserved", colony.pheromoneObservations()),
+                pair("colonyPheromoneReinforced", colony.pheromoneReinforcements()),
+                pair("colonyPheromoneStopped", colony.pheromoneStopSignals()),
+                pair("nestVisibleExpansionEnabled",
+                        SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.get()),
+                pair("nestMaxPopulation", SwarmConfig.NEST_MAX_POPULATION.get()),
+                pair("nestAdaptiveRecruitment", SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.get()),
+                pair("nestWorkerShare", SwarmConfig.NEST_WORKER_TARGET_SHARE.get()),
+                pair("nestGuardShare", SwarmConfig.NEST_GUARD_TARGET_SHARE.get()),
+                pair("nestResponseThreshold", SwarmConfig.NEST_RESPONSE_THRESHOLD.get()),
+                pair("colonyScienceAvailable", colony.available()),
+                pair("colonyScienceAgeTicks", colony.available()
+                        ? Math.max(0L, level.getGameTime() - colony.sampleTick()) : -1),
+                pair("colonyScienceLocation", colony.available()
+                        ? colony.x() + "," + colony.y() + "," + colony.z() : "unavailable"),
+                pair("colonySciencePopulation", colony.population()),
+                pair("colonyScienceChamberLevel", colony.chamberLevel()),
+                pair("colonyScienceVisibleShellLevel", colony.visibleChamberLevel()),
+                pair("colonyScienceCapacity", colony.colonyCapacity()),
+                pair("colonySciencePeak", colony.peakPopulation()),
+                pair("colonyScienceDelta", colony.deltaPopulation()),
+                pair("colonyScienceMean", colony.averagePopulation()),
+                pair("colonyScienceSamples", colony.samples()),
+                pair("colonyScienceOccupancy", colonyModel.occupancy()),
+                pair("colonyScienceFoodReadiness", colonyModel.nutritionReadiness()),
+                pair("colonyScienceWorkers", colonyModel.workers()),
+                pair("colonyScienceGuards", colonyModel.guards()),
+                pair("colonyScienceScouts", colonyModel.scouts()),
+                pair("colonyScienceReserves", colonyModel.reserves()),
+                pair("colonyScienceNextRecruit", colonyModel.recommendedRecruit().name()),
+                pair("colonyScienceWorkerResponse", colonyModel.workerResponse()),
+                pair("colonyScienceGuardResponse", colonyModel.guardResponse()),
+                pair("colonyScienceScoutResponse", colonyModel.scoutResponse()),
+                pair("colonyScienceReserveResponse", colonyModel.reserveResponse()),
+                pair("colonyScienceSoil", colony.soilPoints()),
+                pair("colonyScienceTimber", colony.timberPoints()),
+                pair("colonyScienceNutrient", colony.nutrientPoints()),
+                pair("colonyScienceLegacy", colony.legacyPoints()),
+                pair("colonyScienceTotal", colony.resourceTotal()),
+                pair("colonyScienceBirths", colony.births()),
+                pair("nestBuildInterval", SwarmConfig.NEST_BUILD_INTERVAL_TICKS.get()),
+                pair("nestMinPopulation", SwarmConfig.NEST_MIN_GROUP_SIZE.get()),
+                pair("nestCoresFoundedByLoadedAgents",
+                        (int) Math.min(Integer.MAX_VALUE, nestsFoundedByLoadedAgents)),
+                pair("liveTacticalAlliedAgents", tacticalAgentsWithAllies),
+                pair("liveTacticalPeerLinks", tacticalPeerLinks),
+                pair("liveTacticalBreacherSupport", agentsWithTacticalBreacher),
                 pair("taskSearch", taskCounts.getOrDefault(SwarmTaskType.SEARCH, 0)),
                 pair("taskFlank", taskCounts.getOrDefault(SwarmTaskType.FLANK, 0)),
                 pair("taskBreach", taskCounts.getOrDefault(SwarmTaskType.BREACH, 0)),
@@ -571,6 +855,10 @@ public final class SwarmControlNetwork {
                 pair("metricRecoveryAttempts", (int) Math.min(Integer.MAX_VALUE, metrics.recoveryPlanningAttempts())),
                 pair("metricRecoveryFailures", (int) Math.min(Integer.MAX_VALUE, metrics.recoveryPlanningFailures())),
                 pair("metricPathQueries", (int) Math.min(Integer.MAX_VALUE, metrics.pathQueries())),
+                pair("metricNavCommandsIssued", (int) Math.min(Integer.MAX_VALUE, navCommands.issued())),
+                pair("metricNavCommandsSkipped", (int) Math.min(Integer.MAX_VALUE, navCommands.skipped())),
+                pair("metricNavRetries", (int) Math.min(Integer.MAX_VALUE, navCommands.retryDone())),
+                pair("metricNavRefreshes", (int) Math.min(Integer.MAX_VALUE, navCommands.periodicRefresh())),
                 pair("metricRoleReassignments", (int) Math.min(Integer.MAX_VALUE, metrics.roleReassignments())),
                 pair("metricSearchStarted", (int) Math.min(Integer.MAX_VALUE, metrics.searchEpisodesStarted())),
                 pair("metricSearchSucceeded", (int) Math.min(Integer.MAX_VALUE, metrics.searchEpisodesSucceeded())),
@@ -580,6 +868,8 @@ public final class SwarmControlNetwork {
                 pair("metricAvgReacquisitionTicks", metrics.averageReacquisitionTicks()),
                 pair("metricRecoveryFailureRate", metrics.recoveryFailureRate()),
                 pair("metricObservedCommDropRate", metrics.communicationDropRate()),
+                pair("supportPositionOptimizationEnabled",
+                        SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()),
                 pair("formationHysteresis", SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()),
                 pair("roleHysteresis", SwarmConfig.ROLE_HYSTERESIS_TICKS.get()),
 
@@ -611,6 +901,11 @@ public final class SwarmControlNetwork {
                 pair("navLateralPenalty", SwarmConfig.NAV_LOCAL_LATERAL_PENALTY.get()),
                 pair("navCongestionPenalty", SwarmConfig.NAV_LOCAL_CONGESTION_PENALTY.get()),
                 pair("navCongestionRadius", SwarmConfig.NAV_LOCAL_CONGESTION_RADIUS.get()),
+                pair("navPathBudgetPerTick", SwarmConfig.NAV_PATH_EVIDENCE_BUDGET_PER_TICK.get()),
+                pair("pathBudgetUsed", pathBudget.reservedTokens()),
+                pair("pathBudgetWaiters", pathBudget.waiters()),
+                pair("pathBudgetGranted", (int) Math.min(Integer.MAX_VALUE, pathBudget.reservationsGranted())),
+                pair("pathBudgetDeferred", (int) Math.min(Integer.MAX_VALUE, pathBudget.reservationsDeferred())),
                 pair("navPathEvidenceEnabled", SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.get()),
                 pair("navPathNodePenalty", SwarmConfig.NAV_PATH_NODE_PENALTY.get()),
                 pair("navPathResidualPenalty", SwarmConfig.NAV_PATH_RESIDUAL_PENALTY.get()),

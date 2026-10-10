@@ -1,4 +1,7 @@
 {
   "key.swarmmobs.open_command_center": "打开蜂群控制中心",
-  "key.categories.swarmmobs": "Swarm Mobs 蜂群模组"
+  "key.categories.swarmmobs": "Swarm Mobs 蜂群模组",
+  "block.swarmmobs.nest_core": "怪物群落核心",
+  "entity.swarmmobs.nest_regent_zombie": "巢群首领·僵尸",
+  "entity.swarmmobs.nest_regent_skeleton": "巢群首领·骷髅"
 }
