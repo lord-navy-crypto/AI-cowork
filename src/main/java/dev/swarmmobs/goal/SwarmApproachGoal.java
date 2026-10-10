@@ -572,6 +572,16 @@ public final class SwarmApproachGoal extends Goal {
         lastCommandY = targetY;
         lastCommandZ = navigationZ;
         lastCommandSpeed = speed;
+        // Count only an actual game navigator-accepted MOVE directly to the
+        // collision-checked Zombie firing-lane waypoint. Detour/recovery
+        // commands or a rejected path never masquerade as cooperation.
+        if (mob instanceof Zombie
+                && navigationMode == SwarmNavigationMode.PLAN
+                && state.zombieBowLaneYieldPlanned()
+                && Math.hypot(navigationX - state.destinationX(),
+                        navigationZ - state.destinationZ()) <= 0.35) {
+            state.recordZombieBowLaneYieldAccepted();
+        }
         // The legacy per-level issued counter must count only moves the
         // Minecraft navigator actually accepted; failed requests have
         // their own explicit real server telemetry.
