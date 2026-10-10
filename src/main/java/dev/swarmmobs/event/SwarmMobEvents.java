@@ -661,6 +661,9 @@ public final class SwarmMobEvents {
                     && state.currentTask() != SwarmTaskType.MATERIAL) {
                 List<Vec2> shootingPeers = tacticalNeighbors.stream()
                         .filter(peer -> peer instanceof Skeleton)
+                        // This is a 2-D corridor estimate; a Skeleton on
+                        // another floor must not divert a Zombie below it.
+                        .filter(peer -> Math.abs(peer.getY() - mob.getY()) <= 2.0)
                         .limit(4)
                         .filter(peer -> peer.hasLineOfSight(selection.player())
                                 && peer.distanceToSqr(selection.player())
