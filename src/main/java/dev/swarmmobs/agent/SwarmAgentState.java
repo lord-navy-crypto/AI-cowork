@@ -45,6 +45,8 @@ public final class SwarmAgentState {
     private SwarmRole role = SwarmRole.CHASER;
     // Runtime-only encounter geometry, used for inspection and acceptance.
     private String tacticalPattern = "STANDARD";
+    private boolean searchRallyActive;
+    private long searchRallyEpisodes;
     // Updated by local same-target sightings, consulted by vanilla bow handoff.
     private boolean bowLaneClear = true;
     // Local crowd-avoidance lane; reset on target switches.
@@ -144,6 +146,7 @@ public final class SwarmAgentState {
         tacticalAssignmentTarget = selectedTarget;
         resetSupportPositionState();
         tacticalPattern = "STANDARD";
+        searchRallyActive = false;
         bowLaneClear = true;
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -348,6 +351,20 @@ public final class SwarmAgentState {
         }
         crowdLaneUses++;
         return crowdLaneSide;
+    }
+
+    public boolean searchRallyActive() {
+        return searchRallyActive;
+    }
+
+    public long searchRallyEpisodes() {
+        return searchRallyEpisodes;
+    }
+
+    /** Count transitions, not planner frames, to avoid inflated telemetry. */
+    public void updateSearchRally(boolean regrouping) {
+        if (regrouping && !searchRallyActive) searchRallyEpisodes++;
+        searchRallyActive = regrouping;
     }
 
     public int tacticalPeerCount() {
@@ -950,6 +967,7 @@ public final class SwarmAgentState {
     }
 
     public void forgetTarget() {
+        updateSearchRally(false);
         bindTacticalTarget(null);
         this.targetObservation = null;
         this.directObservation = false;
