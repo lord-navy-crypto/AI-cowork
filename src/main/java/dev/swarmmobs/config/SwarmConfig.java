@@ -379,7 +379,7 @@ public final class SwarmConfig {
                 .define("nestBlockGatherEnabled", false);
 
         NEST_ADAPTIVE_STOCK_ENABLED = BUILDER
-                .comment("When colony lifecycle is enabled, adapt food/soil/log worker demand to current population, chamber capacity and configured hard cap, instead of static stock targets.")
+                .comment("When colony lifecycle is enabled, adapt food/soil/log worker demand to population and capacity. Real dropped-item intake is limited to each category's outstanding demand so one large stack cannot starve the others; surplus items stay physical. Explicit manual resource accounting remains bounded by the global store.")
                 .define("nestAdaptiveStockEnabled", true);
 
         NEST_CROP_REPLANT_ENABLED = BUILDER
