@@ -875,3 +875,32 @@ construction, world griefing switches, toggles and frame times.
 The change stays on the existing unmerged PR branch. It must not be
 silently merged into main, published as a release or enabled in the
 user's live survival world without separate authorization.
+
+## Bonus battle: optional synchronized tactical rounds (safe real-time mode)
+
+The extra "turn-based" battle option is a **tactical planning cadence**, NOT
+a replacement of Minecraft's continuous combat system. The operator-facing
+`tacticalRoundsEnabled` switch is OFF by default.
+
+- An observed real target UUID and shared game tick determine a deterministic
+  `HOLD -> COVER -> ROTATE` phase, 100 ticks each. Any two members pursuing
+  that same UUID compute the same phase without messaging a global master.
+- The base Zombie/Creeper/Skeleton target relay and formation assignment
+  remain the sole authoritative combat intents. Every mob keeps its normal
+  full-time melee, bow, fuse, pathfinding and engineering action windows.
+- Only the Skeleton's **planned support corridor** is influenced: HOLD/COVER
+  keep the stable side, ROTATE requests the opposite side. A requested
+  position must pass the existing real-world block collision ray and the
+  bounded teammate-occlusion test. If only one lane is clear, that lane wins;
+  if neither passes, no round-based steering is issued and the preexisting
+  plan is retained. No AI may force the Skeleton to fire along a blocked lane.
+- When the switch is OFF the exact preceding mixed-squad side selection is
+  preserved, including all combat Goal priorities and old fallback rules.
+- The model deliberately does not pause any mob for an enemy's 'turn',
+  manufacture damage, make shots homing, accelerate fuses or directly
+  control the vanilla bow. It is a safe, optional command-center experiment.
+- Fast deterministic tests check synchronized rounds, alternate positions
+  under equal clearance, and blocked-lane noninterference. The 3-species
+  Minecraft Runtime GameTest runs with tactical rounds enabled to protect
+  target sharing, original bow equipment, Creeper hazard movement and
+  engineering Goal registration.
