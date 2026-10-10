@@ -5531,8 +5531,8 @@ public final class SwarmRuntimeGameTests {
         var creeperSpeed=creeper.getAttribute(Attributes.MOVEMENT_SPEED);
         if(zombieSpeed!=null) zombieSpeed.setBaseValue(0.0);
         if(creeperSpeed!=null) creeperSpeed.setBaseValue(0.0);
-        boolean oldRounds = SwarmConfig.TACTICAL_ROUNDS_ENABLED.get();
-        SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(true);
+        boolean oldSupportOptimization = SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get();
+        SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(true);
         TestPlayerHandle handle=createTickingTestPlayer(helper,GameType.SURVIVAL);
         ServerPlayer player=handle.player();
         player.setNoGravity(true);
@@ -5606,11 +5606,11 @@ public final class SwarmRuntimeGameTests {
                     return;
                 }
                 safety.stop();
-                // Bonus-round positioning must keep the original
-                // vanilla bow equipment and role intact.
-                if(!SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
+                // Optional geometric support positioning must preserve
+                // the existing native attack and movement Goal registration.
+                if(!SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()
                         || !s.hasDestination() || !c.hasDestination()) {
-                    helper.fail("Bonus tactical rounds removed mixed squad coordination");
+                    helper.fail("Support-position optimization removed mixed squad coordination");
                     return;
                 }
                 if(!skeleton.getItemBySlot(EquipmentSlot.MAINHAND).is(Items.BOW)) {
@@ -5620,7 +5620,7 @@ public final class SwarmRuntimeGameTests {
                 helper.succeed();
             } finally {
                 creeper.discard();
-                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(oldSupportOptimization);
                 handle.close();
             }
         });
@@ -5721,16 +5721,16 @@ public final class SwarmRuntimeGameTests {
         Vec3 at=helper.absoluteVec(new Vec3(4,1,2));
         player.setPos(at.x,at.y,at.z);
         boolean oldMaster=SwarmConfig.ENABLED.get();
-        boolean oldRounds=SwarmConfig.TACTICAL_ROUNDS_ENABLED.get();
+        boolean oldSupportOptimization=SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get();
         SwarmConfig.ENABLED.set(true);
-        SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(true);
+        SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(true);
         var state=worker.getData(SwarmAttachments.AGENT_STATE.get());
         helper.runAfterDelay(23,()->{
             if(state.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
                     || !player.getUUID().equals(state.targetId())) {
                 handle.close();
                 SwarmConfig.ENABLED.set(oldMaster);
-                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(oldSupportOptimization);
                 helper.fail("Live Player encounter failed to transition WORK -> COMBAT");
                 return;
             }
@@ -5739,7 +5739,7 @@ public final class SwarmRuntimeGameTests {
         helper.runAfterDelay(38,()->{
             if(state.engagementMode()!=dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.RECOVERY) {
                 SwarmConfig.ENABLED.set(oldMaster);
-                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(oldSupportOptimization);
                 helper.fail("Disengagement failed to trigger non-working recovery");
             }
         });
@@ -5753,7 +5753,7 @@ public final class SwarmRuntimeGameTests {
                 helper.succeed();
             } finally {
                 SwarmConfig.ENABLED.set(oldMaster);
-                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(oldRounds);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(oldSupportOptimization);
                 handle.close();
             }
         });
