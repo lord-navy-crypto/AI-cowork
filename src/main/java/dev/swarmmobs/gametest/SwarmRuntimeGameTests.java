@@ -4978,4 +4978,106 @@ public final class SwarmRuntimeGameTests {
                     .set(mobLoot, helper.getLevel().getServer());
         }
     }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_worker_site_lease",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void oneRealLogWorkSiteCannotBeTakenByTwoZombieWorkers(
+            GameTestHelper helper) {
+        BlockPos nestPos = new BlockPos(0, 1, 2);
+        BlockPos logPos = new BlockPos(4, 1, 2);
+        helper.setBlock(nestPos, SwarmNestBlocks.NEST_CORE.get());
+        helper.setBlock(logPos, Blocks.OAK_LOG);
+        var be = helper.getLevel().getBlockEntity(helper.absolutePos(nestPos));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Colony work-site fixture missing core"); return;
+        }
+        Zombie first = helper.spawn(EntityType.ZOMBIE, new BlockPos(3, 1, 2));
+        Zombie second = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 2));
+        first.setNoGravity(true);
+        second.setNoGravity(true);
+        long nestId = helper.absolutePos(nestPos).asLong();
+        first.getPersistentData().putLong("SwarmColonyNest", nestId);
+        second.getPersistentData().putLong("SwarmColonyNest", nestId);
+
+        boolean master = SwarmConfig.ENABLED.get();
+        boolean lifecycle = SwarmConfig.NEST_LIFECYCLE_ENABLED.get();
+        boolean hauling = SwarmConfig.NEST_HAULING_ENABLED.get();
+        boolean gathering = SwarmConfig.NEST_BLOCK_GATHER_ENABLED.get();
+        boolean grief = helper.getLevel().getGameRules()
+                .getBoolean(GameRules.RULE_MOBGRIEFING);
+        try {
+            SwarmConfig.ENABLED.set(true);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(true);
+            SwarmConfig.NEST_HAULING_ENABLED.set(true);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(true);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(true, helper.getLevel().getServer());
+
+            var a = new SwarmZombieColonyGatherGoal(first);
+            var b = new SwarmZombieColonyGatherGoal(second);
+            if (!a.canUse()) {
+                helper.fail("First worker failed to claim the only log work site"); return;
+            }
+            long now = helper.getLevel().getGameTime();
+            if (nest.workBoard().size(now) != 1) {
+                helper.fail("One log must create precisely one reservation"); return;
+            }
+            if (b.canUse()) {
+                b.stop();
+                helper.fail("Second worker duplicated the active log assignment");
+                a.stop();
+                return;
+            }
+            a.start();
+            a.tick();
+            a.stop();
+            if (!helper.getLevel().getBlockState(helper.absolutePos(logPos)).isAir()
+                    || nest.workBoard().size(now) != 0 || nest.resources() != 0) {
+                helper.fail("Exclusive work job did not yield exactly one physical mined site");
+                return;
+            }
+            helper.succeed();
+        } finally {
+            SwarmConfig.ENABLED.set(master);
+            SwarmConfig.NEST_LIFECYCLE_ENABLED.set(lifecycle);
+            SwarmConfig.NEST_HAULING_ENABLED.set(hauling);
+            SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(gathering);
+            helper.getLevel().getGameRules().getRule(GameRules.RULE_MOBGRIEFING)
+                    .set(grief, helper.getLevel().getServer());
+        }
+    }
+
+    @PrefixGameTestTemplate(false)
+    @GameTest(batch = "swarm_runtime_colony_return_signal",
+            templateNamespace = SwarmMobs.MOD_ID, template = TEMPLATE, timeoutTicks = 100)
+    public static void physicalSuccessfulHaulRecruitsWithoutGrantingVirtualItems(
+            GameTestHelper helper) {
+        BlockPos nestPos = new BlockPos(0, 1, 2);
+        helper.setBlock(nestPos, SwarmNestBlocks.NEST_CORE.get());
+        var be = helper.getLevel().getBlockEntity(helper.absolutePos(nestPos));
+        if (!(be instanceof SwarmNestBlockEntity nest)) {
+            helper.fail("Return feedback fixture missing core"); return;
+        }
+        Vec3 pos = helper.absoluteVec(new Vec3(1.0, 1.5, 2.5));
+        ItemEntity original = new ItemEntity(helper.getLevel(), pos.x, pos.y, pos.z,
+                new ItemStack(Items.OAK_LOG, 2));
+        helper.getLevel().addFreshEntity(original);
+        long now = helper.getLevel().getGameTime();
+        double before = nest.laborFeedback().costFactor(
+                SwarmNestColonyPolicy.Kind.TIMBER, now);
+        int accepted = nest.acceptHaulDelivery(original, 16);
+        double after = nest.laborFeedback().costFactor(
+                SwarmNestColonyPolicy.Kind.TIMBER, now);
+        if (accepted != 2 || original.isAlive() || nest.timberPoints() != 6
+                || nest.haulTrips() != 1 || nest.resources() != 6
+                || nest.laborFeedback().successes() != 1
+                || !(after < before)
+                || nest.laborFeedback().costFactor(
+                        SwarmNestColonyPolicy.Kind.NUTRIENT, now) != 1.0) {
+            helper.fail("Returning physical cargo failed local, category-specific reinforcement");
+            return;
+        }
+        helper.succeed();
+    }
 }
