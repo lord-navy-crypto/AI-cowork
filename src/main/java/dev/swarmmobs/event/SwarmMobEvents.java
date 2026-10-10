@@ -53,6 +53,8 @@ import dev.swarmmobs.goal.SwarmSkeletonBowGoal;
 import dev.swarmmobs.goal.SwarmZombieEngineerGoal;
 import dev.swarmmobs.goal.SwarmZombieBreacherSafetyGoal;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Skeleton;
@@ -576,11 +578,30 @@ public final class SwarmMobEvents {
                     state.crowdLaneSide(),
                     state.engagementMode() == SwarmEngagementPolicy.Mode.COMBAT
                             && selection.direct() && confidence >= 0.65);
-            int crowdSide = state.acceptCrowdLane(
-                    crowdChoice.active() ? crowdChoice.side() : 0, gameTick);
-            if (crowdChoice.active() && crowdSide != 0) {
-                plannedDestination = SwarmPackDecongestionPolicy.waypoint(
-                        plannedDestination, tacticalFrame.forward(), crowdSide);
+            if (crowdChoice.active()) {
+                // Cheap block-shape probes only in already-loaded chunks.
+                // Do not force chunks or spend an extra pathfinding query.
+                Vec2 right = SwarmPackDecongestionPolicy.waypoint(
+                        plannedDestination, tacticalFrame.forward(), 1);
+                Vec2 left = SwarmPackDecongestionPolicy.waypoint(
+                        plannedDestination, tacticalFrame.forward(), -1);
+                boolean rightUsable = safeCrowdWaypoint(level, mob, right);
+                boolean leftUsable = safeCrowdWaypoint(level, mob, left);
+                var feasible = SwarmPackDecongestionPolicy.chooseFeasible(
+                        crowdChoice, rightUsable, leftUsable);
+                boolean priorLaneBlocked = (state.crowdLaneSide() > 0 && !rightUsable)
+                        || (state.crowdLaneSide() < 0 && !leftUsable);
+                int crowdSide = state.acceptCrowdLane(
+                        feasible.active() ? feasible.side() : 0,
+                        gameTick, priorLaneBlocked);
+                if (feasible.active() && crowdSide != 0) {
+                    plannedDestination = SwarmPackDecongestionPolicy.waypoint(
+                            plannedDestination, tacticalFrame.forward(), crowdSide);
+                } else {
+                    state.recordCrowdLaneRejected();
+                }
+            } else {
+                state.acceptCrowdLane(0, gameTick);
             }
 
             if (profile.archetype() == dev.swarmmobs.agent.SwarmAgentArchetype.RANGED_SUPPORT) {
@@ -686,6 +707,32 @@ public final class SwarmMobEvents {
         if (gameTick % 10L == 0L) {
             SwarmDebugParticles.render(level, mob, communicationNeighbors);
         }
+    }
+
+    /**
+     * Lightweight conservative Minecraft waypoint check. Never loads chunks.
+     * This is not a full path guarantee: the ordinary navigation/recovery
+     * controller still decides whether a viable route reaches the waypoint.
+     */
+    private static boolean safeCrowdWaypoint(
+            ServerLevel level, PathfinderMob mob, Vec2 point
+    ) {
+        if (point == null || !Double.isFinite(point.x())
+                || !Double.isFinite(point.z())) {
+            return false;
+        }
+        BlockPos feet = BlockPos.containing(point.x(), mob.getY(), point.z());
+        if (!level.isInWorldBounds(feet)
+                || !level.isInWorldBounds(feet.above())
+                || !level.hasChunkAt(feet)) {
+            return false;
+        }
+        BlockPos head = feet.above();
+        BlockPos ground = feet.below();
+        return level.getBlockState(feet).getCollisionShape(level, feet).isEmpty()
+                && level.getBlockState(head).getCollisionShape(level, head).isEmpty()
+                && level.getFluidState(feet).isEmpty()
+                && level.getBlockState(ground).isFaceSturdy(level, ground, Direction.UP);
     }
 
     private static boolean hasClearSupportShot(
