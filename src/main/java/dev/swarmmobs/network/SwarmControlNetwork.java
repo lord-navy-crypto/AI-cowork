@@ -749,6 +749,8 @@ public final class SwarmControlNetwork {
         int activeFlankFillers = 0;
         int skeletonSpacing = 0;
         long skeletonSpacingEpisodes = 0;
+        long skeletonMoveFallbacks = 0;
+        long zombieFlankFallbacks = 0;
         long flankFillEpisodes = 0;
         int searchRallying = 0;
         long searchRallyEpisodes = 0;
@@ -791,6 +793,8 @@ public final class SwarmControlNetwork {
                     if (tacticalState.coveringVacantFlank()) activeFlankFillers++;
                     if (tacticalState.rangedSpacingActive()) skeletonSpacing++;
                     skeletonSpacingEpisodes += tacticalState.rangedSpacingEpisodes();
+                    skeletonMoveFallbacks += tacticalState.rangedSpacingFallbacks();
+                    zombieFlankFallbacks += tacticalState.zombieFlankFallbacks();
                     flankFillEpisodes += tacticalState.vacantFlankCoverageEpisodes();
                     if (tacticalState.searchRallyActive()) searchRallying++;
                     searchRallyEpisodes += tacticalState.searchRallyEpisodes();
@@ -867,6 +871,8 @@ public final class SwarmControlNetwork {
                 pair("laneDiversionSamples", Math.min(Integer.MAX_VALUE, laneDiversionSamples)),
                 pair("skeletonSpacing", skeletonSpacing),
                 pair("skeletonSpacingEpisodes", Math.min(Integer.MAX_VALUE, skeletonSpacingEpisodes)),
+                pair("skeletonMoveFallbacks", Math.min(Integer.MAX_VALUE, skeletonMoveFallbacks)),
+                pair("zombieFlankFallbacks", Math.min(Integer.MAX_VALUE, zombieFlankFallbacks)),
                 pair("activeFlankFillers", activeFlankFillers),
                 pair("flankFillEpisodes", Math.min(Integer.MAX_VALUE, flankFillEpisodes)),
                 pair("tacticSweep", tacticSweep),

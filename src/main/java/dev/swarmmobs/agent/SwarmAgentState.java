@@ -4,6 +4,7 @@ import dev.swarmmobs.algorithm.SwarmCommunicationPolicy.TargetMessage;
 import dev.swarmmobs.algorithm.TargetObservation;
 import dev.swarmmobs.algorithm.SwarmEngagementPolicy;
 import dev.swarmmobs.algorithm.SwarmSupportPositionPolicy;
+import dev.swarmmobs.algorithm.SwarmGameHandoffTimeoutPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -52,6 +53,12 @@ public final class SwarmAgentState {
     // Minecraft Skeleton has a locally checked open square to regain distance.
     private boolean rangedSpacingActive;
     private long rangedSpacingEpisodes;
+    private long rangedSpacingStartedAt = Long.MIN_VALUE;
+    private long rangedSpacingRetryAfter = Long.MIN_VALUE;
+    private long rangedSpacingFallbacks;
+    private long zombieFlankStartedAt = Long.MIN_VALUE;
+    private long zombieFlankRetryAfter = Long.MIN_VALUE;
+    private long zombieFlankFallbacks;
     // Local crowd-avoidance lane; reset on target switches.
     private int crowdLaneSide;
     private long crowdLaneLastSwitchTick = Long.MIN_VALUE;
@@ -157,6 +164,10 @@ public final class SwarmAgentState {
         coveringVacantFlank = false;
         bowLaneClear = true;
         rangedSpacingActive = false;
+        rangedSpacingStartedAt = Long.MIN_VALUE;
+        rangedSpacingRetryAfter = Long.MIN_VALUE;
+        zombieFlankStartedAt = Long.MIN_VALUE;
+        zombieFlankRetryAfter = Long.MIN_VALUE;
         crowdLaneSide = 0;
         crowdLaneLastSwitchTick = Long.MIN_VALUE;
 
@@ -331,10 +342,69 @@ public final class SwarmAgentState {
         return rangedSpacingEpisodes;
     }
 
-    /** Count actual starts, not every planning update. */
+    /** Count genuine starts. Without a game tick this is telemetry-only. */
     public void updateRangedSpacing(boolean active) {
-        if (active && !rangedSpacingActive) rangedSpacingEpisodes++;
+        updateRangedSpacing(active, Long.MIN_VALUE);
+    }
+
+    public void updateRangedSpacing(boolean active, long tick) {
+        if (active && !mayAttemptRangedSpacing(tick)) active = false;
+        if (active && !rangedSpacingActive) {
+            rangedSpacingEpisodes++;
+            rangedSpacingStartedAt = tick;
+        }
+        if (!active) rangedSpacingStartedAt = Long.MIN_VALUE;
         rangedSpacingActive = active;
+    }
+
+    public boolean mayAttemptRangedSpacing(long tick) {
+        return tick < 0 || tick >= rangedSpacingRetryAfter;
+    }
+
+    public long rangedSpacingFallbacks() {
+        return rangedSpacingFallbacks;
+    }
+
+    /**
+     * A Skeleton reposition which lasts too long yields to native bow
+     * controls instead of locking MOVE on an unreachable game square.
+     */
+    public boolean expireRangedSpacing(long tick) {
+        if (!rangedSpacingActive || !SwarmGameHandoffTimeoutPolicy.timedOut(
+                tick, rangedSpacingStartedAt,
+                SwarmGameHandoffTimeoutPolicy.SKELETON_MAX_MOVE_TICKS)) {
+            return false;
+        }
+        rangedSpacingActive = false;
+        rangedSpacingStartedAt = Long.MIN_VALUE;
+        rangedSpacingRetryAfter = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
+                tick, SwarmGameHandoffTimeoutPolicy.SKELETON_RETRY_COOLDOWN_TICKS);
+        rangedSpacingFallbacks++;
+        return true;
+    }
+
+    /** Called only when a visible game Zombie flank waypoint is worthwhile. */
+    public boolean allowShortZombieFlank(long tick) {
+        if (tick < 0 || tick < zombieFlankRetryAfter) return false;
+        if (zombieFlankStartedAt == Long.MIN_VALUE) zombieFlankStartedAt = tick;
+        if (SwarmGameHandoffTimeoutPolicy.timedOut(tick,
+                zombieFlankStartedAt,
+                SwarmGameHandoffTimeoutPolicy.ZOMBIE_MAX_FLANK_TICKS)) {
+            zombieFlankStartedAt = Long.MIN_VALUE;
+            zombieFlankRetryAfter = SwarmGameHandoffTimeoutPolicy.nextEligibleTick(
+                    tick, SwarmGameHandoffTimeoutPolicy.ZOMBIE_RETRY_COOLDOWN_TICKS);
+            zombieFlankFallbacks++;
+            return false;
+        }
+        return true;
+    }
+
+    public void clearShortZombieFlank() {
+        zombieFlankStartedAt = Long.MIN_VALUE;
+    }
+
+    public long zombieFlankFallbacks() {
+        return zombieFlankFallbacks;
     }
 
     public int crowdLaneSide() {
@@ -1133,6 +1203,8 @@ public final class SwarmAgentState {
         this.pendingRoleSinceTick = Long.MIN_VALUE;
         this.hasDestination = false;
         this.rangedSpacingActive = false;
+        this.rangedSpacingStartedAt = Long.MIN_VALUE;
+        clearShortZombieFlank();
         this.behaviorMode = SwarmBehaviorMode.ENGAGE;
         this.searchRadius = 0.0;
         clearPredictionTelemetry();

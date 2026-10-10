@@ -771,9 +771,12 @@ public final class SwarmMobEvents {
                         plannedDestination = newLane;
                     }
                 }
-                state.updateRangedSpacing(possible);
+                // An expired waypoint lease may not instantly re-arm on
+                // the next planner sample. Allow normal Skeleton bow combat
+                // to resume before another optional sidestep.
+                state.updateRangedSpacing(possible, gameTick);
             } else {
-                state.updateRangedSpacing(false);
+                state.updateRangedSpacing(false, gameTick);
             }
 
             state.updateLocalPlan(

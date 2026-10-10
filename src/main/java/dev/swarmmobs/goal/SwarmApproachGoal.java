@@ -20,6 +20,7 @@ import dev.swarmmobs.algorithm.SwarmNavigationRecoveryPolicy;
 import dev.swarmmobs.algorithm.SwarmRecoveryCandidatePolicy;
 import dev.swarmmobs.algorithm.SwarmRangedHandoffPolicy;
 import dev.swarmmobs.algorithm.SwarmZombieFlankHandoffPolicy;
+import dev.swarmmobs.algorithm.SwarmCrowdWaypointWorldPolicy;
 import dev.swarmmobs.algorithm.SwarmCreeperHandoffPolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleAvoidancePolicy;
 import dev.swarmmobs.algorithm.SwarmObstacleHoldPolicy;
@@ -118,6 +119,10 @@ public final class SwarmApproachGoal extends Goal {
 
         SwarmAgentProfile profile = SwarmAgentProfiles.profile(mob);
         if (profile.archetype() == SwarmAgentArchetype.RANGED_SUPPORT) {
+            if (state.rangedSpacingActive()
+                    && mob.level() instanceof ServerLevel gameLevel) {
+                state.expireRangedSpacing(gameLevel.getGameTime());
+            }
             if (state.rangedSpacingActive()) {
                 return mob.distanceToSqr(state.destinationX(), mob.getY(),
                         state.destinationZ()) > 0.75 * 0.75;
@@ -166,9 +171,16 @@ public final class SwarmApproachGoal extends Goal {
                             mob.distanceToSqr(target),
                             mob.distanceToSqr(state.destinationX(), mob.getY(),
                                     state.destinationZ()),
-                            release)) {
+                            release)
+                        && mob.level() instanceof ServerLevel gameLevel
+                        && SwarmCrowdWaypointWorldPolicy.locallyTraversable(
+                                gameLevel, mob.getY(),
+                                new Vec2(state.destinationX(), state.destinationZ()))
+                        && state.allowShortZombieFlank(gameLevel.getGameTime())) {
                     return true;
                 }
+                // Failed / expired optional flank never blocks vanilla melee.
+                state.clearShortZombieFlank();
                 return mob.distanceToSqr(target) > release * release;
             }
         }
