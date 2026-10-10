@@ -183,6 +183,44 @@ public final class SwarmControlNetwork {
         }
 
         switch (action) {
+            case "playtest_enable", "playtest_disable" -> {
+                boolean enabled = action.equals("playtest_enable");
+                SwarmConfig.ENABLED.set(true);
+                SwarmConfig.COMMUNICATION_ENABLED.set(true);
+                SwarmConfig.DIVISION_OF_LABOR_ENABLED.set(true);
+                SwarmConfig.TARGET_PREDICTION_ENABLED.set(true);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(true);
+                SwarmConfig.NAV_OBSTACLE_AVOIDANCE_ENABLED.set(true);
+                SwarmConfig.NAV_WALKABILITY_ENABLED.set(true);
+                SwarmConfig.NAV_PATH_EVIDENCE_ENABLED.set(true);
+                SwarmConfig.ZOMBIE_ENGINEERING_ENABLED.set(true);
+                SwarmConfig.ZOMBIE_ENGINEERING_PATH_EVIDENCE_ENABLED.set(true);
+                SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(enabled);
+                SwarmConfig.NEST_LIFECYCLE_ENABLED.set(enabled);
+                SwarmConfig.NEST_HAULING_ENABLED.set(enabled);
+                SwarmConfig.NEST_BERRY_FORAGING_ENABLED.set(enabled);
+                SwarmConfig.NEST_BLOCK_GATHER_ENABLED.set(enabled);
+                SwarmConfig.NEST_CROP_REPLANT_ENABLED.set(enabled);
+                SwarmConfig.NEST_ANIMAL_HUNT_ENABLED.set(enabled);
+                SwarmConfig.NEST_VISIBLE_EXPANSION_ENABLED.set(enabled);
+                SwarmConfig.NEST_ADAPTIVE_STOCK_ENABLED.set(true);
+                SwarmConfig.NEST_ADAPTIVE_RECRUITMENT.set(true);
+                SwarmConfig.NEST_PHEROMONES_ENABLED.set(true);
+                SwarmConfig.NEST_PHEROMONE_EXPLORATION_ENABLED.set(true);
+                if (enabled) {
+                    SwarmConfig.NEST_BUILD_INTERVAL_TICKS.set(100);
+                    SwarmConfig.NEST_GATHER_INTERVAL.set(60);
+                    SwarmConfig.NEST_HAUL_ATTEMPT_INTERVAL.set(40);
+                    SwarmConfig.NEST_BERRY_FORAGE_INTERVAL.set(120);
+                    SwarmConfig.NEST_HAUL_MAX_STACK.set(64);
+                    player.serverLevel().getGameRules().getRule(
+                            net.minecraft.world.level.GameRules.RULE_MOBGRIEFING)
+                            .set(true, player.getServer());
+                    player.serverLevel().getGameRules().getRule(
+                            net.minecraft.world.level.GameRules.RULE_DOMOBSPAWNING)
+                            .set(true, player.getServer());
+                }
+            }
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
             case "support_position_toggle" -> SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(
                     !SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get());
