@@ -11,6 +11,7 @@ import dev.swarmmobs.algorithm.SwarmCongestionPolicy;
 import dev.swarmmobs.algorithm.SwarmPathBudgetRegistry;
 import dev.swarmmobs.algorithm.SwarmPathProbePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationCommandPolicy;
+import dev.swarmmobs.algorithm.SwarmNavigationAcceptancePolicy;
 import dev.swarmmobs.algorithm.SwarmNavigationEpisodePolicy;
 import dev.swarmmobs.algorithm.SwarmOptionalWaypointProgressPolicy;
 import dev.swarmmobs.algorithm.SwarmOptionalGameWaypointCommitmentPolicy;
@@ -81,6 +82,13 @@ public final class SwarmApproachGoal extends Goal {
     private double lastCommandY;
     private double lastCommandZ;
     private double lastCommandSpeed;
+    // Navigation.moveTo can reject a proposed command. An attempted route is
+    // never progress evidence; remember the last rejected destination
+    // across Goal stop/start to avoid per-tick pathfinding thrash.
+    private long lastRejectedTick = Long.MIN_VALUE;
+    private double lastRejectedX;
+    private double lastRejectedY;
+    private double lastRejectedZ;
     private boolean obstacleDetourActive;
     private double obstacleDetourX;
     private double obstacleDetourZ;
@@ -285,6 +293,7 @@ public final class SwarmApproachGoal extends Goal {
         obstacleDetourUntilTick = Long.MIN_VALUE;
         commandIssued = false;
         lastCommandTick = Long.MIN_VALUE;
+        lastRejectedTick = Long.MIN_VALUE;
         mob.getNavigation().stop();
         if (mob.level() instanceof ServerLevel level) {
             SwarmPathBudgetRegistry.cancel(level, mob);
@@ -491,8 +500,15 @@ public final class SwarmApproachGoal extends Goal {
                 false
         );
 
+        long now = mob.level().getGameTime();
+        if (!SwarmNavigationAcceptancePolicy.mayRetry(
+                now, lastRejectedTick,
+                lastRejectedX, lastRejectedY, lastRejectedZ,
+                navigationX, targetY, navigationZ)) {
+            return;
+        }
+
         if (mob.level() instanceof ServerLevel level) {
-            long now = level.getGameTime();
             SwarmNavigationCommandPolicy.Decision decision =
                     SwarmNavigationCommandPolicy.evaluate(
                             commandIssued,
@@ -512,22 +528,38 @@ public final class SwarmApproachGoal extends Goal {
             if (decision == SwarmNavigationCommandPolicy.Decision.SKIP) {
                 return;
             }
-            lastCommandTick = now;
         }
 
-        // Only meaningful changes and bounded retries create a new path.
-        // Active combat goals still retain their original MOVE handoff.
+        // PathNavigation may reject a locally walkable endpoint if there is
+        // no complete game path. Only a successful moveTo is an ISSUED
+        // command and valid evidence for the movement progress watchdog.
+        boolean accepted = mob.getNavigation().moveTo(
+                navigationX, targetY, navigationZ, speed);
+        if (!accepted) {
+            commandIssued = false;
+            lastRejectedTick = now;
+            lastRejectedX = navigationX;
+            lastRejectedY = targetY;
+            lastRejectedZ = navigationZ;
+            state.recordNavigationCommandRejection();
+            if (state.rangedSpacingActive()) {
+                state.failRangedSpacingForRejectedPath(now);
+            } else if (mob instanceof Zombie && state.shortZombieFlankActive()) {
+                state.failShortZombieFlankForRejectedPath(now);
+            }
+            mob.getNavigation().stop();
+            state.clearNavigationTelemetry();
+            resetProgressSample();
+            resetOptionalProgressSample();
+            return;
+        }
+        lastRejectedTick = Long.MIN_VALUE;
         commandIssued = true;
+        lastCommandTick = now;
         lastCommandX = navigationX;
         lastCommandY = targetY;
         lastCommandZ = navigationZ;
         lastCommandSpeed = speed;
-        mob.getNavigation().moveTo(
-                navigationX,
-                targetY,
-                navigationZ,
-                speed
-        );
     }
 
     private SwarmObstacleAvoidancePolicy.Avoidance localObstacleAvoidance(
