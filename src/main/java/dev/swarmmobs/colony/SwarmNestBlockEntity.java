@@ -124,13 +124,18 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     }
 
     public void reinforcePheromone(BlockPos at, SwarmNestColonyPolicy.Kind kind, long tick) {
+        reinforcePheromone(at,kind,tick,1.0);
+    }
+
+    public void reinforcePheromone(BlockPos at, SwarmNestColonyPolicy.Kind kind,
+                                   long tick, double depositionMultiplier) {
         if (at == null || !(level instanceof ServerLevel server)
                 || !server.hasChunkAt(at)) return;
         pheromoneField.reinforce(
                 new SwarmNestPheromoneField.Position(
                         worldPosition.getX(),worldPosition.getY(),worldPosition.getZ()),
                 new SwarmNestPheromoneField.Position(at.getX(),at.getY(),at.getZ()),
-                kind,tick);
+                kind,tick,depositionMultiplier);
     }
 
     public void inhibitPheromone(BlockPos at, SwarmNestColonyPolicy.Kind kind, long tick) {
