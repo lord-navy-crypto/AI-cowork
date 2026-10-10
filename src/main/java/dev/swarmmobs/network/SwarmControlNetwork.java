@@ -94,6 +94,8 @@ public final class SwarmControlNetwork {
 
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
+            case "tactical_rounds_toggle" -> SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(
+                    !SwarmConfig.TACTICAL_ROUNDS_ENABLED.get());
 
             case "ai_toggle" -> {
                 boolean next = !SwarmConfig.EXTERNAL_AI_ENABLED.get();
@@ -144,6 +146,7 @@ public final class SwarmControlNetwork {
             case "coord_baseline" -> {
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
+                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(false);
             }
 
             case "toggle_division" ->
@@ -493,6 +496,7 @@ public final class SwarmControlNetwork {
             }
 
             case "baseline_all" -> {
+                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(false);
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
                 SwarmConfig.NEST_HAULING_ENABLED.set(false);
@@ -837,6 +841,7 @@ public final class SwarmControlNetwork {
                 pair("metricAvgReacquisitionTicks", metrics.averageReacquisitionTicks()),
                 pair("metricRecoveryFailureRate", metrics.recoveryFailureRate()),
                 pair("metricObservedCommDropRate", metrics.communicationDropRate()),
+                pair("tacticalRoundsEnabled", SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()),
                 pair("formationHysteresis", SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()),
                 pair("roleHysteresis", SwarmConfig.ROLE_HYSTERESIS_TICKS.get()),
 
