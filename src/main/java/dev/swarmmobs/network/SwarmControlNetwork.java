@@ -94,8 +94,8 @@ public final class SwarmControlNetwork {
 
         switch (action) {
             case "toggle_master" -> SwarmConfig.ENABLED.set(!SwarmConfig.ENABLED.get());
-            case "tactical_rounds_toggle" -> SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(
-                    !SwarmConfig.TACTICAL_ROUNDS_ENABLED.get());
+            case "support_position_toggle" -> SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(
+                    !SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get());
 
             case "ai_toggle" -> {
                 boolean next = !SwarmConfig.EXTERNAL_AI_ENABLED.get();
@@ -146,7 +146,7 @@ public final class SwarmControlNetwork {
             case "coord_baseline" -> {
                 SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.set(20);
                 SwarmConfig.ROLE_HYSTERESIS_TICKS.set(12);
-                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(false);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(false);
             }
 
             case "toggle_division" ->
@@ -496,7 +496,7 @@ public final class SwarmControlNetwork {
             }
 
             case "baseline_all" -> {
-                SwarmConfig.TACTICAL_ROUNDS_ENABLED.set(false);
+                SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.set(false);
                 SwarmConfig.NEST_CONSTRUCTION_ENABLED.set(false);
                 SwarmConfig.NEST_LIFECYCLE_ENABLED.set(false);
                 SwarmConfig.NEST_HAULING_ENABLED.set(false);
@@ -617,8 +617,9 @@ public final class SwarmControlNetwork {
         int tacticalPeerLinks = 0;
         int agentsWithTacticalBreacher = 0;
         int workAgents = 0, alertAgents = 0, combatAgents = 0, recoveringAgents = 0;
-        int roundHoldAgents = 0, roundCoverAgents = 0, roundRotateAgents = 0;
-        long roundPhaseSwitches = 0;
+        int optimizedSupportAgents = 0;
+        long supportLaneSwitches = 0, supportFeasibleSamples = 0,
+                supportUnavailableSamples = 0;
         long nestsFoundedByLoadedAgents = 0L;
         EnumMap<SwarmTaskType, Integer> taskCounts = new EnumMap<>(SwarmTaskType.class);
         EnumMap<SwarmSpecialization, Integer> specializationCounts =
@@ -647,16 +648,14 @@ public final class SwarmControlNetwork {
             if (masterEnabled) {
                 SwarmAgentState tacticalState =
                         mob.getData(SwarmAttachments.AGENT_STATE.get());
-                if (SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()
+                if (SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()
                         && tacticalState.engagementMode()
                                 == dev.swarmmobs.algorithm.SwarmEngagementPolicy.Mode.COMBAT
                         && tacticalState.tacticalPeerCount() > 0) {
-                    switch (tacticalState.tacticalRoundPhase()) {
-                        case HOLD -> roundHoldAgents++;
-                        case COVER -> roundCoverAgents++;
-                        case ROTATE -> roundRotateAgents++;
-                    }
-                    roundPhaseSwitches += tacticalState.tacticalRoundSwitchCount();
+                    if (tacticalState.supportPositionSide() != 0) optimizedSupportAgents++;
+                    supportLaneSwitches += tacticalState.supportPositionSwitches();
+                    supportFeasibleSamples += tacticalState.supportPositionFeasibleSamples();
+                    supportUnavailableSamples += tacticalState.supportPositionUnavailableSamples();
                 }
                 switch (tacticalState.engagementMode()) {
                     case WORK -> workAgents++;
@@ -705,10 +704,10 @@ public final class SwarmControlNetwork {
                 pair("aiLastError", ai.lastError()),
                 pair("master", masterEnabled),
                 pair("liveAgents", zombies + skeletons + spiders + creepers),
-                pair("roundHoldAgents", roundHoldAgents),
-                pair("roundCoverAgents", roundCoverAgents),
-                pair("roundRotateAgents", roundRotateAgents),
-                pair("roundPhaseSwitches", Math.min(Integer.MAX_VALUE,roundPhaseSwitches)),
+                pair("optimizedSupportAgents", optimizedSupportAgents),
+                pair("supportLaneSwitches", Math.min(Integer.MAX_VALUE,supportLaneSwitches)),
+                pair("supportFeasibleSamples", Math.min(Integer.MAX_VALUE,supportFeasibleSamples)),
+                pair("supportUnavailableSamples", Math.min(Integer.MAX_VALUE,supportUnavailableSamples)),
                 pair("modeWorkAgents", workAgents),
                 pair("modeAlertAgents", alertAgents),
                 pair("modeCombatAgents", combatAgents),
@@ -869,7 +868,8 @@ public final class SwarmControlNetwork {
                 pair("metricAvgReacquisitionTicks", metrics.averageReacquisitionTicks()),
                 pair("metricRecoveryFailureRate", metrics.recoveryFailureRate()),
                 pair("metricObservedCommDropRate", metrics.communicationDropRate()),
-                pair("tacticalRoundsEnabled", SwarmConfig.TACTICAL_ROUNDS_ENABLED.get()),
+                pair("supportPositionOptimizationEnabled",
+                        SwarmConfig.SUPPORT_POSITION_OPTIMIZATION_ENABLED.get()),
                 pair("formationHysteresis", SwarmConfig.FORMATION_SLOT_HYSTERESIS_TICKS.get()),
                 pair("roleHysteresis", SwarmConfig.ROLE_HYSTERESIS_TICKS.get()),
 
