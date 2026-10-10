@@ -80,6 +80,27 @@ public final class SwarmNestBlockEntity extends BlockEntity {
     public int resources() { return resources; }
     public int chamberLevel() { return chamberLevel; }
     public int visibleChamberLevel() { return visibleChamberLevel; }
+    /**
+     * Protect only modules THIS nest has already constructed, not arbitrary
+     * player wood/dirt. Prevents the workforce mining its own paid-for shell.
+     */
+    public boolean ownsShellPiece(BlockPos at) {
+        if (at == null || visibleChamberLevel <= 0) return false;
+        int count = Math.min(visibleChamberLevel,
+                SwarmNestArchitecturePolicy.MAX_CHAMBER_LEVEL);
+        for (int chamber = 0; chamber < count; chamber++) {
+            for (int slot = 0; slot < 2; slot++) {
+                var p = SwarmNestVisibleShellPolicy.piece(chamber, slot);
+                if (worldPosition.getX() + p.x() == at.getX()
+                        && worldPosition.getY() + p.y() == at.getY()
+                        && worldPosition.getZ() + p.z() == at.getZ()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public int effectiveCapacity() {
         return SwarmNestArchitecturePolicy.effectiveCapacity(
                 chamberLevel, SwarmConfig.NEST_MAX_POPULATION.get());
