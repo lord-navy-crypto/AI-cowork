@@ -665,6 +665,7 @@ public final class SwarmCommands {
                         "Agent #" + nearest.getId()
                                 + " archetype=" + SwarmAgentProfiles.profile(nearest).archetype()
                                 + " role=" + state.role()
+                                + " tacticalPattern=" + state.tacticalPattern()
                                 + " pendingRole=" + (state.pendingRole() == null ? "none" : state.pendingRole())
                                 + " roleReassignments=" + state.roleReassignmentCount()
                                 + " mode=" + state.behaviorMode()
