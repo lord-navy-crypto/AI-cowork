@@ -277,6 +277,42 @@ class SwarmTacticalHandoffStateTest {
         assertEquals(0,state.zombieNoProgressFallbacks());
     }
 
+    @Test void SkeletonAvoidsTwoConsecutiveUnreachableGameLocations() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(40,1));
+        state.updateLocalPlan(0,0,SwarmRole.REAR_PRESSURE,0,6,0,0);
+        state.updateRangedSpacing(true,100);
+        assertTrue(state.expireRangedSpacing(130)); // first failure
+        state.updateLocalPlan(0,0,SwarmRole.REAR_PRESSURE,5,6,0,0);
+        state.updateRangedSpacing(true,180);
+        assertTrue(state.expireRangedSpacing(210)); // second failure
+        assertEquals(2,state.recentRangedFailureLocations(260));
+        assertFalse(state.canUseRangedWaypoint(0,6,260));
+        assertFalse(state.canUseRangedWaypoint(5,6,260));
+        assertTrue(state.canUseRangedWaypoint(10,6,260));
+        state.bindTacticalTarget(new UUID(40,2));
+        assertEquals(0,state.recentRangedFailureLocations(261));
+        assertTrue(state.canUseRangedWaypoint(0,6,261));
+    }
+
+    @Test void ZombieAvoidsTwoFailedFlankSquaresWhileNativeMeleeStillAvailable() {
+        SwarmAgentState state = new SwarmAgentState();
+        state.bindTacticalTarget(new UUID(41,1));
+        state.updateLocalPlan(0,0,SwarmRole.FLANK_LEFT,0,5,0,0);
+        assertTrue(state.allowShortZombieFlank(100));
+        assertFalse(state.allowShortZombieFlank(118));
+        state.updateLocalPlan(0,0,SwarmRole.FLANK_RIGHT,4,5,0,0);
+        assertTrue(state.allowShortZombieFlank(148));
+        assertFalse(state.allowShortZombieFlank(166));
+        assertEquals(2,state.recentZombieFailureLocations(196));
+        assertFalse(state.canUseZombieFlankWaypoint(0,5,196));
+        assertFalse(state.canUseZombieFlankWaypoint(4,5,196));
+        assertTrue(state.canUseZombieFlankWaypoint(8,5,196));
+        state.bindTacticalTarget(new UUID(41,2));
+        assertEquals(0,state.recentZombieFailureLocations(197));
+        assertTrue(state.canUseZombieFlankWaypoint(0,5,197));
+    }
+
     @Test void clearingTargetDoesNotLeavePhantomSquadState() {
         SwarmAgentState state = new SwarmAgentState();
         state.bindTacticalTarget(new UUID(1, 2));
