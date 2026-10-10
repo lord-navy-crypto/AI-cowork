@@ -61,4 +61,32 @@ class SwarmNestLaborEconomyPolicyTest {
         assertFalse(SwarmNestLaborEconomyPolicy.needs(
                 SwarmNestColonyPolicy.Kind.NONE,0,0,0,0,targets));
     }
+    @Test void demandLimitedIntakeLeavesSurplusPhysicalItemsInWorld() {
+        var target = SwarmNestLaborEconomyPolicy.targets(0,4,0,12);
+        // A 64-stack must not monopolize the finite 128-point store.
+        assertEquals(2,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                TIMBER,64,0,0,0,0,target));
+        assertEquals(8,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                SOIL,64,6,0,6,0,target));
+        assertEquals(6,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                FOOD,64,14,8,6,0,target));
+        assertEquals(0,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                TIMBER,64,6,0,6,0,target));
+        assertEquals(0,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                SwarmNestColonyPolicy.Kind.NONE,64,0,0,0,0,target));
+        // Never split an item into fractional resource points.
+        assertEquals(1,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                TIMBER,64,5,0,5,0,target));
+    }
+
+    @Test void finiteGlobalStoreAlwaysWinsOverCategoryDemand() {
+        var target = SwarmNestLaborEconomyPolicy.targets(0,4,0,12);
+        assertEquals(0,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                FOOD,64,126,0,0,0,target));
+        assertEquals(1,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                SOIL,64,127,0,0,0,target));
+        assertEquals(0,SwarmNestLaborEconomyPolicy.demandedItemLimit(
+                FOOD,64,128,0,0,0,target));
+    }
+
 }
